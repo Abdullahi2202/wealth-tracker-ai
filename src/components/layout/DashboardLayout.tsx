@@ -5,6 +5,15 @@ import DashboardHeader from "./DashboardHeader";
 import Sidebar from "./Sidebar";
 import MobileNavigation from "./MobileNavigation";
 
+// Define the type for window.Capacitor
+declare global {
+  interface Window {
+    Capacitor?: {
+      isNativePlatform: () => boolean;
+    }
+  }
+}
+
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
