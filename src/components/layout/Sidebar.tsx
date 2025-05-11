@@ -7,7 +7,8 @@ import {
   ArrowLeftRight, 
   MessageSquare,
   Settings, 
-  Home
+  Home,
+  Wallet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,11 @@ const Sidebar = () => {
       name: "Cards",
       icon: CreditCard,
       path: "/cards",
+    },
+    {
+      name: "Payments",
+      icon: Wallet,
+      path: "/payments",
     },
     {
       name: "Expenses",
