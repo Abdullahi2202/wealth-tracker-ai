@@ -13,6 +13,19 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     if (!user) {
       navigate("/");
     }
+    
+    // Add additional setup for mobile app if needed
+    const setupMobileApp = () => {
+      // Prevent bounce effect on iOS
+      document.body.style.overscrollBehavior = "none";
+      
+      // Add status bar class if in native app context
+      if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        document.body.classList.add("capacitor-app");
+      }
+    };
+    
+    setupMobileApp();
   }, [navigate]);
 
   return (
