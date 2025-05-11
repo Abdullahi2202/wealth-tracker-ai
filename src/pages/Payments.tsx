@@ -6,32 +6,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { CreditCard, ArrowRight, ArrowDown } from "lucide-react";
+import { CreditCard, ArrowRight, Wallet, ArrowDown, Send, Receive } from "lucide-react";
 import { toast } from "sonner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface CardOption {
   id: string;
   cardNumber: string;
+  cardHolder: string;
+  expiryDate: string;
   bank: string;
   balance: number;
+  color?: string;
 }
 
 const sampleCards: CardOption[] = [
   {
     id: "card1",
     cardNumber: "4540 •••• •••• 1234",
+    cardHolder: "DEMO USER",
+    expiryDate: "12/26",
     bank: "National Bank",
     balance: 3250.75,
   },
   {
     id: "card2",
     cardNumber: "5412 •••• •••• 5678",
+    cardHolder: "DEMO USER",
+    expiryDate: "09/27",
     bank: "Metro Credit Union",
     balance: 1680.42,
+    color: "bg-gradient-to-r from-purple-500 to-indigo-600",
   },
 ];
 
@@ -45,13 +53,12 @@ const paymentFormSchema = z.object({
   note: z.string().optional(),
 });
 
-const requestFormSchema = z.object({
+const receiveFormSchema = z.object({
   amount: z.string().refine((val) => {
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Amount must be greater than 0"),
   cardId: z.string().min(1, "Please select a card"),
-  senderCard: z.string().min(16, "Card number must be 16 digits").max(19),
   note: z.string().optional(),
 });
 
@@ -68,12 +75,11 @@ const Payments = () => {
     },
   });
 
-  const requestForm = useForm<z.infer<typeof requestFormSchema>>({
-    resolver: zodResolver(requestFormSchema),
+  const receiveForm = useForm<z.infer<typeof receiveFormSchema>>({
+    resolver: zodResolver(receiveFormSchema),
     defaultValues: {
       amount: "",
       cardId: "",
-      senderCard: "",
       note: "",
     },
   });
@@ -90,9 +96,14 @@ const Payments = () => {
     }
   };
 
-  const onRequestPayment = (values: z.infer<typeof requestFormSchema>) => {
-    toast.success(`Payment request for $${parseFloat(values.amount).toFixed(2)} sent successfully!`);
-    console.log("Payment request details:", values);
+  const onReceivePayment = (values: z.infer<typeof receiveFormSchema>) => {
+    const selectedCard = cards.find(card => card.id === values.cardId);
+    const amount = parseFloat(values.amount);
+    
+    if (selectedCard) {
+      toast.success(`Created QR code to receive $${amount.toFixed(2)} on ${selectedCard.bank} card ending in ${selectedCard.cardNumber.slice(-4)}`);
+      console.log("Payment receive details:", values);
+    }
   };
 
   return (
@@ -100,13 +111,71 @@ const Payments = () => {
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Payments</h1>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          {cards.map((card) => (
+            <div key={card.id} className="flex flex-col h-full">
+              <Card
+                className={`credit-card h-48 group transform transition hover:-translate-y-1 hover:shadow-lg ${
+                  card.color || "bg-gradient-to-r from-blue-500 to-blue-700"
+                }`}
+              >
+                <CardContent className="p-6 flex flex-col h-full justify-between text-white">
+                  <div className="flex justify-between items-start">
+                    <div className="text-white/80 font-medium">{card.bank}</div>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="40"
+                      height="32"
+                      viewBox="0 0 40 32"
+                      className="opacity-80"
+                      fill="none"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        clipRule="evenodd"
+                        d="M25.5 11C26.3284 11 27 10.3284 27 9.5C27 8.67157 26.3284 8 25.5 8C24.6716 8 24 8.67157 24 9.5C24 10.3284 24.6716 11 25.5 11ZM31.5 8C30.6716 8 30 8.67157 30 9.5C30 10.3284 30.6716 11 31.5 11C32.3284 11 33 10.3284 33 9.5C33 8.67157 32.3284 8 31.5 8Z"
+                        fill="white"
+                      />
+                    </svg>
+                  </div>
+
+                  <div className="mt-4 text-lg tracking-widest font-mono">
+                    {card.cardNumber}
+                  </div>
+
+                  <div className="flex justify-between items-end mt-6">
+                    <div className="text-sm space-y-1">
+                      <div className="text-white/70 uppercase text-xs">
+                        Card Holder
+                      </div>
+                      <div>{card.cardHolder}</div>
+                    </div>
+                    <div className="text-sm space-y-1">
+                      <div className="text-white/70 uppercase text-xs">
+                        Expires
+                      </div>
+                      <div>{card.expiryDate}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <div className="mt-3">
+                <p className="text-sm text-muted-foreground">Available Balance</p>
+                <p className="font-semibold text-xl">
+                  ${card.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <Tabs defaultValue="send" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="send" className="flex gap-2 items-center">
-              <ArrowRight className="h-4 w-4" /> Send Payment
+              <Send className="h-4 w-4" /> Send Payment
             </TabsTrigger>
-            <TabsTrigger value="request" className="flex gap-2 items-center">
-              <ArrowDown className="h-4 w-4" /> Request Payment
+            <TabsTrigger value="receive" className="flex gap-2 items-center">
+              <Receive className="h-4 w-4" /> Receive Payment
             </TabsTrigger>
           </TabsList>
           
@@ -125,28 +194,29 @@ const Payments = () => {
                       control={paymentForm.control}
                       name="cardId"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="space-y-3">
                           <FormLabel>From</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a card" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
+                          <FormControl>
+                            <RadioGroup
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              className="grid grid-cols-1 gap-4"
+                            >
                               {cards.map((card) => (
-                                <SelectItem key={card.id} value={card.id} className="flex items-center">
-                                  <div className="flex items-center gap-2">
-                                    <CreditCard className="h-4 w-4" />
-                                    <span>{card.bank} {card.cardNumber} (${card.balance.toFixed(2)})</span>
-                                  </div>
-                                </SelectItem>
+                                <div key={card.id} className="flex items-center space-x-2">
+                                  <RadioGroupItem value={card.id} id={card.id} />
+                                  <label
+                                    htmlFor={card.id}
+                                    className="flex items-center space-x-2 cursor-pointer w-full"
+                                  >
+                                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                    <span className="flex-1">{card.bank} {card.cardNumber} </span>
+                                    <span className="font-medium">${card.balance.toFixed(2)}</span>
+                                  </label>
+                                </div>
                               ))}
-                            </SelectContent>
-                          </Select>
+                            </RadioGroup>
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -204,56 +274,42 @@ const Payments = () => {
             </Card>
           </TabsContent>
           
-          <TabsContent value="request">
+          <TabsContent value="receive">
             <Card>
               <CardHeader>
-                <CardTitle>Request Money</CardTitle>
+                <CardTitle>Receive Money</CardTitle>
                 <CardDescription>
-                  Request a payment from someone to your card
+                  Generate payment link or QR code to receive money
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Form {...requestForm}>
-                  <form onSubmit={requestForm.handleSubmit(onRequestPayment)} className="space-y-4">
+                <Form {...receiveForm}>
+                  <form onSubmit={receiveForm.handleSubmit(onReceivePayment)} className="space-y-4">
                     <FormField
-                      control={requestForm.control}
+                      control={receiveForm.control}
                       name="cardId"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="space-y-3">
                           <FormLabel>Receive to</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a card" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {cards.map((card) => (
-                                <SelectItem key={card.id} value={card.id}>
-                                  <div className="flex items-center gap-2">
-                                    <CreditCard className="h-4 w-4" />
-                                    <span>{card.bank} {card.cardNumber}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={requestForm.control}
-                      name="senderCard"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Request from (Card Number)</FormLabel>
                           <FormControl>
-                            <Input placeholder="Card number" {...field} />
+                            <RadioGroup
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              className="grid grid-cols-1 gap-4"
+                            >
+                              {cards.map((card) => (
+                                <div key={card.id} className="flex items-center space-x-2">
+                                  <RadioGroupItem value={card.id} id={`receive-${card.id}`} />
+                                  <label
+                                    htmlFor={`receive-${card.id}`}
+                                    className="flex items-center space-x-2 cursor-pointer w-full"
+                                  >
+                                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                    <span>{card.bank} {card.cardNumber}</span>
+                                  </label>
+                                </div>
+                              ))}
+                            </RadioGroup>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -261,7 +317,7 @@ const Payments = () => {
                     />
 
                     <FormField
-                      control={requestForm.control}
+                      control={receiveForm.control}
                       name="amount"
                       render={({ field }) => (
                         <FormItem>
@@ -278,7 +334,7 @@ const Payments = () => {
                     />
 
                     <FormField
-                      control={requestForm.control}
+                      control={receiveForm.control}
                       name="note"
                       render={({ field }) => (
                         <FormItem>
@@ -291,7 +347,7 @@ const Payments = () => {
                       )}
                     />
 
-                    <Button type="submit" className="w-full">Request Payment</Button>
+                    <Button type="submit" className="w-full">Generate QR Code</Button>
                   </form>
                 </Form>
               </CardContent>
