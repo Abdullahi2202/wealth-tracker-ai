@@ -12,6 +12,8 @@ import * as z from "zod";
 import { CreditCard, ArrowRight, Wallet, ArrowDown, Send, Download } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import PaymentGateway from "@/components/payments/PaymentGateway";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 interface CardOption {
   id: string;
@@ -51,6 +53,7 @@ const paymentFormSchema = z.object({
   cardId: z.string().min(1, "Please select a card"),
   recipientCard: z.string().min(16, "Card number must be 16 digits").max(19),
   note: z.string().optional(),
+  gateway: z.string().min(1, "Please select a payment method"),
 });
 
 const receiveFormSchema = z.object({
@@ -64,6 +67,8 @@ const receiveFormSchema = z.object({
 
 const Payments = () => {
   const [cards] = useState<CardOption[]>(sampleCards);
+  const [selectedPaymentGateway, setSelectedPaymentGateway] = useState("card");
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const paymentForm = useForm<z.infer<typeof paymentFormSchema>>({
     resolver: zodResolver(paymentFormSchema),
@@ -72,6 +77,7 @@ const Payments = () => {
       cardId: "",
       recipientCard: "",
       note: "",
+      gateway: "card",
     },
   });
 
@@ -89,8 +95,14 @@ const Payments = () => {
     const amount = parseFloat(values.amount);
     
     if (selectedCard && selectedCard.balance >= amount) {
-      toast.success(`$${amount.toFixed(2)} payment sent successfully!`);
-      console.log("Payment details:", values);
+      setIsProcessing(true);
+      // Simulate payment processing
+      setTimeout(() => {
+        setIsProcessing(false);
+        toast.success(`$${amount.toFixed(2)} payment sent successfully via ${values.gateway} gateway!`);
+        console.log("Payment details:", values);
+        paymentForm.reset();
+      }, 1500);
     } else {
       toast.error("Insufficient funds for this payment.");
     }
@@ -104,6 +116,12 @@ const Payments = () => {
       toast.success(`Created QR code to receive $${amount.toFixed(2)} on ${selectedCard.bank} card ending in ${selectedCard.cardNumber.slice(-4)}`);
       console.log("Payment receive details:", values);
     }
+  };
+  
+  // Update form when gateway changes
+  const handleGatewayChange = (gateway: string) => {
+    setSelectedPaymentGateway(gateway);
+    paymentForm.setValue("gateway", gateway);
   };
 
   return (
@@ -252,6 +270,11 @@ const Payments = () => {
                         </FormItem>
                       )}
                     />
+                    
+                    <PaymentGateway
+                      selectedGateway={selectedPaymentGateway}
+                      onGatewayChange={handleGatewayChange}
+                    />
 
                     <FormField
                       control={paymentForm.control}
@@ -267,7 +290,13 @@ const Payments = () => {
                       )}
                     />
 
-                    <Button type="submit" className="w-full">Send Payment</Button>
+                    <Button 
+                      type="submit" 
+                      className="w-full"
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? "Processing..." : "Send Payment"}
+                    </Button>
                   </form>
                 </Form>
               </CardContent>
@@ -279,7 +308,7 @@ const Payments = () => {
               <CardHeader>
                 <CardTitle>Receive Money</CardTitle>
                 <CardDescription>
-                  Generate payment link or QR code to receive money
+                  Generate payment QR code to receive money
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -346,6 +375,31 @@ const Payments = () => {
                         </FormItem>
                       )}
                     />
+
+                    <div className="border border-border rounded-md p-4 bg-muted/30 mt-4">
+                      <div className="text-center pb-4">
+                        <p className="text-muted-foreground mb-2">Sample QR Code for payment</p>
+                      </div>
+                      <div className="mx-auto max-w-[200px]">
+                        <AspectRatio ratio={1 / 1} className="bg-white rounded-md overflow-hidden">
+                          <svg
+                            viewBox="0 0 100 100"
+                            className="h-full w-full"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path d="M0,0 L33,0 L33,33 L0,33 L0,0" fill="none" stroke="black" strokeWidth="3" />
+                            <path d="M7,7 L26,7 L26,26 L7,26 L7,7" fill="none" stroke="black" strokeWidth="3" />
+                            <path d="M67,0 L100,0 L100,33 L67,33 L67,0" fill="none" stroke="black" strokeWidth="3" />
+                            <path d="M74,7 L93,7 L93,26 L74,26 L74,7" fill="none" stroke="black" strokeWidth="3" />
+                            <path d="M0,67 L33,67 L33,100 L0,100 L0,67" fill="none" stroke="black" strokeWidth="3" />
+                            <path d="M7,74 L26,74 L26,93 L7,93 L7,74" fill="none" stroke="black" strokeWidth="3" />
+                            <path d="M42,0 L58,0 L58,100 L42,100" fill="none" stroke="black" strokeWidth="3" />
+                            <path d="M67,42 L100,42 L100,58 L67,58" fill="none" stroke="black" strokeWidth="3" />
+                            <path d="M67,67 L83,67 L83,100 L67,100" fill="none" stroke="black" strokeWidth="3" />
+                          </svg>
+                        </AspectRatio>
+                      </div>
+                    </div>
 
                     <Button type="submit" className="w-full">Generate QR Code</Button>
                   </form>
