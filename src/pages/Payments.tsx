@@ -1,4 +1,3 @@
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +12,7 @@ import { CreditCard, ArrowRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PaymentGateway from "@/components/payments/PaymentGateway";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
+import ReceivedPayments from "@/components/payments/ReceivedPayments";
 
 interface CardOption {
   id: string;
@@ -64,6 +63,8 @@ const Payments = () => {
   const [cards] = useState<CardOption[]>(sampleCards);
   const [selectedPaymentGateway, setSelectedPaymentGateway] = useState("card");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showReceivedPayments, setShowReceivedPayments] = useState(false);
+  const [selectedCardForPayments, setSelectedCardForPayments] = useState("");
   
   const paymentForm = useForm<z.infer<typeof paymentFormSchema>>({
     resolver: zodResolver(paymentFormSchema),
@@ -105,7 +106,8 @@ const Payments = () => {
     const selectedCard = cards.find(card => card.id === values.cardId);
     
     if (selectedCard) {
-      toast.success(`Viewing payments received on ${selectedCard.bank} card ending in ${selectedCard.cardNumber.slice(-4)}`);
+      setSelectedCardForPayments(values.cardId);
+      setShowReceivedPayments(true);
     }
   };
   
@@ -113,6 +115,11 @@ const Payments = () => {
   const handleGatewayChange = (gateway: string) => {
     setSelectedPaymentGateway(gateway);
     paymentForm.setValue("gateway", gateway);
+  };
+
+  const handleBackFromReceivedPayments = () => {
+    setShowReceivedPayments(false);
+    setSelectedCardForPayments("");
   };
 
   return (
@@ -178,178 +185,178 @@ const Payments = () => {
           ))}
         </div>
 
-        <Tabs defaultValue="send" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="send" className="flex gap-2 items-center">
-              <CreditCard className="h-4 w-4" /> Send Payment
-            </TabsTrigger>
-            <TabsTrigger value="receive" className="flex gap-2 items-center">
-              <Download className="h-4 w-4" /> Received Payments
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="send">
-            <Card>
-              <CardHeader>
-                <CardTitle>Send Money</CardTitle>
-                <CardDescription>
-                  Transfer money to another card
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...paymentForm}>
-                  <form onSubmit={paymentForm.handleSubmit(onSendPayment)} className="space-y-4">
-                    <FormField
-                      control={paymentForm.control}
-                      name="cardId"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>From</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="grid grid-cols-1 gap-4"
-                            >
-                              {cards.map((card) => (
-                                <div key={card.id} className="flex items-center space-x-2">
-                                  <RadioGroupItem value={card.id} id={card.id} />
-                                  <label
-                                    htmlFor={card.id}
-                                    className="flex items-center space-x-2 cursor-pointer w-full"
-                                  >
-                                    <CreditCard className="h-4 w-4 text-muted-foreground" />
-                                    <span className="flex-1">{card.bank} {card.cardNumber} </span>
-                                    <span className="font-medium">${card.balance.toFixed(2)}</span>
-                                  </label>
-                                </div>
-                              ))}
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+        {showReceivedPayments ? (
+          <ReceivedPayments 
+            cardId={selectedCardForPayments} 
+            onBack={handleBackFromReceivedPayments} 
+          />
+        ) : (
+          <Tabs defaultValue="send" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="send" className="flex gap-2 items-center">
+                <CreditCard className="h-4 w-4" /> Send Payment
+              </TabsTrigger>
+              <TabsTrigger value="receive" className="flex gap-2 items-center">
+                <Download className="h-4 w-4" /> Received Payments
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="send">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Send Money</CardTitle>
+                  <CardDescription>
+                    Transfer money to another card
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...paymentForm}>
+                    <form onSubmit={paymentForm.handleSubmit(onSendPayment)} className="space-y-4">
+                      <FormField
+                        control={paymentForm.control}
+                        name="cardId"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel>From</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                                className="grid grid-cols-1 gap-4"
+                              >
+                                {cards.map((card) => (
+                                  <div key={card.id} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={card.id} id={card.id} />
+                                    <label
+                                      htmlFor={card.id}
+                                      className="flex items-center space-x-2 cursor-pointer w-full"
+                                    >
+                                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                      <span className="flex-1">{card.bank} {card.cardNumber} </span>
+                                      <span className="font-medium">${card.balance.toFixed(2)}</span>
+                                    </label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={paymentForm.control}
-                      name="recipientCard"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>To</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Card number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={paymentForm.control}
+                        name="recipientCard"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>To</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Card number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={paymentForm.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Amount</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-2.5">$</span>
-                              <Input className="pl-7" placeholder="0.00" {...field} />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={paymentForm.control}
+                        name="amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Amount</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5">$</span>
+                                <Input className="pl-7" placeholder="0.00" {...field} />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     
-                    <PaymentGateway
-                      selectedGateway={selectedPaymentGateway}
-                      onGatewayChange={handleGatewayChange}
-                    />
+                      <PaymentGateway
+                        selectedGateway={selectedPaymentGateway}
+                        onGatewayChange={handleGatewayChange}
+                      />
 
-                    <FormField
-                      control={paymentForm.control}
-                      name="note"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Note (optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Add a note" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={paymentForm.control}
+                        name="note"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Note (optional)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Add a note" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <Button 
-                      type="submit" 
-                      className="w-full"
-                      disabled={isProcessing}
-                    >
-                      {isProcessing ? "Processing..." : "Send Payment"}
-                    </Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="receive">
-            <Card>
-              <CardHeader>
-                <CardTitle>Received Payments</CardTitle>
-                <CardDescription>
-                  View payments received on your cards
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...receiveForm}>
-                  <form onSubmit={receiveForm.handleSubmit(viewReceivePayments)} className="space-y-4">
-                    <FormField
-                      control={receiveForm.control}
-                      name="cardId"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Select Card</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="grid grid-cols-1 gap-4"
-                            >
-                              {cards.map((card) => (
-                                <div key={card.id} className="flex items-center space-x-2">
-                                  <RadioGroupItem value={card.id} id={`receive-${card.id}`} />
-                                  <label
-                                    htmlFor={`receive-${card.id}`}
-                                    className="flex items-center space-x-2 cursor-pointer w-full"
-                                  >
-                                    <CreditCard className="h-4 w-4 text-muted-foreground" />
-                                    <span>{card.bank} {card.cardNumber}</span>
-                                  </label>
-                                </div>
-                              ))}
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <Button 
+                        type="submit" 
+                        className="w-full"
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? "Processing..." : "Send Payment"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="receive">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Received Payments</CardTitle>
+                  <CardDescription>
+                    View payments received on your cards
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...receiveForm}>
+                    <form onSubmit={receiveForm.handleSubmit(viewReceivePayments)} className="space-y-4">
+                      <FormField
+                        control={receiveForm.control}
+                        name="cardId"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel>Select Card</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                                className="grid grid-cols-1 gap-4"
+                              >
+                                {cards.map((card) => (
+                                  <div key={card.id} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={card.id} id={`receive-${card.id}`} />
+                                    <label
+                                      htmlFor={`receive-${card.id}`}
+                                      className="flex items-center space-x-2 cursor-pointer w-full"
+                                    >
+                                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                      <span>{card.bank} {card.cardNumber}</span>
+                                    </label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <div className="border border-border rounded-md p-4 bg-muted/30 mt-4">
-                      <div className="text-center">
-                        <p className="text-muted-foreground mb-4">No payments received yet</p>
-                        <p className="text-sm text-muted-foreground">Select a card to view received payments</p>
-                      </div>
-                    </div>
-
-                    <Button type="submit" className="w-full">View Payments</Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                      <Button type="submit" className="w-full">View Payments</Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </DashboardLayout>
   );
