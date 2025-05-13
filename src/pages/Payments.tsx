@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { CreditCard, ArrowRight, Wallet, ArrowDown, Send, Receive } from "lucide-react";
+import { CreditCard, ArrowRight, Wallet, ArrowDown, Send, Download } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
@@ -175,7 +175,7 @@ const Payments = () => {
               <Send className="h-4 w-4" /> Send Payment
             </TabsTrigger>
             <TabsTrigger value="receive" className="flex gap-2 items-center">
-              <Receive className="h-4 w-4" /> Receive Payment
+              <Download className="h-4 w-4" /> Receive Payment
             </TabsTrigger>
           </TabsList>
           
