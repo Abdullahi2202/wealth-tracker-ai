@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { CreditCard, ArrowRight, Wallet, ArrowDown, Send, Download } from "lucide-react";
+import { CreditCard, ArrowRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PaymentGateway from "@/components/payments/PaymentGateway";
@@ -57,12 +57,7 @@ const paymentFormSchema = z.object({
 });
 
 const receiveFormSchema = z.object({
-  amount: z.string().refine((val) => {
-    const num = parseFloat(val);
-    return !isNaN(num) && num > 0;
-  }, "Amount must be greater than 0"),
   cardId: z.string().min(1, "Please select a card"),
-  note: z.string().optional(),
 });
 
 const Payments = () => {
@@ -84,9 +79,7 @@ const Payments = () => {
   const receiveForm = useForm<z.infer<typeof receiveFormSchema>>({
     resolver: zodResolver(receiveFormSchema),
     defaultValues: {
-      amount: "",
       cardId: "",
-      note: "",
     },
   });
 
@@ -99,7 +92,7 @@ const Payments = () => {
       // Simulate payment processing
       setTimeout(() => {
         setIsProcessing(false);
-        toast.success(`$${amount.toFixed(2)} payment sent successfully via ${values.gateway} gateway!`);
+        toast.success(`$${amount.toFixed(2)} payment sent successfully!`);
         console.log("Payment details:", values);
         paymentForm.reset();
       }, 1500);
@@ -108,13 +101,11 @@ const Payments = () => {
     }
   };
 
-  const onReceivePayment = (values: z.infer<typeof receiveFormSchema>) => {
+  const viewReceivePayments = (values: z.infer<typeof receiveFormSchema>) => {
     const selectedCard = cards.find(card => card.id === values.cardId);
-    const amount = parseFloat(values.amount);
     
     if (selectedCard) {
-      toast.success(`Created QR code to receive $${amount.toFixed(2)} on ${selectedCard.bank} card ending in ${selectedCard.cardNumber.slice(-4)}`);
-      console.log("Payment receive details:", values);
+      toast.success(`Viewing payments received on ${selectedCard.bank} card ending in ${selectedCard.cardNumber.slice(-4)}`);
     }
   };
   
@@ -190,10 +181,10 @@ const Payments = () => {
         <Tabs defaultValue="send" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="send" className="flex gap-2 items-center">
-              <Send className="h-4 w-4" /> Send Payment
+              <CreditCard className="h-4 w-4" /> Send Payment
             </TabsTrigger>
             <TabsTrigger value="receive" className="flex gap-2 items-center">
-              <Download className="h-4 w-4" /> Receive Payment
+              <Download className="h-4 w-4" /> Received Payments
             </TabsTrigger>
           </TabsList>
           
@@ -202,7 +193,7 @@ const Payments = () => {
               <CardHeader>
                 <CardTitle>Send Money</CardTitle>
                 <CardDescription>
-                  Transfer money to another card or bank account
+                  Transfer money to another card
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -306,20 +297,20 @@ const Payments = () => {
           <TabsContent value="receive">
             <Card>
               <CardHeader>
-                <CardTitle>Receive Money</CardTitle>
+                <CardTitle>Received Payments</CardTitle>
                 <CardDescription>
-                  Generate payment QR code to receive money
+                  View payments received on your cards
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...receiveForm}>
-                  <form onSubmit={receiveForm.handleSubmit(onReceivePayment)} className="space-y-4">
+                  <form onSubmit={receiveForm.handleSubmit(viewReceivePayments)} className="space-y-4">
                     <FormField
                       control={receiveForm.control}
                       name="cardId"
                       render={({ field }) => (
                         <FormItem className="space-y-3">
-                          <FormLabel>Receive to</FormLabel>
+                          <FormLabel>Select Card</FormLabel>
                           <FormControl>
                             <RadioGroup
                               onValueChange={field.onChange}
@@ -345,63 +336,14 @@ const Payments = () => {
                       )}
                     />
 
-                    <FormField
-                      control={receiveForm.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Amount</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-2.5">$</span>
-                              <Input className="pl-7" placeholder="0.00" {...field} />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={receiveForm.control}
-                      name="note"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Note (optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Add a note" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
                     <div className="border border-border rounded-md p-4 bg-muted/30 mt-4">
-                      <div className="text-center pb-4">
-                        <p className="text-muted-foreground mb-2">Sample QR Code for payment</p>
-                      </div>
-                      <div className="mx-auto max-w-[200px]">
-                        <AspectRatio ratio={1 / 1} className="bg-white rounded-md overflow-hidden">
-                          <svg
-                            viewBox="0 0 100 100"
-                            className="h-full w-full"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path d="M0,0 L33,0 L33,33 L0,33 L0,0" fill="none" stroke="black" strokeWidth="3" />
-                            <path d="M7,7 L26,7 L26,26 L7,26 L7,7" fill="none" stroke="black" strokeWidth="3" />
-                            <path d="M67,0 L100,0 L100,33 L67,33 L67,0" fill="none" stroke="black" strokeWidth="3" />
-                            <path d="M74,7 L93,7 L93,26 L74,26 L74,7" fill="none" stroke="black" strokeWidth="3" />
-                            <path d="M0,67 L33,67 L33,100 L0,100 L0,67" fill="none" stroke="black" strokeWidth="3" />
-                            <path d="M7,74 L26,74 L26,93 L7,93 L7,74" fill="none" stroke="black" strokeWidth="3" />
-                            <path d="M42,0 L58,0 L58,100 L42,100" fill="none" stroke="black" strokeWidth="3" />
-                            <path d="M67,42 L100,42 L100,58 L67,58" fill="none" stroke="black" strokeWidth="3" />
-                            <path d="M67,67 L83,67 L83,100 L67,100" fill="none" stroke="black" strokeWidth="3" />
-                          </svg>
-                        </AspectRatio>
+                      <div className="text-center">
+                        <p className="text-muted-foreground mb-4">No payments received yet</p>
+                        <p className="text-sm text-muted-foreground">Select a card to view received payments</p>
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full">Generate QR Code</Button>
+                    <Button type="submit" className="w-full">View Payments</Button>
                   </form>
                 </Form>
               </CardContent>

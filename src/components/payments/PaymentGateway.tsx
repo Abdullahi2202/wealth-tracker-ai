@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CreditCard, Smartphone, Globe } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface PaymentGatewayOption {
@@ -25,20 +25,6 @@ export const paymentGateways: PaymentGatewayOption[] = [
     icon: <CreditCard className="h-6 w-6" />,
     description: "Pay securely with your credit or debit card",
     bgColor: "bg-gradient-to-r from-blue-500 to-blue-600",
-  },
-  {
-    id: "mobile",
-    name: "Mobile Payment",
-    icon: <Smartphone className="h-6 w-6" />,
-    description: "Use your mobile wallet for quick payment",
-    bgColor: "bg-gradient-to-r from-green-500 to-green-600",
-  },
-  {
-    id: "online",
-    name: "Online Banking",
-    icon: <Globe className="h-6 w-6" />,
-    description: "Pay directly from your bank account",
-    bgColor: "bg-gradient-to-r from-purple-500 to-purple-600",
   }
 ];
 
@@ -48,7 +34,7 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
 }) => {
   return (
     <div className="mb-6">
-      <h3 className="text-lg font-medium mb-3">Choose Payment Method</h3>
+      <h3 className="text-lg font-medium mb-3">Payment Method</h3>
       <RadioGroup
         value={selectedGateway}
         onValueChange={onGatewayChange}
