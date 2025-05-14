@@ -9,7 +9,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Wallet, Building } from "lucide-react";
 
 interface PaymentData {
   id: string;
@@ -18,6 +18,7 @@ interface PaymentData {
   date: string;
   cardId: string;
   description: string;
+  sourceType: "bank" | "wallet"; // Updated to show realistic source types
 }
 
 // Sample data - in a real app, this would come from an API
@@ -28,7 +29,8 @@ const samplePayments: PaymentData[] = [
     amount: 250.00,
     date: "2025-05-10",
     cardId: "card1",
-    description: "Rent payment"
+    description: "Rent payment",
+    sourceType: "bank"
   },
   {
     id: "pay2",
@@ -36,7 +38,8 @@ const samplePayments: PaymentData[] = [
     amount: 125.50,
     date: "2025-05-08",
     cardId: "card1",
-    description: "Dinner share"
+    description: "Dinner share",
+    sourceType: "wallet"
   },
   {
     id: "pay3",
@@ -44,7 +47,8 @@ const samplePayments: PaymentData[] = [
     amount: 75.00,
     date: "2025-05-05",
     cardId: "card2",
-    description: "Movie tickets"
+    description: "Movie tickets",
+    sourceType: "bank"
   },
   {
     id: "pay4",
@@ -52,7 +56,26 @@ const samplePayments: PaymentData[] = [
     amount: 350.00,
     date: "2025-05-03",
     cardId: "card2",
-    description: "Trip expenses"
+    description: "Trip expenses",
+    sourceType: "wallet"
+  },
+  {
+    id: "pay5",
+    sender: "Kevin Clark",
+    amount: 180.00,
+    date: "2025-05-12",
+    cardId: "wallet",
+    description: "Groceries share",
+    sourceType: "bank"
+  },
+  {
+    id: "pay6",
+    sender: "Lisa Taylor",
+    amount: 75.25,
+    date: "2025-05-11",
+    cardId: "bank",
+    description: "Group dinner",
+    sourceType: "bank"
   }
 ];
 
@@ -87,6 +110,7 @@ const ReceivedPayments = ({ cardId, onBack }: ReceivedPaymentsProps) => {
               <TableHead>Date</TableHead>
               <TableHead>From</TableHead>
               <TableHead>Description</TableHead>
+              <TableHead>Source</TableHead>
               <TableHead className="text-right">Amount</TableHead>
             </TableRow>
           </TableHeader>
@@ -96,6 +120,21 @@ const ReceivedPayments = ({ cardId, onBack }: ReceivedPaymentsProps) => {
                 <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
                 <TableCell>{payment.sender}</TableCell>
                 <TableCell>{payment.description}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {payment.sourceType === "bank" ? (
+                      <>
+                        <Building className="h-4 w-4 text-blue-600" />
+                        <span>Bank Transfer</span>
+                      </>
+                    ) : (
+                      <>
+                        <Wallet className="h-4 w-4 text-green-600" />
+                        <span>Wallet</span>
+                      </>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="text-right font-medium">
                   ${payment.amount.toFixed(2)}
                 </TableCell>
@@ -105,7 +144,7 @@ const ReceivedPayments = ({ cardId, onBack }: ReceivedPaymentsProps) => {
         </Table>
       ) : (
         <div className="border border-border rounded-md p-8 bg-muted/30 text-center">
-          <p className="text-muted-foreground">No payments received for this card</p>
+          <p className="text-muted-foreground">No payments received for this account</p>
         </div>
       )}
     </div>

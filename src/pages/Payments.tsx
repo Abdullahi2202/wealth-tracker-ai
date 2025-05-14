@@ -1,3 +1,4 @@
+
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { CreditCard, ArrowRight, Download } from "lucide-react";
+import { CreditCard, ArrowRight, Download, Plus, ArrowDown, Wallet, Building } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -71,6 +72,16 @@ const receiveFormSchema = z.object({
   cardId: z.string().min(1, "Please select a card"),
 });
 
+const topUpFormSchema = z.object({
+  amount: z.string().refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num > 0;
+  }, "Amount must be greater than 0"),
+  destinationId: z.string().min(1, "Please select where to add funds"),
+  sourceType: z.enum(["bank", "debit"]),
+  sourceDetails: z.string().min(1, "Please enter source details"),
+});
+
 const Payments = () => {
   const [cards] = useState<CardOption[]>(sampleCards);
   const [selectedPaymentGateway, setSelectedPaymentGateway] = useState("credit");
@@ -79,6 +90,12 @@ const Payments = () => {
   const [selectedCardForPayments, setSelectedCardForPayments] = useState("");
   const [selectedUtilityType, setSelectedUtilityType] = useState("");
   const [isOtherUtility, setIsOtherUtility] = useState(false);
+  const [selectedTopUpSource, setSelectedTopUpSource] = useState<"bank" | "debit">("bank");
+  
+  // Search params handling for direct tab navigation
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabParam = urlParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam || 'send');
   
   const paymentForm = useForm<z.infer<typeof paymentFormSchema>>({
     resolver: zodResolver(paymentFormSchema),
@@ -96,6 +113,16 @@ const Payments = () => {
     resolver: zodResolver(receiveFormSchema),
     defaultValues: {
       cardId: "",
+    },
+  });
+
+  const topUpForm = useForm<z.infer<typeof topUpFormSchema>>({
+    resolver: zodResolver(topUpFormSchema),
+    defaultValues: {
+      amount: "",
+      destinationId: "",
+      sourceType: "bank",
+      sourceDetails: "",
     },
   });
 
@@ -125,6 +152,19 @@ const Payments = () => {
       setShowReceivedPayments(true);
     }
   };
+
+  const onTopUp = (values: z.infer<typeof topUpFormSchema>) => {
+    const amount = parseFloat(values.amount);
+    
+    setIsProcessing(true);
+    // Simulate top up processing
+    setTimeout(() => {
+      setIsProcessing(false);
+      toast.success(`$${amount.toFixed(2)} added to your account successfully!`);
+      console.log("Top up details:", values);
+      topUpForm.reset();
+    }, 1500);
+  };
   
   // Update form when gateway changes
   const handleGatewayChange = (gateway: string) => {
@@ -139,9 +179,19 @@ const Payments = () => {
     setIsOtherUtility(value === "other");
   };
 
+  // Handle top up source change
+  const handleTopUpSourceChange = (value: "bank" | "debit") => {
+    setSelectedTopUpSource(value);
+    topUpForm.setValue("sourceType", value);
+  };
+
   const handleBackFromReceivedPayments = () => {
     setShowReceivedPayments(false);
     setSelectedCardForPayments("");
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
   };
 
   return (
@@ -213,10 +263,13 @@ const Payments = () => {
             onBack={handleBackFromReceivedPayments} 
           />
         ) : (
-          <Tabs defaultValue="send" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
               <TabsTrigger value="send" className="flex gap-2 items-center">
                 <CreditCard className="h-4 w-4" /> Send Payment
+              </TabsTrigger>
+              <TabsTrigger value="topup" className="flex gap-2 items-center">
+                <Plus className="h-4 w-4" /> Top Up
               </TabsTrigger>
               <TabsTrigger value="receive" className="flex gap-2 items-center">
                 <Download className="h-4 w-4" /> Received Payments
@@ -359,15 +412,160 @@ const Payments = () => {
               </Card>
             </TabsContent>
             
+            <TabsContent value="topup">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Up</CardTitle>
+                  <CardDescription>
+                    Add funds to your wallet or cards
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...topUpForm}>
+                    <form onSubmit={topUpForm.handleSubmit(onTopUp)} className="space-y-4">
+                      <FormField
+                        control={topUpForm.control}
+                        name="destinationId"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel>Destination</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                                className="grid grid-cols-1 gap-4"
+                              >
+                                {cards.map((card) => (
+                                  <div key={card.id} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={card.id} id={`topup-${card.id}`} />
+                                    <label
+                                      htmlFor={`topup-${card.id}`}
+                                      className="flex items-center space-x-2 cursor-pointer w-full"
+                                    >
+                                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                      <span>{card.bank} {card.cardNumber}</span>
+                                    </label>
+                                  </div>
+                                ))}
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="wallet" id="topup-wallet" />
+                                  <label
+                                    htmlFor="topup-wallet"
+                                    className="flex items-center space-x-2 cursor-pointer w-full"
+                                  >
+                                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                                    <span>Wallet Balance</span>
+                                  </label>
+                                </div>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={topUpForm.control}
+                        name="amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Amount</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5">$</span>
+                                <Input className="pl-7" placeholder="0.00" {...field} />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={topUpForm.control}
+                        name="sourceType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Source</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={(value) => handleTopUpSourceChange(value as "bank" | "debit")}
+                                defaultValue={field.value}
+                                className="grid grid-cols-2 gap-4"
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="bank" id="source-bank" />
+                                  <label
+                                    htmlFor="source-bank"
+                                    className="flex items-center space-x-2 cursor-pointer"
+                                  >
+                                    <Building className="h-4 w-4 text-muted-foreground" />
+                                    <span>Bank Account</span>
+                                  </label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="debit" id="source-debit" />
+                                  <label
+                                    htmlFor="source-debit"
+                                    className="flex items-center space-x-2 cursor-pointer"
+                                  >
+                                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                    <span>Debit Card</span>
+                                  </label>
+                                </div>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={topUpForm.control}
+                        name="sourceDetails"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              {selectedTopUpSource === "bank" ? "Bank Account Number" : "Card Number"}
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder={selectedTopUpSource === "bank" ? "Enter account number" : "Enter card number"} 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button 
+                        type="submit" 
+                        className="w-full"
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? "Processing..." : "Top Up"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
             <TabsContent value="receive">
               <Card>
                 <CardHeader>
                   <CardTitle>Received Payments</CardTitle>
                   <CardDescription>
-                    View payments received on your cards
+                    View payments received in your wallet or from bank transfers
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Money can only be received into your wallet balance or directly from bank transfers. 
+                    Cards cannot directly receive payments.
+                  </p>
+                  
                   <Form {...receiveForm}>
                     <form onSubmit={receiveForm.handleSubmit(viewReceivePayments)} className="space-y-4">
                       <FormField
@@ -375,13 +573,33 @@ const Payments = () => {
                         name="cardId"
                         render={({ field }) => (
                           <FormItem className="space-y-3">
-                            <FormLabel>Select Card</FormLabel>
+                            <FormLabel>Select Account</FormLabel>
                             <FormControl>
                               <RadioGroup
                                 onValueChange={field.onChange}
                                 defaultValue={field.value}
                                 className="grid grid-cols-1 gap-4"
                               >
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="wallet" id="receive-wallet" />
+                                  <label
+                                    htmlFor="receive-wallet"
+                                    className="flex items-center space-x-2 cursor-pointer w-full"
+                                  >
+                                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                                    <span>Wallet Balance</span>
+                                  </label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="bank" id="receive-bank" />
+                                  <label
+                                    htmlFor="receive-bank"
+                                    className="flex items-center space-x-2 cursor-pointer w-full"
+                                  >
+                                    <Building className="h-4 w-4 text-muted-foreground" />
+                                    <span>Bank Transfers</span>
+                                  </label>
+                                </div>
                                 {cards.map((card) => (
                                   <div key={card.id} className="flex items-center space-x-2">
                                     <RadioGroupItem value={card.id} id={`receive-${card.id}`} />
