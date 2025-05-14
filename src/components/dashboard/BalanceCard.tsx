@@ -1,6 +1,9 @@
 
-import { CreditCard } from "lucide-react";
+import { CreditCard, Send, Wallet, ArrowUp, ArrowDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { useNavigate } from "react-router-dom";
 
 interface BalanceCardProps {
   totalBalance: number;
@@ -8,6 +11,8 @@ interface BalanceCardProps {
 }
 
 const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
+  const navigate = useNavigate();
+
   return (
     <Card className="wallet-card text-white h-full">
       <CardContent className="p-6">
@@ -28,7 +33,7 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
         </div>
         
         <div className="mt-4 pt-4 border-t border-white/20">
-          <div className="flex justify-between">
+          <div className="flex justify-between mb-4">
             <div>
               <p className="text-xs opacity-70">This Month's Income</p>
               <p className="text-lg font-medium">{currency}3,580.00</p>
@@ -37,6 +42,63 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
               <p className="text-xs opacity-70">This Month's Expenses</p>
               <p className="text-lg font-medium">{currency}2,149.25</p>
             </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Button
+                  onClick={() => navigate("/payments")}
+                  variant="outline"
+                  className="bg-white/10 border-white/20 hover:bg-white/20 text-white flex items-center justify-center gap-2"
+                >
+                  <Send className="h-4 w-4" />
+                  Pay
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80">
+                <div className="space-y-2">
+                  <h4 className="font-medium">Payment Options</h4>
+                  <p className="text-sm">Pay using your wallet balance or saved cards</p>
+                  <div className="flex gap-2 mt-1">
+                    <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                      <Wallet className="h-3 w-3" /> Wallet Balance
+                    </div>
+                    <div className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                      <CreditCard className="h-3 w-3" /> Saved Cards
+                    </div>
+                  </div>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Button
+                  onClick={() => navigate("/payments?tab=request")}
+                  variant="outline"
+                  className="bg-white/10 border-white/20 hover:bg-white/20 text-white flex items-center justify-center gap-2"
+                >
+                  <ArrowDown className="h-4 w-4" />
+                  Receive
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80">
+                <div className="space-y-2">
+                  <h4 className="font-medium">Deposit Options</h4>
+                  <p className="text-sm">Received money can only be deposited to:</p>
+                  <div className="flex gap-2 mt-1">
+                    <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                      <Wallet className="h-3 w-3" /> Wallet Balance
+                    </div>
+                    <div className="flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                      <ArrowDown className="h-3 w-3" /> Bank Account
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Note: Money cannot be received directly onto cards</p>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
           </div>
         </div>
       </CardContent>
