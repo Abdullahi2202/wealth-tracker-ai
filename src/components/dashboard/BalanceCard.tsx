@@ -1,5 +1,5 @@
 
-import { CreditCard, Send, Wallet, ArrowUp, ArrowDown } from "lucide-react";
+import { CreditCard, Send, Wallet, ArrowUp, ArrowDown, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
@@ -12,6 +12,33 @@ interface BalanceCardProps {
 
 const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
   const navigate = useNavigate();
+
+  const actionButtons = [
+    {
+      title: "Top Up",
+      icon: <ArrowUp className="h-5 w-5 text-white" />,
+      action: () => navigate("/payments?tab=request"),
+      description: "Add funds to your wallet balance"
+    },
+    {
+      title: "Transfer",
+      icon: <ArrowDown className="h-5 w-5 text-white" />,
+      action: () => navigate("/payments"),
+      description: "Send money to others"
+    },
+    {
+      title: "QR Code",
+      icon: <QrCode className="h-5 w-5 text-white" />,
+      action: () => navigate("/payments?mode=qr"),
+      description: "Scan or share payment QR codes"
+    },
+    {
+      title: "Wallet",
+      icon: <Wallet className="h-5 w-5 text-white" />,
+      action: () => navigate("/cards"),
+      description: "Manage your cards and accounts"
+    },
+  ];
 
   return (
     <Card className="wallet-card text-white h-full">
@@ -99,6 +126,28 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
                 </div>
               </HoverCardContent>
             </HoverCard>
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="mt-6 grid grid-cols-4 gap-2">
+            {actionButtons.map((button, index) => (
+              <HoverCard key={index} openDelay={300}>
+                <HoverCardTrigger asChild>
+                  <button
+                    onClick={button.action}
+                    className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all"
+                  >
+                    <div className="p-2 rounded-full mb-1">
+                      {button.icon}
+                    </div>
+                    <span className="text-xs font-medium">{button.title}</span>
+                  </button>
+                </HoverCardTrigger>
+                <HoverCardContent side="bottom" className="w-48">
+                  <p className="text-sm">{button.description}</p>
+                </HoverCardContent>
+              </HoverCard>
+            ))}
           </div>
         </div>
       </CardContent>
