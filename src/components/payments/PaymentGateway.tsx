@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CreditCard, DollarSign, Wallet } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface PaymentGatewayOption {
@@ -32,13 +32,6 @@ export const paymentGateways: PaymentGatewayOption[] = [
     icon: <CreditCard className="h-6 w-6" />,
     description: "Pay directly from your bank account",
     bgColor: "bg-gradient-to-r from-green-500 to-green-600",
-  },
-  {
-    id: "cash",
-    name: "Cash Payment",
-    icon: <DollarSign className="h-6 w-6" />,
-    description: "Pay with cash on delivery",
-    bgColor: "bg-gradient-to-r from-yellow-500 to-yellow-600",
   }
 ];
 

@@ -11,6 +11,8 @@ import * as z from "zod";
 import { CreditCard, ArrowRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import PaymentGateway from "@/components/payments/PaymentGateway";
 import ReceivedPayments from "@/components/payments/ReceivedPayments";
 
@@ -44,6 +46,15 @@ const sampleCards: CardOption[] = [
   },
 ];
 
+const utilityOptions = [
+  { value: "electricity", label: "Electricity" },
+  { value: "water", label: "Water" },
+  { value: "gas", label: "Gas" },
+  { value: "internet", label: "Internet" },
+  { value: "phone", label: "Phone" },
+  { value: "other", label: "Other" }
+];
+
 const paymentFormSchema = z.object({
   amount: z.string().refine((val) => {
     const num = parseFloat(val);
@@ -51,6 +62,7 @@ const paymentFormSchema = z.object({
   }, "Amount must be greater than 0"),
   cardId: z.string().min(1, "Please select a card"),
   recipientCard: z.string().min(16, "Card number must be 16 digits").max(19),
+  utilityType: z.string().min(1, "Please select a utility type"),
   note: z.string().optional(),
   gateway: z.string().min(1, "Please select a payment method"),
 });
@@ -61,10 +73,12 @@ const receiveFormSchema = z.object({
 
 const Payments = () => {
   const [cards] = useState<CardOption[]>(sampleCards);
-  const [selectedPaymentGateway, setSelectedPaymentGateway] = useState("card");
+  const [selectedPaymentGateway, setSelectedPaymentGateway] = useState("credit");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showReceivedPayments, setShowReceivedPayments] = useState(false);
   const [selectedCardForPayments, setSelectedCardForPayments] = useState("");
+  const [selectedUtilityType, setSelectedUtilityType] = useState("");
+  const [isOtherUtility, setIsOtherUtility] = useState(false);
   
   const paymentForm = useForm<z.infer<typeof paymentFormSchema>>({
     resolver: zodResolver(paymentFormSchema),
@@ -72,8 +86,9 @@ const Payments = () => {
       amount: "",
       cardId: "",
       recipientCard: "",
+      utilityType: "",
       note: "",
-      gateway: "card",
+      gateway: "credit",
     },
   });
 
@@ -115,6 +130,13 @@ const Payments = () => {
   const handleGatewayChange = (gateway: string) => {
     setSelectedPaymentGateway(gateway);
     paymentForm.setValue("gateway", gateway);
+  };
+
+  // Handle utility type change
+  const handleUtilityTypeChange = (value: string) => {
+    setSelectedUtilityType(value);
+    paymentForm.setValue("utilityType", value);
+    setIsOtherUtility(value === "other");
   };
 
   const handleBackFromReceivedPayments = () => {
@@ -282,17 +304,47 @@ const Payments = () => {
 
                       <FormField
                         control={paymentForm.control}
-                        name="note"
+                        name="utilityType"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Note (optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Add a note" {...field} />
-                            </FormControl>
+                            <FormLabel>Utility Type</FormLabel>
+                            <Select 
+                              onValueChange={(value) => handleUtilityTypeChange(value)}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select utility type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {utilityOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
+                      {isOtherUtility && (
+                        <FormField
+                          control={paymentForm.control}
+                          name="note"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Additional Details</FormLabel>
+                              <FormControl>
+                                <Textarea placeholder="Please specify utility details..." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
 
                       <Button 
                         type="submit" 
