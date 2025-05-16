@@ -1,4 +1,3 @@
-
 import { useNavigate, useLocation } from "react-router-dom";
 import { 
   CreditCard, 
@@ -113,6 +112,9 @@ const Sidebar = () => {
     }
   ];
 
+  const { useUserRole } = require("@/hooks/useUserRole");
+  const role = useUserRole && typeof useUserRole === 'function' ? useUserRole() : null;
+
   const renderMenuItem = (item) => {
     if (item.isSubmenu) {
       return (
@@ -191,6 +193,26 @@ const Sidebar = () => {
         </h2>
         <div className="space-y-1">
           {mainMenuItems.map(renderMenuItem)}
+          <Button
+            key="profile"
+            variant="ghost"
+            className="w-full justify-start mb-1 hover:bg-secondary/10"
+            onClick={() => window.location.href = "/profile"}
+          >
+            <User className="mr-2 h-4 w-4" />
+            Profile
+          </Button>
+          {role === "admin" && (
+            <Button
+              key="admin"
+              variant="ghost"
+              className="w-full justify-start mb-1 hover:bg-secondary/10"
+              onClick={() => window.location.href = "/admin"}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Admin Panel
+            </Button>
+          )}
         </div>
       </div>
     </div>
