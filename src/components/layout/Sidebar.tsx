@@ -1,3 +1,4 @@
+
 import { useNavigate, useLocation } from "react-router-dom";
 import { 
   CreditCard, 
@@ -23,6 +24,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useState } from "react";
+import { useUserRole } from "@/hooks/useUserRole"; // FIX: use proper ES module import
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -112,8 +114,8 @@ const Sidebar = () => {
     }
   ];
 
-  const { useUserRole } = require("@/hooks/useUserRole");
-  const role = useUserRole && typeof useUserRole === 'function' ? useUserRole() : null;
+  // Use the hook directly
+  const role = useUserRole();
 
   const renderMenuItem = (item) => {
     if (item.isSubmenu) {
@@ -220,3 +222,4 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
+
