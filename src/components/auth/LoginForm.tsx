@@ -94,26 +94,22 @@ const LoginForm = () => {
           >
             {loading ? "Signing in..." : "Sign in"}
           </Button>
-        </form>
-        
-        <div className="mt-6 text-center text-sm">
-          <span className="text-muted-foreground">
-            Don't have an account?{" "}
-          </span>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate("/register");
-            }}
-            className="text-primary hover:underline"
+
+          {/* Make Sign up a clear, obvious button for registration navigation */}
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full mt-2"
+            onClick={() => navigate("/register")}
+            disabled={loading}
           >
             Sign up
-          </a>
-        </div>
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );
 };
 
 export default LoginForm;
+
