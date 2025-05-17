@@ -1,134 +1,120 @@
-
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 
-const RegistrationForm = () => {
+const Register = () => {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
+    email: "",
+    password: "",
     phone: "",
     passportNumber: "",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // If user already registered, redirect to dashboard
-    const checkRegistration = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        navigate("/login");
-        return;
-      }
-      const { data } = await supabase
-        .from("registrations")
-        .select("id")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
-      if (data) {
-        toast.info("You already registered.");
-        navigate("/dashboard");
-      }
-    };
-    checkRegistration();
-  }, [navigate]);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      toast.error("Session expired. Please log in again.");
-      setSubmitting(false);
-      return;
-    }
-    if (!form.phone || !form.passportNumber || !imageFile) {
-      toast.error("Please fill all fields.");
-      setSubmitting(false);
+    const { email, password, phone, passportNumber } = form;
+
+    if (!email || !password || !phone || !passportNumber || !imageFile) {
+      toast.error("Please fill in all fields.");
       return;
     }
 
-    // 1. Upload image
-    const fileExt = imageFile.name.split('.').pop();
-    const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from("user-ids")
-      .upload(filePath, imageFile, { upsert: false });
+    setLoading(true);
 
-    if (uploadError) {
-      toast.error(`Failed to upload image: ${uploadError.message}`);
-      setSubmitting(false);
-      return;
-    }
-
-    // Get public URL (admin can access, user downloads via API)
-    const imageUrl = uploadData ? uploadData.path : filePath;
-
-    // 2. Store registration info
-    const { error } = await supabase.from("registrations").insert({
-      user_id: session.user.id,
-      phone: form.phone,
-      passport_number: form.passportNumber,
-      image_url: imageUrl,
+    // Step 1: Create Supabase Auth user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
     });
 
-    if (error) {
-      toast.error("Failed to submit registration.");
-    } else {
-      toast.success("Registration submitted!");
-      navigate("/dashboard");
+    if (authError || !authData.user) {
+      toast.error(authError?.message || "Failed to register user.");
+      setLoading(false);
+      return;
     }
-    setSubmitting(false);
+
+    const userId = authData.user.id;
+
+    // Step 2: Upload ID image
+    const ext = imageFile.name.split(".").pop();
+    const filePath = `${userId}/${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("user-ids")
+      .upload(filePath, imageFile);
+
+    if (uploadError) {
+      toast.error(`Image upload failed: ${uploadError.message}`);
+      setLoading(false);
+      return;
+    }
+
+    // Step 3: Save extra user info
+    const { error: dbError } = await supabase.from("registrations").insert({
+      user_id: userId,
+      phone,
+      passport_number: passportNumber,
+      image_url: filePath,
+    });
+
+    if (dbError) {
+      toast.error("Failed to store registration data.");
+    } else {
+      toast.success("Registered successfully! Please log in.");
+      navigate("/login");
+    }
+
+    setLoading(false);
   };
 
   return (
-    <Card>
+    <Card className="max-w-md mx-auto mt-10 p-4 shadow-lg">
       <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6 mt-4">
-          <div>
-            <label className="block font-medium mb-1">Phone Number</label>
-            <Input
-              required
-              placeholder="Enter your phone number"
-              value={form.phone}
-              onChange={e =>
-                setForm((f) => ({ ...f, phone: e.target.value }))
-              }
-              type="tel"
-            />
-          </div>
-          <div>
-            <label className="block font-medium mb-1">Passport Number</label>
-            <Input
-              required
-              placeholder="Enter your passport/driver's license number"
-              value={form.passportNumber}
-              onChange={e =>
-                setForm((f) => ({ ...f, passportNumber: e.target.value }))
-              }
-            />
-          </div>
-          <div>
-            <label className="block font-medium mb-1">
-              Upload Passport or Driver’s License
-            </label>
-            <Input
-              required
-              type="file"
-              accept="image/*"
-              onChange={e =>
-                setImageFile(e.target.files ? e.target.files[0] : null)
-              }
-            />
-          </div>
-          <Button type="submit" disabled={submitting} className="w-full">
-            {submitting ? "Submitting..." : "Submit"}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <h2 className="text-2xl font-bold text-center">Create Account</h2>
+          <Input
+            type="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            required
+          />
+          <Input
+            type="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            required
+          />
+          <Input
+            type="tel"
+            placeholder="Phone Number"
+            value={form.phone}
+            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            required
+          />
+          <Input
+            placeholder="Passport / Driver's License Number"
+            value={form.passportNumber}
+            onChange={(e) => setForm((f) => ({ ...f, passportNumber: e.target.value }))}
+            required
+          />
+          <Input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+            required
+          />
+          <Button type="submit" disabled={loading}>
+            {loading ? "Registering..." : "Register"}
           </Button>
         </form>
       </CardContent>
@@ -136,4 +122,4 @@ const RegistrationForm = () => {
   );
 };
 
-export default RegistrationForm;
+export default Register;

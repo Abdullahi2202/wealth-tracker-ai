@@ -1,50 +1,41 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CardTitle, CardDescription, CardContent, Card } from "@/components/ui/card";
+import { Card, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 
-const LoginForm = () => {
+const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
-      toast.error("Please enter both email and password");
+      toast.error("Please enter email and password.");
       return;
     }
 
     setLoading(true);
-    
-    // Simulate authentication
-    setTimeout(() => {
-      // This is just a demo - in a real app, we would verify credentials
-      const isDemo = email.includes("demo") || email.includes("test");
-      
-      if (isDemo && password.length > 3) {
-        // Store fake login state
-        localStorage.setItem("walletmaster_user", JSON.stringify({
-          email,
-          name: "Demo User",
-          role: "user",
-          loginTime: new Date().toISOString()
-        }));
-        
-        toast.success("Login successful!");
-        navigate("/dashboard");
-      } else {
-        toast.error("Invalid credentials. Try demo@walletmaster.com with password 'demo123'");
-      }
-      
-      setLoading(false);
-    }, 1500);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      toast.error("Login failed: " + error.message);
+    } else {
+      toast.success("Logged in successfully!");
+      navigate("/dashboard");
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -54,29 +45,23 @@ const LoginForm = () => {
           Welcome to Wallet Master
         </CardTitle>
         <CardDescription className="text-center mb-6">
-          Enter your credentials to access your account
+          Sign in to your account
         </CardDescription>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
-              placeholder="demo@walletmaster.com"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
-          
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <a href="#" className="text-sm text-primary hover:underline">
-                Forgot password?
-              </a>
-            </div>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               type="password"
@@ -86,24 +71,17 @@ const LoginForm = () => {
               required
             />
           </div>
-          
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-          >
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </Button>
-
-          {/* Make Sign up a clear, obvious button for registration navigation */}
           <Button
             type="button"
             variant="outline"
-            className="w-full mt-2"
+            className="w-full"
             onClick={() => navigate("/register")}
             disabled={loading}
           >
-            Sign up
+            Register
           </Button>
         </form>
       </CardContent>
@@ -111,5 +89,4 @@ const LoginForm = () => {
   );
 };
 
-export default LoginForm;
-
+export default Login;
