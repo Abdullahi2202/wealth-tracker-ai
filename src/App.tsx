@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-// Remove incorrect import: import RegistrationForm from "./pages/RegistrationForm";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Cards from "./pages/Cards";
 import Assistant from "./pages/Assistant";
