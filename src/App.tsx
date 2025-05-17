@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import Investments from "./pages/Investments";
 import Admin from "./pages/Admin";
 import Profile from "./pages/Profile";
+import Register from "./pages/Register";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/cards" element={<Cards />} />
           <Route path="/payments" element={<Payments />} />
