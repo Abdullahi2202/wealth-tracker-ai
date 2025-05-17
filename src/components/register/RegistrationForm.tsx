@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import RegistrationForm from "@/components/register/RegistrationForm";
 
 const Register = () => {
   const navigate = useNavigate();
