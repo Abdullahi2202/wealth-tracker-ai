@@ -104,7 +104,7 @@ const LoginForm = () => {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              toast.info("Registration will be available soon!");
+              navigate("/register");
             }}
             className="text-primary hover:underline"
           >
