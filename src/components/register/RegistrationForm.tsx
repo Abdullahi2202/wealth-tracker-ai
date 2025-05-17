@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,7 +47,7 @@ const RegistrationForm = () => {
 
     const userId = authData.user.id;
 
-    // Step 2: Upload ID image
+    // Step 2: Upload ID image or PDF
     const ext = imageFile.name.split(".").pop();
     const filePath = `${userId}/${Date.now()}.${ext}`;
 
@@ -55,7 +56,7 @@ const RegistrationForm = () => {
       .upload(filePath, imageFile);
 
     if (uploadError) {
-      toast.error(`Image upload failed: ${uploadError.message}`);
+      toast.error(`File upload failed: ${uploadError.message}`);
       setLoading(false);
       return;
     }
@@ -109,12 +110,17 @@ const RegistrationForm = () => {
             onChange={(e) => setForm((f) => ({ ...f, passportNumber: e.target.value }))}
             required
           />
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-            required
-          />
+          <div>
+            <Input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              required
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Upload a passport, driver's license image, or PDF document.
+            </p>
+          </div>
           <Button type="submit" disabled={loading}>
             {loading ? "Registering..." : "Register"}
           </Button>
@@ -125,3 +131,4 @@ const RegistrationForm = () => {
 };
 
 export default RegistrationForm;
+
