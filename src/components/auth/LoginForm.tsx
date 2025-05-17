@@ -100,7 +100,7 @@ const LoginForm = () => {
             type="button"
             variant="outline"
             className="w-full mt-2"
-            onClick={() => navigate("/RegistrationForm")}
+            onClick={() => navigate("/register")}
             disabled={loading}
           >
             Sign up
