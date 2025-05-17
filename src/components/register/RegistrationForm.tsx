@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import RegistrationForm from "@/components/register/RegistrationForm";
 
-const Register = () => {
+// Debug log
+console.log("RegistrationForm loaded ✅");
+
+const RegistrationForm = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     email: "",
@@ -30,7 +32,7 @@ const Register = () => {
 
     setLoading(true);
 
-    // Step 1: Create Supabase Auth user
+    // Step 1: Create user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -58,7 +60,7 @@ const Register = () => {
       return;
     }
 
-    // Step 3: Save extra user info
+    // Step 3: Save extra info
     const { error: dbError } = await supabase.from("registrations").insert({
       user_id: userId,
       phone,
@@ -77,10 +79,9 @@ const Register = () => {
   };
 
   return (
-    <Card className="max-w-md mx-auto mt-10 p-4 shadow-lg">
+    <Card className="shadow-lg p-4">
       <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <h2 className="text-2xl font-bold text-center">Create Account</h2>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
           <Input
             type="email"
             placeholder="Email"
@@ -123,4 +124,4 @@ const Register = () => {
   );
 };
 
-export default Register;
+export default RegistrationForm;
