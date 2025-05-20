@@ -61,7 +61,7 @@ const RegistrationForm = () => {
       return;
     }
 
-    // Step 3: Save extra info
+    // Step 3: Save extra info to registrations
     const { error: dbError } = await supabase.from("registrations").insert({
       user_id: userId,
       phone,
@@ -70,7 +70,13 @@ const RegistrationForm = () => {
     });
 
     if (dbError) {
-      toast.error("Failed to store registration data.");
+      // Log the full error to browser console for easier diagnostics
+      console.error("Error inserting into registrations:", dbError);
+      toast.error(
+        "Failed to store registration data." +
+          (dbError.details ? " Details: " + dbError.details : "") +
+          (dbError.message ? " Message: " + dbError.message : "")
+      );
     } else {
       toast.success("Registered successfully! Please log in.");
       navigate("/login");
@@ -131,4 +137,3 @@ const RegistrationForm = () => {
 };
 
 export default RegistrationForm;
-
