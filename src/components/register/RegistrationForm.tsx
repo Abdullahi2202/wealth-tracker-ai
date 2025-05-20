@@ -13,20 +13,20 @@ console.log("RegistrationForm loaded ✅");
 const RegistrationForm = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({
+    fullName: "",
     email: "",
     password: "",
     phone: "",
     passportNumber: "",
   });
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { email, password, phone, passportNumber } = form;
+    const { fullName, email, password, phone, passportNumber } = form;
 
-    if (!email || !password || !phone || !passportNumber || !imageFile) {
+    if (!fullName || !email || !password || !phone || !passportNumber) {
       toast.error("Please fill in all fields.");
       return;
     }
@@ -47,30 +47,21 @@ const RegistrationForm = () => {
 
     const userId = authData.user.id;
 
-    // Step 2: Upload ID image or PDF
-    const ext = imageFile.name.split(".").pop();
-    const filePath = `${userId}/${Date.now()}.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("user-ids")
-      .upload(filePath, imageFile);
-
-    if (uploadError) {
-      toast.error(`File upload failed: ${uploadError.message}`);
-      setLoading(false);
-      return;
-    }
-
-    // Step 3: Save extra info to registrations
+    // Step 2: Save extra info to registrations
     const { error: dbError } = await supabase.from("registrations").insert({
       user_id: userId,
       phone,
       passport_number: passportNumber,
-      image_url: filePath,
+      image_url: "", // No image is uploaded, so keep this as an empty string
     });
 
+    // Optionally, update 'profiles' table with full name if you use it
+    await supabase
+      .from("profiles")
+      .update({ full_name: fullName })
+      .eq("id", userId);
+
     if (dbError) {
-      // Log the full error to browser console for easier diagnostics
       console.error("Error inserting into registrations:", dbError);
       toast.error(
         "Failed to store registration data." +
@@ -89,6 +80,13 @@ const RegistrationForm = () => {
     <Card className="shadow-lg p-4">
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
+          <Input
+            type="text"
+            placeholder="Full Name"
+            value={form.fullName}
+            onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+            required
+          />
           <Input
             type="email"
             placeholder="Email"
@@ -116,17 +114,6 @@ const RegistrationForm = () => {
             onChange={(e) => setForm((f) => ({ ...f, passportNumber: e.target.value }))}
             required
           />
-          <div>
-            <Input
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-              required
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Upload a passport, driver's license image, or PDF document.
-            </p>
-          </div>
           <Button type="submit" disabled={loading}>
             {loading ? "Registering..." : "Register"}
           </Button>
