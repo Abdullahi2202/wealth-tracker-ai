@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,19 +6,22 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 
-type Profile = {
-  id: string;
-  email: string | null;
-  full_name: string | null;
-};
-
+// Now uses the actual table fields for "registrations"
 type Registration = {
   id: string;
-  user_id: string;
+  username: string;
+  name: string;
+  email: string;
   phone: string;
   passport_number: string;
   image_url: string;
   created_at: string;
+};
+
+type Profile = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
 };
 
 type UserRole = "admin" | "user";
@@ -74,20 +78,19 @@ const Admin = () => {
       }
       setRoles(rolesMap);
 
-      // Fetch registrations
+      // Fetch registrations (now uses correct columns)
       const { data: regs, error: e3 } = await supabase.from("registrations").select("*");
       if (!regs || e3) {
         setLoading(false);
         return;
       }
-      setRegistrations(regs);
+      setRegistrations(regs as Registration[]);
       setLoading(false);
     };
     fetchData();
   }, []);
 
   const setRole = async (user_id: string, role: UserRole) => {
-    // Upsert the role
     const { error } = await supabase.from("user_roles").upsert(
       [{ user_id, role }],
       { onConflict: "user_id,role" }
@@ -100,9 +103,9 @@ const Admin = () => {
     }
   };
 
-  // Helper to get registration by user_id
-  const getReg = (user_id: string) =>
-    registrations.find((r) => r.user_id === user_id);
+  // Helper to get registration by user_id (now matches username)
+  const getReg = (profile_id: string) =>
+    registrations.find((r) => r.username === profile_id);
 
   // Helper to get image public URL via API
   const getImageUrl = (image_path: string) =>
