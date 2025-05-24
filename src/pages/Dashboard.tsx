@@ -19,14 +19,15 @@ const Dashboard = () => {
     }, 800);
     // Fetch user's registration
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
       if (!session?.user) return;
-      const { data } = await supabase
+      const { data: regData } = await supabase
         .from("registrations")
         .select("phone, passport_number, image_url")
         .eq("user_id", session.user.id)
         .maybeSingle();
-      setMyRegistration(data || null);
+      setMyRegistration(regData || null);
     })();
   }, []);
 
