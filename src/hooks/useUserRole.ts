@@ -7,18 +7,23 @@ export function useUserRole() {
 
   useEffect(() => {
     async function fetchRole() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) {
         setRole(null);
         return;
       }
-      const { data } = await supabase
+      // Fix: Query by email (user_roles table)
+      const result = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", session.user.id)
+        .eq("email", session.user.email)
         .maybeSingle();
-      if (data?.role === "admin") setRole("admin");
-      else setRole("user");
+      const userRole = result.data?.role;
+      if (userRole === "admin") setRole("admin");
+      else if (userRole) setRole("user");
+      else setRole(null);
     }
     fetchRole();
   }, []);
