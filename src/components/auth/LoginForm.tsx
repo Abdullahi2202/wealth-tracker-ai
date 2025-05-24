@@ -31,8 +31,22 @@ const Login = () => {
     if (error) {
       toast.error("Login failed: " + error.message);
     } else {
-      toast.success("Logged in successfully!");
-      navigate("/dashboard");
+      // After successful login, fetch user info and store in localStorage
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // Store minimal info for UI (don't include password or tokens!)
+        localStorage.setItem(
+          "walletmaster_user",
+          JSON.stringify({
+            name: session.user.user_metadata?.full_name ?? "",
+            email: session.user.email,
+          })
+        );
+        toast.success("Logged in successfully!");
+        navigate("/dashboard");
+      } else {
+        toast.error("Login successful but no user session found.");
+      }
     }
 
     setLoading(false);
