@@ -48,12 +48,13 @@ const RegistrationForm = () => {
     const userId = authData.user.id;
 
     // Step 2: Save extra info to registrations
-    const { error: dbError } = await supabase.from("registrations").insert({
-      user_id: userId,
-      phone,
-      passport_number: passportNumber,
-      image_url: "", // No image is uploaded, so keep this as an empty string
-    });
+   const { error: dbError } = await supabase.from("registrations").insert({
+  user_id: userId, // should equal auth.user.id
+  phone,
+  passport_number: passportNumber,
+  image_url: "",
+});
+
 
     // Optionally, update 'profiles' table with full name if you use it
     await supabase
