@@ -10,6 +10,10 @@ import Dashboard from "./pages/Dashboard";
 import Cards from "./pages/Cards";
 import Assistant from "./pages/Assistant";
 import Payments from "./pages/Payments";
+import PaymentsHome from "./pages/PaymentsHome";
+import SendPayment from "./pages/SendPayment";
+import TopUpWallet from "./pages/TopUpWallet";
+import ReceivedPaymentsMobile from "./pages/ReceivedPaymentsMobile";
 import NotFound from "./pages/NotFound";
 import Transactions from "./pages/Transactions";
 import Expenses from "./pages/Expenses";
@@ -34,6 +38,11 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/cards" element={<Cards />} />
           <Route path="/payments" element={<Payments />} />
+          {/* Mobile-first redesign routes below */}
+          <Route path="/payments/home" element={<PaymentsHome />} />
+          <Route path="/payments/send" element={<SendPayment />} />
+          <Route path="/payments/topup" element={<TopUpWallet />} />
+          <Route path="/payments/received" element={<ReceivedPaymentsMobile />} />
           <Route path="/assistant" element={<Assistant />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/expenses" element={<Expenses />} />
