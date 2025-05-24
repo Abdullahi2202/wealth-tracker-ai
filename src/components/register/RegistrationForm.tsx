@@ -91,6 +91,13 @@ const RegistrationForm = () => {
 
     if (dbError) {
       console.error("Error inserting into registrations:", dbError);
+      // Special case: duplicate key error
+      if (dbError.code === "23505") {
+        toast.error("This email is already registered. Please log in instead.");
+        setLoading(false);
+        navigate("/login");
+        return;
+      }
       toast.error(
         "Failed to store registration data." +
         (dbError.details ? " Details: " + dbError.details : "") +
