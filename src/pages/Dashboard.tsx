@@ -22,10 +22,11 @@ const Dashboard = () => {
       const { data } = await supabase.auth.getSession();
       const session = data.session;
       if (!session?.user) return;
+      // FIX: query by "username" not "user_id"
       const { data: regData } = await supabase
         .from("registrations")
         .select("phone, passport_number, image_url")
-        .eq("user_id", session.user.id)
+        .eq("username", session.user.id)
         .maybeSingle();
       setMyRegistration(regData || null);
     })();
