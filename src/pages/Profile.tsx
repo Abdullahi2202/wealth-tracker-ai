@@ -21,10 +21,16 @@ const Profile = () => {
         window.location.href = "/login";
         return;
       }
+      const userEmail = session.user.email;
+      if (!userEmail) {
+        toast.error("No user email.");
+        window.location.href = "/login";
+        return;
+      }
       const { data, error } = await supabase
         .from("profiles")
         .select("email, full_name")
-        .eq("id", session.user.id)
+        .eq("email", userEmail)
         .maybeSingle();
 
       if (error || !data) {
@@ -45,10 +51,12 @@ const Profile = () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
+    const userEmail = session.user.email;
+    if (!userEmail) return;
     const { error } = await supabase
       .from("profiles")
       .update({ full_name: profile.full_name, updated_at: new Date().toISOString() })
-      .eq("id", session.user.id);
+      .eq("email", userEmail);
     if (!error) {
       toast.success("Profile updated");
     } else {

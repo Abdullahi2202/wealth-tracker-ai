@@ -6,12 +6,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 
-// Now uses the actual table fields for "registrations"
+// Matches new table fields
 type Registration = {
   id: string;
-  username: string;
-  name: string;
   email: string;
+  full_name: string;
   phone: string;
   passport_number: string;
   image_url: string;
@@ -19,8 +18,7 @@ type Registration = {
 };
 
 type Profile = {
-  id: string;
-  email: string | null;
+  email: string;
   full_name: string | null;
 };
 
@@ -42,10 +40,16 @@ const Admin = () => {
         navigate("/login");
         return;
       }
+      const userEmail = session.user.email;
+      if (!userEmail) {
+        toast.error("No user email.");
+        navigate("/login");
+        return;
+      }
       const { data } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", session.user.id)
+        .eq("email", userEmail)
         .maybeSingle();
       if (!data || data.role !== "admin") {
         toast.error("You must be an admin to access this page.");
@@ -59,7 +63,7 @@ const Admin = () => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data: users, error: e1 } = await supabase.from("profiles").select("id, email, full_name");
+      const { data: users, error: e1 } = await supabase.from("profiles").select("email, full_name");
       if (e1) {
         toast.error("Could not load users.");
         setLoading(false);
@@ -67,18 +71,18 @@ const Admin = () => {
       }
       setProfiles(users || []);
       // Fetch all user roles
-      const { data: allRoles, error: e2 } = await supabase.from("user_roles").select("user_id, role");
+      const { data: allRoles, error: e2 } = await supabase.from("user_roles").select("email, role");
       if (!allRoles || e2) {
         setLoading(false);
         return;
       }
       const rolesMap: Record<string, UserRole> = {};
       for (const entry of allRoles) {
-        rolesMap[entry.user_id] = entry.role;
+        rolesMap[entry.email] = entry.role;
       }
       setRoles(rolesMap);
 
-      // Fetch registrations (now uses correct columns)
+      // Fetch registrations
       const { data: regs, error: e3 } = await supabase.from("registrations").select("*");
       if (!regs || e3) {
         setLoading(false);
@@ -90,22 +94,22 @@ const Admin = () => {
     fetchData();
   }, []);
 
-  const setRole = async (user_id: string, role: UserRole) => {
+  const setRole = async (email: string, role: UserRole) => {
     const { error } = await supabase.from("user_roles").upsert(
-      [{ user_id, role }],
-      { onConflict: "user_id,role" }
+      [{ email, role }],
+      { onConflict: "email,role" }
     );
     if (!error) {
       toast.success("Role updated!");
-      setRoles((r) => ({ ...r, [user_id]: role }));
+      setRoles((r) => ({ ...r, [email]: role }));
     } else {
       toast.error("Failed to update role.");
     }
   };
 
-  // Helper to get registration by user_id (now matches username)
-  const getReg = (profile_id: string) =>
-    registrations.find((r) => r.username === profile_id);
+  // Helper to get registration by email
+  const getReg = (profile_email: string) =>
+    registrations.find((r) => r.email === profile_email);
 
   // Helper to get image public URL via API
   const getImageUrl = (image_path: string) =>
@@ -135,9 +139,9 @@ const Admin = () => {
                 </thead>
                 <tbody>
                   {profiles.map((profile) => {
-                    const reg = getReg(profile.id);
+                    const reg = getReg(profile.email);
                     return (
-                      <tr key={profile.id} className="border-b">
+                      <tr key={profile.email} className="border-b">
                         <td className="px-2 py-2">{profile.email}</td>
                         <td className="px-2 py-2">{profile.full_name || "-"}</td>
                         <td className="px-2 py-2">
@@ -160,20 +164,20 @@ const Admin = () => {
                             <span className="text-muted-foreground italic">-</span>
                           )}
                         </td>
-                        <td className="px-2 py-2 capitalize">{roles[profile.id] || "user"}</td>
+                        <td className="px-2 py-2 capitalize">{roles[profile.email] || "user"}</td>
                         <td className="px-2 py-2 space-x-2">
                           <Button
-                            variant={roles[profile.id] === "admin" ? "default" : "outline"}
+                            variant={roles[profile.email] === "admin" ? "default" : "outline"}
                             size="sm"
-                            onClick={() => setRole(profile.id, "admin")}
+                            onClick={() => setRole(profile.email, "admin")}
                           >
                             Make Admin
                           </Button>
                           <Button
-                            variant={roles[profile.id] === "user" ? "default" : "outline"}
+                            variant={roles[profile.email] === "user" ? "default" : "outline"}
                             size="sm"
-                            onClick={() => setRole(profile.id, "user")}
-                            disabled={profile.id === roles[profile.id]}
+                            onClick={() => setRole(profile.email, "user")}
+                            disabled={profile.email === roles[profile.email]}
                           >
                             Make User
                           </Button>
@@ -192,3 +196,4 @@ const Admin = () => {
 };
 
 export default Admin;
+

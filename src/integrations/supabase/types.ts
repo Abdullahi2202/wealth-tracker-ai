@@ -12,23 +12,20 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
-          email: string | null
+          email: string
           full_name: string | null
-          id: string
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
-          email?: string | null
+          email: string
           full_name?: string | null
-          id: string
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
-          email?: string | null
+          email?: string
           full_name?: string | null
-          id?: string
           updated_at?: string | null
         }
         Relationships: []
@@ -37,53 +34,83 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string
+          full_name: string
           id: string
           image_url: string
-          name: string
           passport_number: string
           phone: string
-          username: string
         }
         Insert: {
           created_at?: string | null
           email: string
+          full_name: string
           id?: string
           image_url: string
-          name: string
           passport_number: string
           phone: string
-          username: string
         }
         Update: {
           created_at?: string | null
           email?: string
+          full_name?: string
           id?: string
           image_url?: string
-          name?: string
           passport_number?: string
           phone?: string
-          username?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string | null
+          date: string
+          email: string
+          id: string
+          name: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string | null
+          date?: string
+          email: string
+          id?: string
+          name: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string | null
+          date?: string
+          email?: string
+          id?: string
+          name?: string
+          type?: string
         }
         Relationships: []
       }
       user_roles: {
         Row: {
           created_at: string | null
+          email: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
-          user_id: string
         }
         Insert: {
           created_at?: string | null
+          email: string
           id?: string
           role: Database["public"]["Enums"]["app_role"]
-          user_id: string
         }
         Update: {
           created_at?: string | null
+          email?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
         }
         Relationships: []
       }
@@ -94,6 +121,10 @@ export type Database = {
     Functions: {
       is_admin: {
         Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_admin_by_email: {
+        Args: { _email: string }
         Returns: boolean
       }
     }
