@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,13 +47,15 @@ const RegistrationForm = () => {
     const userId = authData.user.id;
 
     // Step 2: Save extra info to registrations
-   const { error: dbError } = await supabase.from("registrations").insert({
-  user_id: userId, // should equal auth.user.id
-  phone,
-  passport_number: passportNumber,
-  image_url: "",
-});
-
+    // Use the correct column names for your DB schema:
+    const { error: dbError } = await supabase.from("registrations").insert({
+      username: userId,                // Correct column!
+      name: fullName,                  // Correct column!
+      email,                           // Correct column!
+      phone,
+      passport_number: passportNumber,
+      image_url: "",
+    });
 
     // Optionally, update 'profiles' table with full name if you use it
     await supabase

@@ -36,27 +36,33 @@ export type Database = {
       registrations: {
         Row: {
           created_at: string | null
+          email: string
           id: string
           image_url: string
+          name: string
           passport_number: string
           phone: string
-          user_id: string
+          username: string
         }
         Insert: {
           created_at?: string | null
+          email: string
           id?: string
           image_url: string
+          name: string
           passport_number: string
           phone: string
-          user_id: string
+          username: string
         }
         Update: {
           created_at?: string | null
+          email?: string
           id?: string
           image_url?: string
+          name?: string
           passport_number?: string
           phone?: string
-          user_id?: string
+          username?: string
         }
         Relationships: []
       }
