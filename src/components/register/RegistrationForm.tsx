@@ -39,16 +39,45 @@ const RegistrationForm = () => {
       password,
     });
 
-    if (authError || !authData.user) {
+    // If the user is not confirmed (email verification required), inform the user and return
+    if (authError) {
       toast.error(authError?.message || "Failed to register user.");
       setLoading(false);
       return;
     }
 
+    // Try to ensure we are authenticated for the RLS check:
+    // Try sign in right after signup (in case auto-login is not enabled)
+    let userSession = (await supabase.auth.getSession()).data.session;
+
+    if (!userSession) {
+      // Try to login (this only works if confirmation is not required)
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      if (loginError) {
+        toast.error("Registration successful! Please check your email for confirmation before logging in.");
+        setLoading(false);
+        navigate("/login");
+        return;
+      }
+      // Recheck session
+      userSession = (await supabase.auth.getSession()).data.session;
+    }
+
+    // At this point, user is signed in, can store registration info
+    if (!userSession || !userSession.user?.email) {
+      toast.error("Error: You must verify your email before proceeding.");
+      setLoading(false);
+      navigate("/login");
+      return;
+    }
+
     // Step 2: Save extra info to registrations (use email as key)
     const { error: dbError } = await supabase.from("registrations").insert({
-      email,                    // Correct column!
-      full_name: fullName,      // Correct column!
+      email: userSession.user.email,
+      full_name: fullName,
       phone,
       passport_number: passportNumber,
       image_url: "",
@@ -58,14 +87,14 @@ const RegistrationForm = () => {
     await supabase
       .from("profiles")
       .update({ full_name: fullName })
-      .eq("email", email);
+      .eq("email", userSession.user.email);
 
     if (dbError) {
       console.error("Error inserting into registrations:", dbError);
       toast.error(
         "Failed to store registration data." +
-          (dbError.details ? " Details: " + dbError.details : "") +
-          (dbError.message ? " Message: " + dbError.message : "")
+        (dbError.details ? " Details: " + dbError.details : "") +
+        (dbError.message ? " Message: " + dbError.message : "")
       );
     } else {
       toast.success("Registered successfully! Please log in.");
