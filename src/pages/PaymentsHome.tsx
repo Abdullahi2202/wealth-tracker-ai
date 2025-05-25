@@ -1,6 +1,7 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CreditCard, Download, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Action cards for Payments Home
 const actionCards = [
@@ -60,3 +61,4 @@ const PaymentsHome = () => {
 };
 
 export default PaymentsHome;
+
