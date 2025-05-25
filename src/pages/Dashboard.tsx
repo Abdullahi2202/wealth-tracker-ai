@@ -1,4 +1,3 @@
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
 import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
@@ -100,8 +99,6 @@ const Dashboard = () => {
             Manage your finances with insights, analytics, and fast payments.
           </p>
         </div>
-        {/* Main balance card */}
-        <BalanceCard totalBalance={4931.17} currency="$" />
         {/* Remove redundant DashboardQuickLinks if sidebar present (on desktop) */}
         <div className="w-full max-w-lg md:hidden">
           <DashboardQuickLinks />
@@ -112,4 +109,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
