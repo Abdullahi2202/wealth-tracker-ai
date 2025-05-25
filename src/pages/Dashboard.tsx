@@ -6,7 +6,7 @@ import DashboardQuickLinks from "@/components/dashboard/DashboardQuickLinks";
 import ExpenseChart from "@/components/dashboard/ExpenseChart";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 
-// Custom balance card (more visually distinct, shadowed, modern)
+// Custom balance card (modern, visually distinct)
 const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; currency?: string }) => (
   <Card
     className="wallet-card w-full max-w-lg mx-auto shadow-2xl rounded-2xl border-none relative overflow-hidden bg-gradient-to-tr from-blue-600 to-fuchsia-700 text-white"
@@ -104,8 +104,8 @@ const Dashboard = () => {
       {/* Main balance card */}
       <BalanceCard totalBalance={4931.17} currency="$" />
 
-      {/* Quick action links */}
-      <div className="w-full max-w-3xl">
+      {/* Updated Quick action links - Horizontal Icons */}
+      <div className="w-full max-w-lg">
         <DashboardQuickLinks />
       </div>
 
@@ -119,4 +119,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
