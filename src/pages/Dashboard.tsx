@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
-// BalanceCard WITH quick action buttons grid!
+// BalanceCard with quick action buttons grid!
 const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; currency?: string }) => (
   <Card
     className="wallet-card w-full max-w-lg mx-auto shadow-2xl rounded-2xl border-none relative overflow-hidden bg-gradient-to-tr from-blue-600 to-fuchsia-700 text-white"
@@ -87,9 +87,9 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
-      <div className="min-h-screen w-full flex flex-col gap-7 items-center bg-gradient-to-tr from-violet-100 via-blue-50 to-pink-50 px-1 pt-7 md:pt-12 animate-fade-in">
+      <div className="min-h-screen w-full max-w-full flex flex-col gap-7 items-center bg-gradient-to-tr from-violet-100 via-blue-50 to-pink-50 px-0 pt-7 md:pt-12 animate-fade-in overflow-x-hidden overflow-y-auto">
         {/* Greeting */}
-        <div className="w-full max-w-4xl text-center">
+        <div className="w-full max-w-4xl text-center px-2 md:px-0">
           <h2 className="font-bold text-2xl md:text-3xl text-finance-purple mb-3">
             {userName && (
               <>Welcome back, <span className="font-extrabold text-finance-blue">{userName}</span>!</>
@@ -101,11 +101,14 @@ const Dashboard = () => {
           </p>
         </div>
         {/* Main balance card with quick actions */}
-        <BalanceCard totalBalance={4931.17} currency="$" />
-        {/* Removed DashboardQuickLinks as requested */}
+        <div className="w-full flex justify-center px-1">
+          <BalanceCard totalBalance={4931.17} currency="$" />
+        </div>
+        {/* Removed all upper nav icons. The only navigation now is bottom nav. */}
       </div>
     </DashboardLayout>
   );
 };
 
 export default Dashboard;
+
