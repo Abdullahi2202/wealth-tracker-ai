@@ -1,8 +1,7 @@
-
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "./DashboardHeader";
-import Sidebar from "./Sidebar";
+import DashboardSidebar from "../dashboard/DashboardSidebar";
 import MobileNavigation from "./MobileNavigation";
 
 // Define the type for window.Capacitor
@@ -42,7 +41,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       <DashboardHeader />
       <div className="flex flex-1">
         <aside className="hidden md:flex w-64 flex-col border-r bg-background">
-          <Sidebar />
+          <DashboardSidebar />
         </aside>
         <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
       </div>
