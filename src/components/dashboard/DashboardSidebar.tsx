@@ -1,13 +1,19 @@
 
+// Sidebar for desktop and mobile, matching the WalletMaster branding and nav order
+
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Sidebar, SidebarContent, SidebarGroup,
-  SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { Home, CreditCard, BarChart3, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Matches other nav menu icons/pages
 const menuItems = [
   {
     label: "Home",
@@ -17,17 +23,17 @@ const menuItems = [
   {
     label: "Payments",
     path: "/payments/home",
-    icon: CreditCard
+    icon: CreditCard,
   },
   {
     label: "Analytics",
     path: "/transactions",
-    icon: BarChart3
+    icon: BarChart3,
   },
   {
     label: "Profile",
     path: "/profile",
-    icon: User
+    icon: User,
   },
 ];
 
@@ -42,6 +48,7 @@ export default function DashboardSidebar() {
           <div className="font-bold text-2xl text-finance-purple px-4 pt-5 pb-2 mb-4">
             Wallet<span className="text-finance-blue">Master</span>
           </div>
+          <h2 className="mb-3 px-4 text-lg font-semibold tracking-tight">Navigation</h2>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
@@ -50,19 +57,17 @@ export default function DashboardSidebar() {
                   : location.pathname.startsWith(item.path);
                 return (
                   <SidebarMenuItem key={item.label}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                    >
+                    <SidebarMenuButton asChild isActive={isActive}>
                       <button
                         className={cn(
-                          "flex items-center w-full gap-3 py-2 px-2 rounded-lg transition-colors",
+                          "flex items-center w-full gap-3 py-2 px-3 rounded-lg transition-colors font-medium",
                           isActive
                             ? "bg-blue-600/10 text-blue-600 font-bold"
-                            : "hover:bg-muted/50"
+                            : "hover:bg-muted/50 text-zinc-800"
                         )}
                         onClick={() => navigate(item.path)}
                         aria-label={item.label}
+                        tabIndex={0}
                       >
                         <item.icon
                           className={cn(

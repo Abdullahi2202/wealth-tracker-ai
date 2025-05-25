@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -98,12 +97,10 @@ const Dashboard = () => {
           Manage your finances with insights, analytics, and fast payments.
         </p>
       </div>
-
       {/* Main balance card */}
       <BalanceCard totalBalance={4931.17} currency="$" />
-
-      {/* Quick action links - Horizontal Icons */}
-      <div className="w-full max-w-lg">
+      {/* Remove redundant DashboardQuickLinks if sidebar present (on desktop) */}
+      <div className="w-full max-w-lg md:hidden">
         <DashboardQuickLinks />
       </div>
     </div>

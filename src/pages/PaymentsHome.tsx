@@ -1,8 +1,8 @@
 
-import { useNavigate } from "react-router-dom";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CreditCard, Download, Plus } from "lucide-react";
-import BottomNavBar from "@/components/layout/BottomNavBar";
 
+// Action cards for Payments Home
 const actionCards = [
   {
     title: "Send Payment",
@@ -31,8 +31,8 @@ const PaymentsHome = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-muted flex flex-col items-center pt-6 pb-24 px-3 animate-fade-in">
-      <div className="w-full max-w-md mx-auto">
+    <DashboardLayout>
+      <div className="w-full max-w-md mx-auto pt-8 pb-20 px-3 animate-fade-in">
         <h1 className="text-center text-3xl font-extrabold mb-8 text-finance-purple">
           Payments
         </h1>
@@ -55,8 +55,7 @@ const PaymentsHome = () => {
           ))}
         </div>
       </div>
-      <BottomNavBar />
-    </div>
+    </DashboardLayout>
   );
 };
 

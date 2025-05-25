@@ -1,28 +1,13 @@
+
+// Only show quicklinks on mobile, as sidebar handles desktop navigation
 import { useLocation, useNavigate } from "react-router-dom";
 import { Home, CreditCard, BarChart3, User } from "lucide-react";
 
-// Unified navigation for user dashboard (matches sidebar, mobile, and footer)
 const DASH_LINKS = [
-  {
-    name: "Home",
-    path: "/dashboard",
-    icon: Home,
-  },
-  {
-    name: "Payments",
-    path: "/payments/home",
-    icon: CreditCard,
-  },
-  {
-    name: "Analytics",
-    path: "/transactions",
-    icon: BarChart3,
-  },
-  {
-    name: "Profile",
-    path: "/profile",
-    icon: User,
-  },
+  { name: "Home", path: "/dashboard", icon: Home },
+  { name: "Payments", path: "/payments/home", icon: CreditCard },
+  { name: "Analytics", path: "/transactions", icon: BarChart3 },
+  { name: "Profile", path: "/profile", icon: User },
 ];
 
 export default function DashboardQuickLinks() {
@@ -30,7 +15,7 @@ export default function DashboardQuickLinks() {
   const location = useLocation();
 
   return (
-    <nav className="w-full max-w-lg mx-auto flex justify-between items-center py-2">
+    <nav className="w-full max-w-lg mx-auto flex justify-between items-center py-2 md:hidden">
       {DASH_LINKS.map((item) => {
         const isActive =
           item.path === "/dashboard"
