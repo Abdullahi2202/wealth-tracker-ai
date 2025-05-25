@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
