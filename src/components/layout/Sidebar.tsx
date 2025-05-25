@@ -25,6 +25,29 @@ import {
 import { useState } from "react";
 import { useUserRole } from "@/hooks/useUserRole"; // FIX: use proper ES module import
 
+const mainMenuItems = [
+  {
+    name: "Home",
+    icon: Home,
+    path: "/dashboard",
+  },
+  {
+    name: "Payments",
+    icon: CreditCard,
+    path: "/payments/home",
+  },
+  {
+    name: "Analytics",
+    icon: BarChart3,
+    path: "/transactions",
+  },
+  {
+    name: "Profile",
+    icon: User,
+    path: "/profile",
+  }
+];
+
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,53 +56,36 @@ const Sidebar = () => {
   const [openAnalytics, setOpenAnalytics] = useState(false);
   const [openProfile, setOpenProfile] = useState(false);
   
-  const mainMenuItems = [
-    {
-      name: "Home",
-      icon: Home,
-      path: "/dashboard",
-    },
-    {
-      name: "Payments",
-      icon: CreditCard,
-      path: "/payments/home",
-    },
-    {
-      name: "Analytics",
-      icon: BarChart3,
-      path: "/transactions",
-    },
-    {
-      name: "Profile",
-      icon: User,
-      path: "/profile",
-    }
-  ];
-
   // Use the hook directly
   const role = useUserRole();
 
-  const renderMenuItem = (item) => (
-    <Button
-      key={item.name}
-      variant={location.pathname.startsWith(item.path) || (item.path === "/dashboard" && location.pathname === "/dashboard") ? "secondary" : "ghost"}
-      className={cn(
-        "w-full justify-start mb-1 flex items-center gap-3 py-2 px-2 rounded-lg transition-colors",
-        location.pathname.startsWith(item.path) || (item.path === "/dashboard" && location.pathname === "/dashboard")
-          ? "bg-blue-600/10 text-blue-600 font-bold"
-          : "hover:bg-muted/50"
-      )}
-      onClick={() => navigate(item.path)}
-    >
-      <item.icon className={cn(
-        "w-6 h-6",
-        location.pathname.startsWith(item.path) || (item.path === "/dashboard" && location.pathname === "/dashboard")
-          ? "text-blue-600"
-          : "text-gray-500"
-      )} strokeWidth={2} />
-      {item.name}
-    </Button>
-  );
+  const renderMenuItem = (item) => {
+    const isActive = item.path === "/dashboard"
+      ? location.pathname === "/dashboard"
+      : location.pathname.startsWith(item.path);
+
+    return (
+      <Button
+        key={item.name}
+        variant={isActive ? "secondary" : "ghost"}
+        className={cn(
+          "w-full justify-start mb-1 flex items-center gap-3 py-2 px-2 rounded-lg transition-colors",
+          isActive
+            ? "bg-blue-600/10 text-blue-600 font-bold"
+            : "hover:bg-muted/50"
+        )}
+        onClick={() => navigate(item.path)}
+      >
+        <item.icon className={cn(
+          "w-6 h-6",
+          isActive
+            ? "text-blue-600"
+            : "text-gray-500"
+        )} strokeWidth={2} />
+        {item.name}
+      </Button>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full pt-2">
@@ -88,7 +94,6 @@ const Sidebar = () => {
           Wallet<span className="text-finance-blue">Master</span>
         </div>
       </div>
-
       <div className="px-3 py-2 flex-1 overflow-auto">
         <h2 className="mb-3 px-4 text-lg font-semibold tracking-tight">
           Navigation
