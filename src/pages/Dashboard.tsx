@@ -1,10 +1,11 @@
+
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
 import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import DashboardQuickLinks from "@/components/dashboard/DashboardQuickLinks";
 
-// BalanceCard RESTORED (WITH action-buttons section REMOVED as requested)
+// BalanceCard WITH quick action buttons grid restored!
 const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; currency?: string }) => (
   <Card
     className="wallet-card w-full max-w-lg mx-auto shadow-2xl rounded-2xl border-none relative overflow-hidden bg-gradient-to-tr from-blue-600 to-fuchsia-700 text-white"
@@ -46,7 +47,25 @@ const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; c
           Receive
         </button>
       </div>
-      {/* Quick Action Grid REMOVED as per your request */}
+      {/* Quick Action Grid RESTORED */}
+      <div className="grid grid-cols-4 gap-2 mt-3">
+        <button className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+          <ArrowUp className="mb-0.5" />
+          <span className="text-xs mt-0.5 font-medium">Top Up</span>
+        </button>
+        <button className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+          <ArrowDown className="mb-0.5" />
+          <span className="text-xs mt-0.5 font-medium">Transfer</span>
+        </button>
+        <button className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+          <QrCode className="mb-0.5" />
+          <span className="text-xs mt-0.5 font-medium">QR Code</span>
+        </button>
+        <button className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+          <Wallet className="mb-0.5" />
+          <span className="text-xs mt-0.5 font-medium">Wallet</span>
+        </button>
+      </div>
     </CardContent>
   </Card>
 );
@@ -82,7 +101,7 @@ const Dashboard = () => {
             Manage your finances with insights, analytics, and fast payments.
           </p>
         </div>
-        {/* Main balance card RESTORED (with quick actions removed) */}
+        {/* Main balance card WITH quick actions */}
         <BalanceCard totalBalance={4931.17} currency="$" />
         {/* Remove redundant DashboardQuickLinks if sidebar present (on desktop) */}
         <div className="w-full max-w-lg md:hidden">
@@ -94,3 +113,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
