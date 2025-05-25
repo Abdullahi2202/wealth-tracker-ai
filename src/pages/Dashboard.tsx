@@ -1,58 +1,54 @@
 
 import { useEffect, useState } from "react";
+import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import DashboardQuickLinks from "@/components/dashboard/DashboardQuickLinks";
-import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
+import ExpenseChart from "@/components/dashboard/ExpenseChart";
+import RecentTransactions from "@/components/dashboard/RecentTransactions";
 
-// -- Main BalanceCard reused, as before --
+// Custom balance card (more visually distinct, shadowed, modern)
 const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; currency?: string }) => (
   <Card
-    className="wallet-card text-white w-full max-w-md mx-auto shadow-xl rounded-2xl p-0"
-    style={{
-      background: "linear-gradient(135deg, #4361ee 0%, #7209b7 100%)",
-      borderRadius: "18px",
-      boxShadow: "0 8px 32px rgba(114, 9, 183, 0.18)"
-    }}
+    className="wallet-card w-full max-w-lg mx-auto shadow-2xl rounded-2xl border-none relative overflow-hidden bg-gradient-to-tr from-blue-600 to-fuchsia-700 text-white"
   >
-    <CardContent className="p-7">
-      <div className="flex justify-between items-start">
+    <CardContent className="p-8">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold opacity-90 mb-0.5">Total Balance</p>
-          <h3 className="text-4xl font-extrabold mt-1 tracking-tight">
+          <div className="text-xs uppercase font-bold tracking-widest text-white/80 mb-1">Total Balance</div>
+          <div className="text-4xl font-extrabold mb-1 tracking-tight flex items-end">
             {currency}
             {totalBalance.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
-          </h3>
-          <p className="text-[14px] mt-4 opacity-90">Available across all accounts</p>
+          </div>
+          <div className="text-sm opacity-90">Available across all accounts</div>
         </div>
-        <div className="bg-white/25 p-3 rounded-full">
+        <div className="bg-white/20 p-3 rounded-full">
           <CreditCard className="h-7 w-7 text-white opacity-90" />
         </div>
       </div>
-      <hr className="border-white/20 my-5" />
-      <div className="flex justify-between mb-5">
+      <div className="mt-6 flex justify-between gap-6">
         <div>
-          <p className="text-xs opacity-80">This Month's Income</p>
-          <p className="text-lg font-semibold">{currency}3,580.00</p>
+          <div className="text-xs opacity-80">This Month's Income</div>
+          <div className="text-lg font-semibold">{currency}3,580.00</div>
         </div>
         <div>
-          <p className="text-xs opacity-80">This Month's Expenses</p>
-          <p className="text-lg font-semibold">{currency}2,149.25</p>
+          <div className="text-xs opacity-80">This Month's Expenses</div>
+          <div className="text-lg font-semibold">{currency}2,149.25</div>
         </div>
       </div>
-      <div className="flex gap-3 mb-5">
-        <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white/15 hover:bg-white/25 transition text-white font-semibold shadow-md focus:outline-none">
+      <div className="flex gap-3 mt-7">
+        <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition text-white font-semibold shadow focus:outline-none backdrop-blur">
           <Send className="h-4 w-4" />
           Pay
         </button>
-        <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white/15 hover:bg-white/25 transition text-white font-semibold shadow-md focus:outline-none">
+        <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition text-white font-semibold shadow focus:outline-none backdrop-blur">
           <ArrowDown className="h-4 w-4" />
           Receive
         </button>
       </div>
-      <div className="grid grid-cols-4 gap-2 mt-1">
+      <div className="grid grid-cols-4 gap-2 mt-3">
         <button className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
           <ArrowUp className="mb-0.5" />
           <span className="text-xs mt-0.5 font-medium">Top Up</span>
@@ -91,28 +87,36 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-muted px-2 py-6 animate-fade-in">
-      {/* User's Name at the Top */}
-      <div className="font-semibold text-2xl mb-8 mt-3 text-finance-purple">
-        {userName && (
-          <span>
-            Hi, <span className="font-extrabold">{userName}</span>
-          </span>
-        )}
+    <div className="min-h-screen w-full flex flex-col gap-7 items-center bg-gradient-to-tr from-violet-100 via-blue-50 to-pink-50 px-1 pt-7 md:pt-12 animate-fade-in">
+      {/* Greeting */}
+      <div className="w-full max-w-4xl text-center">
+        <h2 className="font-bold text-2xl md:text-3xl text-finance-purple mb-3">
+          {userName && (
+            <>Welcome back, <span className="font-extrabold text-finance-blue">{userName}</span>!</>
+          )}
+          {!userName && <>Welcome to <span className="text-finance-blue">WalletMaster</span>!</>}
+        </h2>
+        <p className="text-md md:text-lg text-zinc-500/90 max-w-xl mx-auto">
+          Manage your finances with insights, analytics, and fast payments.
+        </p>
       </div>
 
-      {/* Main Balance Card */}
+      {/* Main balance card */}
       <BalanceCard totalBalance={4931.17} currency="$" />
 
-      {/* Dashboard Quick Links */}
-      <DashboardQuickLinks />
+      {/* Quick action links */}
+      <div className="w-full max-w-3xl">
+        <DashboardQuickLinks />
+      </div>
 
-      {/* 
-        All other dashboard widgets/layouts/icons would be rendered here, as before.
-        Add more widgets here if required!
-      */}
+      {/* Widgets Grid (Expenses + Transactions) */}
+      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-7 mt-2 pb-8">
+        <ExpenseChart />
+        <RecentTransactions />
+      </div>
     </div>
   );
 };
 
 export default Dashboard;
+
