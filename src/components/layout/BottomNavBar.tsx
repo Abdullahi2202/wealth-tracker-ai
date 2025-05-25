@@ -35,7 +35,10 @@ const BottomNavBar = () => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-background border-t h-20 flex items-center justify-around z-50 md:hidden">
       {NAV_ITEMS.map((item) => {
-        const isActive = location.pathname.startsWith(item.path);
+        const isActive =
+          item.path === "/dashboard"
+            ? location.pathname === "/dashboard"
+            : location.pathname.startsWith(item.path);
         return (
           <button
             key={item.name}
@@ -70,3 +73,4 @@ const BottomNavBar = () => {
 };
 
 export default BottomNavBar;
+

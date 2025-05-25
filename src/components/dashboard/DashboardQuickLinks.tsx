@@ -2,26 +2,27 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { Home, CreditCard, BarChart3, User } from "lucide-react";
 
+// Unified navigation for user dashboard (matches sidebar, mobile, and footer)
 const DASH_LINKS = [
   {
     name: "Home",
-    icon: Home,
     path: "/dashboard",
+    icon: Home,
   },
   {
     name: "Payments",
-    icon: CreditCard,
     path: "/payments/home",
+    icon: CreditCard,
   },
   {
     name: "Analytics",
-    icon: BarChart3,
     path: "/transactions",
+    icon: BarChart3,
   },
   {
     name: "Profile",
-    icon: User,
     path: "/profile",
+    icon: User,
   },
 ];
 
@@ -30,7 +31,7 @@ export default function DashboardQuickLinks() {
   const location = useLocation();
 
   return (
-    <nav className="w-full max-w-lg mx-auto flex justify-between items-center py-2 mt-0 mb-8 bg-white/0">
+    <nav className="w-full max-w-lg mx-auto flex justify-between items-center py-2">
       {DASH_LINKS.map((item) => {
         const isActive =
           item.path === "/dashboard"
@@ -46,16 +47,16 @@ export default function DashboardQuickLinks() {
             className="flex flex-col items-center flex-1 focus:outline-none group"
           >
             <span
-              className={`flex items-center justify-center mb-1 transition-all
-                ${isActive ? "bg-blue-600 text-white" : "text-zinc-500"}
+              className={`flex items-center justify-center mb-1 transition-all 
+                ${isActive ? "bg-blue-600 text-white shadow" : "text-zinc-500"}
                 rounded-full`}
               style={{
-                width: isActive ? 40 : 36,
-                height: isActive ? 40 : 36,
+                width: isActive ? 44 : 38,
+                height: isActive ? 44 : 38,
               }}
             >
               <item.icon
-                size={22}
+                size={24}
                 strokeWidth={2.2}
                 className="transition-all"
               />

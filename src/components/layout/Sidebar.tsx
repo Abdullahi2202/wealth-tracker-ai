@@ -1,4 +1,3 @@
-
 import { useNavigate, useLocation } from "react-router-dom";
 import { 
   CreditCard, 
@@ -36,150 +35,51 @@ const Sidebar = () => {
   
   const mainMenuItems = [
     {
-      name: "Dashboard",
+      name: "Home",
       icon: Home,
       path: "/dashboard",
     },
     {
       name: "Payments",
-      icon: Wallet,
-      isSubmenu: true,
-      stateHandler: setOpenPayments,
-      isOpen: openPayments,
-      subItems: [
-        {
-          name: "Cards",
-          icon: CreditCard,
-          path: "/cards",
-        },
-        {
-          name: "Send Money",
-          icon: ArrowUp,
-          path: "/payments",
-        },
-        {
-          name: "Request Money",
-          icon: ArrowDown,
-          path: "/payments?tab=request",
-        }
-      ]
+      icon: CreditCard,
+      path: "/payments/home",
     },
     {
       name: "Analytics",
       icon: BarChart3,
-      isSubmenu: true,
-      stateHandler: setOpenAnalytics,
-      isOpen: openAnalytics,
-      subItems: [
-        {
-          name: "Transactions",
-          icon: ArrowLeftRight,
-          path: "/transactions",
-        },
-        {
-          name: "Expenses",
-          icon: PieChart,
-          path: "/expenses",
-        },
-        {
-          name: "Investment Insights",
-          icon: TrendingUp,
-          path: "/investments",
-        },
-        {
-          name: "Savings",
-          icon: PiggyBank,
-          path: "/budget",
-        }
-      ]
+      path: "/transactions",
     },
     {
       name: "Profile",
       icon: User,
-      isSubmenu: true,
-      stateHandler: setOpenProfile,
-      isOpen: openProfile,
-      subItems: [
-        {
-          name: "Settings",
-          icon: Settings,
-          path: "/settings",
-        },
-        {
-          name: "AI Assistant",
-          icon: MessageSquare,
-          path: "/assistant",
-        }
-      ]
+      path: "/profile",
     }
   ];
 
   // Use the hook directly
   const role = useUserRole();
 
-  const renderMenuItem = (item) => {
-    if (item.isSubmenu) {
-      return (
-        <div key={item.name} className="mb-1">
-          <Collapsible
-            open={item.isOpen}
-            onOpenChange={item.stateHandler}
-            className="w-full"
-          >
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-between"
-              >
-                <div className="flex items-center">
-                  <item.icon className="mr-2 h-4 w-4" />
-                  {item.name}
-                </div>
-                <div className={`transition-transform ${item.isOpen ? 'rotate-180' : ''}`}>
-                  <ArrowDown className="h-4 w-4" />
-                </div>
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pl-8 pt-1">
-              {item.subItems.map((subItem) => (
-                <Button
-                  key={subItem.name}
-                  variant={location.pathname === subItem.path ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start mb-1",
-                    location.pathname === subItem.path 
-                      ? "bg-secondary text-white" 
-                      : "hover:bg-secondary/10"
-                  )}
-                  onClick={() => navigate(subItem.path)}
-                >
-                  <subItem.icon className="mr-2 h-4 w-4" />
-                  {subItem.name}
-                </Button>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      );
-    } else {
-      return (
-        <Button
-          key={item.name}
-          variant={location.pathname === item.path ? "secondary" : "ghost"}
-          className={cn(
-            "w-full justify-start mb-1",
-            location.pathname === item.path 
-              ? "bg-secondary text-white" 
-              : "hover:bg-secondary/10"
-          )}
-          onClick={() => navigate(item.path)}
-        >
-          <item.icon className="mr-2 h-4 w-4" />
-          {item.name}
-        </Button>
-      );
-    }
-  };
+  const renderMenuItem = (item) => (
+    <Button
+      key={item.name}
+      variant={location.pathname.startsWith(item.path) || (item.path === "/dashboard" && location.pathname === "/dashboard") ? "secondary" : "ghost"}
+      className={cn(
+        "w-full justify-start mb-1 flex items-center gap-3 py-2 px-2 rounded-lg transition-colors",
+        location.pathname.startsWith(item.path) || (item.path === "/dashboard" && location.pathname === "/dashboard")
+          ? "bg-blue-600/10 text-blue-600 font-bold"
+          : "hover:bg-muted/50"
+      )}
+      onClick={() => navigate(item.path)}
+    >
+      <item.icon className={cn(
+        "w-6 h-6",
+        location.pathname.startsWith(item.path) || (item.path === "/dashboard" && location.pathname === "/dashboard")
+          ? "text-blue-600"
+          : "text-gray-500"
+      )} strokeWidth={2} />
+      {item.name}
+    </Button>
+  );
 
   return (
     <div className="flex flex-col h-full pt-2">
@@ -188,22 +88,13 @@ const Sidebar = () => {
           Wallet<span className="text-finance-blue">Master</span>
         </div>
       </div>
-      
+
       <div className="px-3 py-2 flex-1 overflow-auto">
         <h2 className="mb-3 px-4 text-lg font-semibold tracking-tight">
           Navigation
         </h2>
         <div className="space-y-1">
           {mainMenuItems.map(renderMenuItem)}
-          <Button
-            key="profile"
-            variant="ghost"
-            className="w-full justify-start mb-1 hover:bg-secondary/10"
-            onClick={() => window.location.href = "/profile"}
-          >
-            <User className="mr-2 h-4 w-4" />
-            Profile
-          </Button>
           {role === "admin" && (
             <Button
               key="admin"
@@ -222,4 +113,3 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
-
