@@ -3,8 +3,6 @@ import { useEffect, useState } from "react";
 import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import DashboardQuickLinks from "@/components/dashboard/DashboardQuickLinks";
-import ExpenseChart from "@/components/dashboard/ExpenseChart";
-import RecentTransactions from "@/components/dashboard/RecentTransactions";
 
 // Custom balance card (modern, visually distinct)
 const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; currency?: string }) => (
@@ -104,15 +102,9 @@ const Dashboard = () => {
       {/* Main balance card */}
       <BalanceCard totalBalance={4931.17} currency="$" />
 
-      {/* Updated Quick action links - Horizontal Icons */}
+      {/* Quick action links - Horizontal Icons */}
       <div className="w-full max-w-lg">
         <DashboardQuickLinks />
-      </div>
-
-      {/* Widgets Grid (Expenses + Transactions) */}
-      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-7 mt-2 pb-8">
-        <ExpenseChart />
-        <RecentTransactions />
       </div>
     </div>
   );
