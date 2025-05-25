@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardContent } from "@/components/ui/card";
+import { User } from "lucide-react";
 
 const Profile = () => {
   const [profile, setProfile] = useState<{ email: string; full_name: string }>({
@@ -66,39 +67,53 @@ const Profile = () => {
   };
 
   return (
-    <div className="container max-w-md py-10">
-      <Card>
-        <CardContent>
-          <CardTitle>My Profile</CardTitle>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-muted px-2">
+      <Card className="max-w-md w-full rounded-2xl shadow-lg border border-gray-200 p-0">
+        <CardContent className="p-8 pt-8 flex flex-col gap-6">
+          <div className="flex flex-col items-center mb-2">
+            <div className="bg-finance-purple/10 text-finance-purple w-16 h-16 rounded-full flex items-center justify-center mb-2">
+              <User className="w-10 h-10" />
+            </div>
+            <CardTitle className="text-2xl font-extrabold mb-1 text-center">
+              My Profile
+            </CardTitle>
+          </div>
           {loading ? (
-            <div>Loading...</div>
+            <div className="text-center text-muted-foreground">Loading...</div>
           ) : (
             <form
               onSubmit={e => {
                 e.preventDefault();
                 handleUpdate();
               }}
-              className="space-y-4 mt-4"
+              className="space-y-6 mt-2"
             >
-              <div>
-                <label className="font-semibold block mb-1">Email</label>
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-base mb-0.5" htmlFor="email">Email</label>
                 <input
-                  className="w-full px-2 py-2 bg-muted rounded border"
+                  id="email"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-600"
                   value={profile.email}
                   readOnly
                 />
               </div>
-              <div>
-                <label className="font-semibold block mb-1">Full Name</label>
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-base mb-0.5" htmlFor="full_name">Full Name</label>
                 <input
-                  className="w-full px-2 py-2 border rounded"
+                  id="full_name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   value={profile.full_name}
                   onChange={(e) =>
                     setProfile((p) => ({ ...p, full_name: e.target.value }))
                   }
+                  placeholder="Enter your name"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full bg-finance-purple hover:bg-finance-purple/90 rounded-xl py-3 text-base font-semibold"
+                disabled={loading}
+              >
                 Save
               </Button>
             </form>
