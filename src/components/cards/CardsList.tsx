@@ -1,9 +1,9 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlusCircle } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CreditCardData {
   id: string;
@@ -36,78 +36,114 @@ const sampleCards: CreditCardData[] = [
 ];
 
 const CardsList = () => {
-  const [cards, setCards] = useState<CreditCardData[]>(sampleCards);
+  const [cards, setCards] = useState<CreditCardData[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    // Fetch real user cards data from supabase
+    const fetchCards = async () => {
+      setLoading(true);
+      // Get user info from localStorage (as across the app)
+      const storedUser = localStorage.getItem("walletmaster_user");
+      let email = "";
+      if (storedUser) {
+        try {
+          const userObj = JSON.parse(storedUser);
+          email = userObj.email || "";
+        } catch {
+          email = "";
+        }
+      }
+      if (!email) {
+        setCards([]);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("registrations")
+        .select("id, full_name, email")
+        .eq("email", email)
+        .limit(1)
+        .maybeSingle();
+      // In a real app, you'd store/fetch list of cards from a "cards" table belonging to the user
+      if (!error && data) {
+        // For illustration, simulate a minimal credit card using registration data
+        setCards([
+          {
+            id: "user-wallet",
+            cardNumber: "•••• •••• •••• " + data.id?.slice(-4) || "0000",
+            cardHolder: (data.full_name || "USER").toUpperCase(),
+            expiryDate: "12/30",
+            bank: "WalletMaster",
+            balance: 0, // could fetch from transactions balance
+            color: "bg-gradient-to-r from-purple-500 to-blue-500"
+          }
+        ]);
+      } else {
+        setCards([]);
+      }
+      setLoading(false);
+    };
+    fetchCards();
+  }, []);
 
   const addNewCard = () => {
-    toast.info("Card linking feature will be available soon!");
+    // Could open a modal to add a real bank/card integration
   };
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Your Cards</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {cards.map((card) => (
-          <div key={card.id} className="flex flex-col h-full">
-            <Card
-              className={`credit-card h-48 group transform transition hover:-translate-y-1 hover:shadow-lg ${
-                card.color || ""
-              }`}
-            >
-              <CardContent className="p-6 flex flex-col h-full justify-between text-white">
-                <div className="flex justify-between items-start">
-                  <div className="text-white/80 font-medium">{card.bank}</div>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="40"
-                    height="32"
-                    viewBox="0 0 40 32"
-                    className="opacity-80"
-                    fill="none"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      clipRule="evenodd"
-                      d="M25.5 11C26.3284 11 27 10.3284 27 9.5C27 8.67157 26.3284 8 25.5 8C24.6716 8 24 8.67157 24 9.5C24 10.3284 24.6716 11 25.5 11ZM31.5 8C30.6716 8 30 8.67157 30 9.5C30 10.3284 30.6716 11 31.5 11C32.3284 11 33 10.3284 33 9.5C33 8.67157 32.3284 8 31.5 8Z"
-                      fill="white"
-                    />
-                  </svg>
-                </div>
-
-                <div className="mt-4 text-lg tracking-widest font-mono">
-                  {card.cardNumber}
-                </div>
-
-                <div className="flex justify-between items-end mt-6">
-                  <div className="text-sm space-y-1">
-                    <div className="text-white/70 uppercase text-xs">
-                      Card Holder
-                    </div>
-                    <div>{card.cardHolder}</div>
-                  </div>
-                  <div className="text-sm space-y-1">
-                    <div className="text-white/70 uppercase text-xs">
-                      Expires
-                    </div>
-                    <div>{card.expiryDate}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <div className="mt-3">
-              <p className="text-sm text-muted-foreground">Available Balance</p>
-              <p className="font-semibold text-xl">
-                ${card.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </p>
-            </div>
+        {loading ? (
+          <div className="text-center text-muted-foreground">Loading...</div>
+        ) : cards.length === 0 ? (
+          <div className="text-center text-muted-foreground col-span-2">
+            No cards found. Add one!
           </div>
-        ))}
+        ) : (
+          cards.map((card) => (
+            <div key={card.id} className="flex flex-col h-full">
+              <Card className={`credit-card h-48 group transform transition hover:-translate-y-1 hover:shadow-lg ${card.color || ""}`}>
+                <CardContent className="p-6 flex flex-col h-full justify-between text-white">
+                  <div className="flex justify-between items-start">
+                    <div className="text-white/80 font-medium">{card.bank}</div>
+                    {/* Bank logo can be added here */}
+                  </div>
+                  <div className="mt-4 text-lg tracking-widest font-mono">
+                    {card.cardNumber}
+                  </div>
+                  <div className="flex justify-between items-end mt-6">
+                    <div className="text-sm space-y-1">
+                      <div className="text-white/70 uppercase text-xs">
+                        Card Holder
+                      </div>
+                      <div>{card.cardHolder}</div>
+                    </div>
+                    <div className="text-sm space-y-1">
+                      <div className="text-white/70 uppercase text-xs">
+                        Expires
+                      </div>
+                      <div>{card.expiryDate}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <div className="mt-3">
+                <p className="text-sm text-muted-foreground">Available Balance</p>
+                <p className="font-semibold text-xl">
+                  ${card.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
 
         <Button
           onClick={addNewCard}
           className="h-48 border-2 border-dashed border-muted-foreground/20 bg-transparent hover:border-primary hover:bg-primary/5 flex flex-col gap-2 rounded-2xl"
           variant="ghost"
         >
-          <PlusCircle className="h-10 w-10 text-muted-foreground" />
           <span>Link New Card</span>
         </Button>
       </div>

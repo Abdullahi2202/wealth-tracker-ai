@@ -1,4 +1,3 @@
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,37 +6,60 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const sampleCards = [
-  {
-    id: "card1",
-    cardNumber: "4540 •••• •••• 1234",
-    cardHolder: "DEMO USER",
-    expiryDate: "12/26",
-    bank: "National Bank",
-    balance: 3250.75,
-  },
-  {
-    id: "card2",
-    cardNumber: "5412 •••• •••• 5678",
-    cardHolder: "DEMO USER",
-    expiryDate: "09/27",
-    bank: "Metro Credit Union",
-    balance: 1680.42,
-  },
-];
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const SendPayment = () => {
-  const [fromCard, setFromCard] = useState(sampleCards[0].id);
+  const [cards, setCards] = useState<{ id: string; cardNumber: string; cardHolder: string; balance: number; bank: string; expiryDate: string }[]>([]);
+  const [fromCard, setFromCard] = useState("");
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSend = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Simulate fetching user's cards (replace with actual cards table later)
+    const fetchCards = async () => {
+      const storedUser = localStorage.getItem("walletmaster_user");
+      let email = "";
+      if (storedUser) {
+        try {
+          const userObj = JSON.parse(storedUser);
+          email = userObj.email || "";
+        } catch {
+          email = "";
+        }
+      }
+      // Demo: Just fetch the registration, present as wallet card for now
+      const { data, error } = await supabase
+        .from("registrations")
+        .select("id, full_name, email")
+        .eq("email", email)
+        .limit(1)
+        .maybeSingle();
+      if (!error && data) {
+        const userCard = {
+          id: "user-wallet",
+          cardNumber: "•••• •••• •••• " + data.id?.slice(-4) || "0000",
+          cardHolder: (data.full_name || "USER").toUpperCase(),
+          bank: "WalletMaster",
+          expiryDate: "12/30",
+          balance: 0
+        };
+        setCards([userCard]);
+        setFromCard(userCard.id);
+      } else {
+        setCards([]);
+        setFromCard("");
+      }
+    };
+    fetchCards();
+  }, []);
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountValue = parseFloat(amount);
-    const card = sampleCards.find((c) => c.id === fromCard);
+    const card = cards.find((c) => c.id === fromCard);
     if (!amountValue || amountValue <= 0) {
       toast.error("Please enter a valid amount.");
       return;
@@ -51,12 +73,32 @@ const SendPayment = () => {
       return;
     }
     setLoading(true);
+    // Save transaction to Supabase
+    const storedUser = localStorage.getItem("walletmaster_user");
+    let email = "";
+    if (storedUser) {
+      try {
+        const userObj = JSON.parse(storedUser);
+        email = userObj.email || "";
+      } catch {
+        email = "";
+      }
+    }
+    await supabase.from("transactions").insert({
+      id: undefined, // let supabase auto-gen
+      email,
+      amount: amountValue,
+      type: "expense",
+      name: "Manual Send", // You can customize
+      category: "Transfer",
+      date: new Date().toISOString().split("T")[0]
+    });
     setTimeout(() => {
       toast.success(`Payment of $${amountValue.toFixed(2)} sent!`);
       setLoading(false);
       setAmount("");
       setRecipient("");
-    }, 1200);
+    }, 1000);
   };
 
   return (
@@ -81,7 +123,7 @@ const SendPayment = () => {
                 value={fromCard}
                 onChange={(e) => setFromCard(e.target.value)}
               >
-                {sampleCards.map((card) => (
+                {cards.map((card) => (
                   <option value={card.id} key={card.id}>
                     {card.bank} — {card.cardNumber} (${card.balance.toFixed(2)})
                   </option>
