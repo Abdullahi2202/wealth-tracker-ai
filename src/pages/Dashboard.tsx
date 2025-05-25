@@ -1,3 +1,5 @@
+
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
 import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,27 +86,30 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-full flex flex-col gap-7 items-center bg-gradient-to-tr from-violet-100 via-blue-50 to-pink-50 px-1 pt-7 md:pt-12 animate-fade-in">
-      {/* Greeting */}
-      <div className="w-full max-w-4xl text-center">
-        <h2 className="font-bold text-2xl md:text-3xl text-finance-purple mb-3">
-          {userName && (
-            <>Welcome back, <span className="font-extrabold text-finance-blue">{userName}</span>!</>
-          )}
-          {!userName && <>Welcome to <span className="text-finance-blue">WalletMaster</span>!</>}
-        </h2>
-        <p className="text-md md:text-lg text-zinc-500/90 max-w-xl mx-auto">
-          Manage your finances with insights, analytics, and fast payments.
-        </p>
+    <DashboardLayout>
+      <div className="min-h-screen w-full flex flex-col gap-7 items-center bg-gradient-to-tr from-violet-100 via-blue-50 to-pink-50 px-1 pt-7 md:pt-12 animate-fade-in">
+        {/* Greeting */}
+        <div className="w-full max-w-4xl text-center">
+          <h2 className="font-bold text-2xl md:text-3xl text-finance-purple mb-3">
+            {userName && (
+              <>Welcome back, <span className="font-extrabold text-finance-blue">{userName}</span>!</>
+            )}
+            {!userName && <>Welcome to <span className="text-finance-blue">WalletMaster</span>!</>}
+          </h2>
+          <p className="text-md md:text-lg text-zinc-500/90 max-w-xl mx-auto">
+            Manage your finances with insights, analytics, and fast payments.
+          </p>
+        </div>
+        {/* Main balance card */}
+        <BalanceCard totalBalance={4931.17} currency="$" />
+        {/* Remove redundant DashboardQuickLinks if sidebar present (on desktop) */}
+        <div className="w-full max-w-lg md:hidden">
+          <DashboardQuickLinks />
+        </div>
       </div>
-      {/* Main balance card */}
-      <BalanceCard totalBalance={4931.17} currency="$" />
-      {/* Remove redundant DashboardQuickLinks if sidebar present (on desktop) */}
-      <div className="w-full max-w-lg md:hidden">
-        <DashboardQuickLinks />
-      </div>
-    </div>
+    </DashboardLayout>
   );
 };
 
 export default Dashboard;
+

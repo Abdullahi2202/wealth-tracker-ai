@@ -10,6 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Home, CreditCard, BarChart3, User } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -43,12 +44,16 @@ export default function DashboardSidebar() {
 
   return (
     <Sidebar>
+      {/* Sidebar Toggle Button */}
+      <div className="flex items-center gap-2 pl-4 pt-5">
+        <SidebarTrigger />
+        <div className="font-bold text-2xl text-finance-purple">
+          Wallet<span className="text-finance-blue">Master</span>
+        </div>
+      </div>
       <SidebarContent>
         <SidebarGroup>
-          <div className="font-bold text-2xl text-finance-purple px-4 pt-5 pb-2 mb-4">
-            Wallet<span className="text-finance-blue">Master</span>
-          </div>
-          <h2 className="mb-3 px-4 text-lg font-semibold tracking-tight">Navigation</h2>
+          <h2 className="mb-3 px-4 text-lg font-semibold tracking-tight mt-4">Navigation</h2>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
