@@ -4,13 +4,23 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { useNavigate } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BalanceCardProps {
   totalBalance: number;
   currency?: string;
+  monthIncome: number;
+  monthExpenses: number;
+  loading?: boolean;
 }
 
-const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
+const BalanceCard = ({
+  totalBalance,
+  currency = "$",
+  monthIncome,
+  monthExpenses,
+  loading = false
+}: BalanceCardProps) => {
   const navigate = useNavigate();
 
   const actionButtons = [
@@ -47,10 +57,16 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
           <div>
             <p className="text-sm font-medium opacity-80">Total Balance</p>
             <h3 className="text-3xl font-bold mt-1">
-              {currency}{totalBalance.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {loading ? (
+                <Skeleton className="h-8 w-28 bg-white/40" />
+              ) : (
+                <>
+                  {currency}{totalBalance.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </>
+              )}
             </h3>
             <p className="text-sm mt-4 opacity-90">Available across all accounts</p>
           </div>
@@ -58,19 +74,41 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
             <CreditCard className="h-6 w-6" />
           </div>
         </div>
-        
+
         <div className="mt-4 pt-4 border-t border-white/20">
           <div className="flex justify-between mb-4">
             <div>
               <p className="text-xs opacity-70">This Month's Income</p>
-              <p className="text-lg font-medium">{currency}3,580.00</p>
+              <p className="text-lg font-medium">
+                {loading ? (
+                  <Skeleton className="h-6 w-16 bg-white/40" />
+                ) : (
+                  <>
+                    {currency}{monthIncome.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </>
+                )}
+              </p>
             </div>
             <div>
               <p className="text-xs opacity-70">This Month's Expenses</p>
-              <p className="text-lg font-medium">{currency}2,149.25</p>
+              <p className="text-lg font-medium">
+                {loading ? (
+                  <Skeleton className="h-6 w-16 bg-white/40" />
+                ) : (
+                  <>
+                    {currency}{monthExpenses.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </>
+                )}
+              </p>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-2 mt-4">
             <HoverCard>
               <HoverCardTrigger asChild>
@@ -78,6 +116,7 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
                   onClick={() => navigate("/payments")}
                   variant="outline"
                   className="bg-white/10 border-white/20 hover:bg-white/20 text-white flex items-center justify-center gap-2"
+                  disabled={loading}
                 >
                   <Send className="h-4 w-4" />
                   Pay
@@ -105,6 +144,7 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
                   onClick={() => navigate("/payments?tab=request")}
                   variant="outline"
                   className="bg-white/10 border-white/20 hover:bg-white/20 text-white flex items-center justify-center gap-2"
+                  disabled={loading}
                 >
                   <ArrowDown className="h-4 w-4" />
                   Receive
@@ -136,6 +176,7 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
                   <button
                     onClick={button.action}
                     className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all"
+                    disabled={loading}
                   >
                     <div className="p-2 rounded-full mb-1">
                       {button.icon}
@@ -156,3 +197,4 @@ const BalanceCard = ({ totalBalance, currency = "$" }: BalanceCardProps) => {
 };
 
 export default BalanceCard;
+
