@@ -2,20 +2,25 @@
 import { useEffect, useState } from "react";
 import { CreditCard, ArrowUp, ArrowDown, Send, Wallet, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+// import ExpenseChart from "@/components/dashboard/ExpenseChart"; <-- removed, as per instructions
 
 const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; currency?: string }) => {
   return (
-    <Card className="wallet-card text-white w-full max-w-md mx-auto shadow-xl rounded-2xl p-0" style={{
-      background: "linear-gradient(135deg, #4361ee 0%, #7209b7 100%)",
-      borderRadius: "18px",
-      boxShadow: "0 8px 32px rgba(114, 9, 183, 0.18)"
-    }}>
+    <Card
+      className="wallet-card text-white w-full max-w-md mx-auto shadow-xl rounded-2xl p-0"
+      style={{
+        background: "linear-gradient(135deg, #4361ee 0%, #7209b7 100%)",
+        borderRadius: "18px",
+        boxShadow: "0 8px 32px rgba(114, 9, 183, 0.18)"
+      }}
+    >
       <CardContent className="p-7">
         <div className="flex justify-between items-start">
           <div>
             <p className="text-sm font-semibold opacity-90 mb-0.5">Total Balance</p>
             <h3 className="text-4xl font-extrabold mt-1 tracking-tight">
-              {currency}{totalBalance.toLocaleString("en-US", {
+              {currency}
+              {totalBalance.toLocaleString("en-US", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -26,9 +31,7 @@ const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; c
             <CreditCard className="h-7 w-7 text-white opacity-90" />
           </div>
         </div>
-
         <hr className="border-white/20 my-5" />
-
         <div className="flex justify-between mb-5">
           <div>
             <p className="text-xs opacity-80">This Month's Income</p>
@@ -39,7 +42,6 @@ const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; c
             <p className="text-lg font-semibold">{currency}2,149.25</p>
           </div>
         </div>
-
         <div className="flex gap-3 mb-5">
           <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-white/15 hover:bg-white/25 transition text-white font-semibold shadow-md focus:outline-none">
             <Send className="h-4 w-4" />
@@ -50,7 +52,6 @@ const BalanceCard = ({ totalBalance, currency = "$" }: { totalBalance: number; c
             Receive
           </button>
         </div>
-
         <div className="grid grid-cols-4 gap-2 mt-1">
           <button className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
             <ArrowUp className="mb-0.5" />
@@ -92,6 +93,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-muted px-2 py-6">
+      {/* User's Name at the Top */}
       <div className="font-semibold text-2xl mb-8 mt-3 text-finance-purple">
         {userName && (
           <span>
@@ -99,7 +101,16 @@ const Dashboard = () => {
           </span>
         )}
       </div>
+
+      {/* Main Balance Card */}
       <BalanceCard totalBalance={4931.17} currency="$" />
+
+      {/* 
+        All other dashboard widgets/layouts/icons would be rendered here, as before.
+        If you had more widgets/components below, re-add them below this comment or here.
+      */}
+      {/* Example placeholder for other widgets: */}
+      {/* <OtherDashboardWidgets /> */}
     </div>
   );
 };
