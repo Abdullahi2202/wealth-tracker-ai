@@ -1,78 +1,66 @@
 
-import { useEffect, useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import BalanceCard from "@/components/dashboard/BalanceCard";
-import ExpenseChart from "@/components/dashboard/ExpenseChart";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import BottomNavBar from "@/components/layout/BottomNavBar";
+import { CreditCard, Plus, Download } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+const actionCards = [
+  {
+    title: "Send Payment",
+    description: "Transfer money securely to anyone.",
+    color: "from-blue-500 to-blue-700",
+    Icon: CreditCard,
+    route: "/payments/send",
+    bg: "bg-gradient-to-br from-blue-500 to-blue-700",
+  },
+  {
+    title: "Top-Up Wallet",
+    description: "Add funds via card or bank.",
+    color: "from-orange-400 to-yellow-500",
+    Icon: Plus,
+    route: "/payments/topup",
+    bg: "bg-gradient-to-br from-orange-400 to-yellow-500",
+  },
+  {
+    title: "Received Payments",
+    description: "View your incoming transactions.",
+    color: "from-green-500 to-teal-600",
+    Icon: Download,
+    route: "/payments/received",
+    bg: "bg-gradient-to-br from-green-500 to-teal-600",
+  },
+];
 
 const Dashboard = () => {
-  const [totalBalance, setTotalBalance] = useState(0);
-  const [myRegistration, setMyRegistration] = useState<null | {
-    phone: string;
-    passport_number: string;
-    image_url: string;
-  }>(null);
-
-  useEffect(() => {
-    setTimeout(() => {
-      setTotalBalance(4931.17);
-    }, 800);
-    // Fetch user's registration
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
-      if (!session?.user) return;
-      const userEmail = session.user.email;
-      if (!userEmail) return;
-      const { data: regData } = await supabase
-        .from("registrations")
-        .select("phone, passport_number, image_url")
-        .eq("email", userEmail)
-        .maybeSingle();
-      setMyRegistration(regData || null);
-    })();
-  }, []);
+  const navigate = useNavigate();
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        {myRegistration && (
-          <Card className="mb-6">
-            <CardContent>
-              <div>
-                <h2 className="font-semibold mb-2">Your Registration Details</h2>
-                <div className="mb-1">Phone: {myRegistration.phone}</div>
-                <div className="mb-1">Passport #: {myRegistration.passport_number}</div>
-                <div className="mb-1">
-                  <a
-                    href={
-                      supabase.storage.from("user-ids").getPublicUrl(myRegistration.image_url).data.publicUrl
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline"
-                  >
-                    View Uploaded ID Image
-                  </a>
-                </div>
+    <div className="min-h-screen bg-muted flex flex-col items-center justify-between px-3 py-6">
+      <div className="w-full max-w-md mx-auto flex-1 flex flex-col justify-center">
+        <h1 className="text-center text-3xl font-extrabold mb-6 text-finance-purple">
+          Payment
+        </h1>
+        <div className="space-y-6">
+          {actionCards.map(({ title, description, Icon, route, bg }) => (
+            <button
+              key={title}
+              onClick={() => navigate(route)}
+              className={`${bg} w-full flex items-center gap-4 rounded-xl shadow-md p-5 mb-2 active:scale-95 transition-transform focus:outline-none`}
+              style={{ minHeight: 100 }}
+            >
+              <span className="flex items-center justify-center bg-white/20 rounded-full p-4 mr-2">
+                <Icon size={32} className="text-white drop-shadow" />
+              </span>
+              <div className="text-left flex-1">
+                <div className="text-lg font-bold text-white mb-1">{title}</div>
+                <div className="text-xs text-white/90">{description}</div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="md:col-span-1">
-            <BalanceCard totalBalance={totalBalance} />
-          </div>
-          <div className="md:col-span-2">
-            <ExpenseChart />
-          </div>
+            </button>
+          ))}
         </div>
       </div>
-    </DashboardLayout>
+      <BottomNavBar />
+    </div>
   );
 };
 
 export default Dashboard;
-
