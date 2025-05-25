@@ -1,6 +1,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { CreditCard, Download, Plus } from "lucide-react";
+import BottomNavBar from "@/components/layout/BottomNavBar";
 
 const actionCards = [
   {
@@ -33,7 +34,7 @@ const PaymentsHome = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-muted flex flex-col items-center px-3 py-6 animate-fade-in">
+    <div className="min-h-screen bg-muted flex flex-col items-center pt-3 pb-20 px-3 animate-fade-in">
       <div className="w-full max-w-md mx-auto">
         <h1 className="text-center text-3xl font-extrabold mb-6 text-finance-purple">
           Payments
@@ -57,8 +58,10 @@ const PaymentsHome = () => {
           ))}
         </div>
       </div>
+      <BottomNavBar />
     </div>
   );
 };
 
 export default PaymentsHome;
+
