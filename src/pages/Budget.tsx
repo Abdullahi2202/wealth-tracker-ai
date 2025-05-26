@@ -1,10 +1,23 @@
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { PiggyBank, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Budget = () => {
+  const [goal, setGoal] = useState(2000); // default, could fetch from db
+  const [current, setCurrent] = useState(1250); // stub, could auto-calc from incomes - expenses
+
+  const handleSetGoal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // For now, just a stub, but here you could persist the goal in db!
+    toast.success("Budget goal set!");
+  };
+
   const savingsGoals = [
     { name: "Emergency Fund", target: 10000, current: 6500, color: "#8b5cf6" },
     { name: "Vacation", target: 3000, current: 1800, color: "#06b6d4" },
@@ -15,6 +28,33 @@ const Budget = () => {
   return (
     <DashboardLayout>
       <h1 className="text-3xl font-bold tracking-tight mb-6">Savings Insights</h1>
+      <div className="mb-6">
+        <form onSubmit={handleSetGoal} className="flex items-end gap-2">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              Monthly Budget Goal
+            </label>
+            <Input
+              type="number"
+              value={goal}
+              min={0}
+              onChange={e => setGoal(Number(e.target.value))}
+              className="w-32"
+            />
+          </div>
+          <Button type="submit" className="h-10">
+            Set Goal
+          </Button>
+        </form>
+        <div className="mt-2 text-sm text-muted-foreground">
+          This month you've spent <span className="font-semibold">${current}</span> out of your goal ${goal}.<br />
+          {current < goal ? (
+            <span className="text-finance-income">On track!</span>
+          ) : (
+            <span className="text-finance-expense">Over budget!</span>
+          )}
+        </div>
+      </div>
       
       <div className="grid gap-6">
         <Card className="bg-primary/5">

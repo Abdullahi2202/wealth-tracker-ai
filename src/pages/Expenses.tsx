@@ -1,14 +1,21 @@
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ExpenseChart from "@/components/dashboard/ExpenseChart";
 import { PieChart } from "lucide-react";
+import TransactionDrawer from "@/components/transactions/TransactionDrawer";
+import { useState } from "react";
 
 const Expenses = () => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   return (
     <DashboardLayout>
       <h1 className="text-3xl font-bold tracking-tight mb-6">Expense Analysis</h1>
-      
+      <div className="flex justify-end mb-2">
+        <Button onClick={() => setDrawerOpen(true)}>
+          + Add Transaction
+        </Button>
+      </div>
+      <TransactionDrawer open={drawerOpen} onOpenChange={setDrawerOpen} onSaved={() => window.location.reload()} />
       <div className="grid gap-6 md:grid-cols-2">
         <ExpenseChart />
         

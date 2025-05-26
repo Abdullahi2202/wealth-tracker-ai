@@ -1,15 +1,23 @@
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowUp, ArrowDown, LineChart } from "lucide-react";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
+import TransactionDrawer from "@/components/transactions/TransactionDrawer";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 const Transactions = () => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   return (
     <DashboardLayout>
       <h1 className="text-3xl font-bold tracking-tight mb-6">Transactions</h1>
-      
+      <div className="flex justify-end mb-2">
+        <Button onClick={() => setDrawerOpen(true)}>
+          + Add Transaction
+        </Button>
+      </div>
+      <TransactionDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="all">All</TabsTrigger>

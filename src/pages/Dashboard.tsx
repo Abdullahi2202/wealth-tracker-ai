@@ -1,8 +1,9 @@
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
 import BalanceCard from "@/components/dashboard/BalanceCard";
 import { supabase } from "@/integrations/supabase/client";
+import TransactionDrawer from "@/components/transactions/TransactionDrawer";
+import { useState } from "react";
 
 type Transaction = {
   id: string;
@@ -22,6 +23,7 @@ const Dashboard = () => {
   const [totalBalance, setTotalBalance] = useState(0);
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpenses, setMonthExpenses] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     // Get user from localStorage (set by Login)
@@ -128,7 +130,7 @@ const Dashboard = () => {
         </div>
         {/* Main balance card */}
         <div className="w-full flex justify-center px-0 pb-3">
-          <div className="w-full max-w-[420px]">
+          <div className="w-full max-w-[420px] flex flex-col gap-2">
             <BalanceCard
               totalBalance={loading ? 0 : totalBalance}
               currency="$"
@@ -136,6 +138,10 @@ const Dashboard = () => {
               monthExpenses={loading ? 0 : monthExpenses}
               loading={loading}
             />
+            <Button onClick={() => setDrawerOpen(true)} className="mt-2 w-full">
+              + Add Transaction
+            </Button>
+            <TransactionDrawer open={drawerOpen} onOpenChange={setDrawerOpen} onSaved={() => window.location.reload()} />
           </div>
         </div>
         {/* Optional: Empty space for bottom nav */}
