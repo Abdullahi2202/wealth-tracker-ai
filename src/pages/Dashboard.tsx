@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import BalanceCard from "@/components/dashboard/BalanceCard";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionDrawer from "@/components/transactions/TransactionDrawer";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 type Transaction = {
   id: string;

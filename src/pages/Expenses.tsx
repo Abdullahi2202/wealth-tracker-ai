@@ -4,6 +4,7 @@ import ExpenseChart from "@/components/dashboard/ExpenseChart";
 import { PieChart } from "lucide-react";
 import TransactionDrawer from "@/components/transactions/TransactionDrawer";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 const Expenses = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
