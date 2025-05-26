@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -66,8 +65,37 @@ export function useWallet() {
     setLoading(false);
   }, []);
 
+  // Subscribe to real-time wallet balance changes
   useEffect(() => {
-    fetchWallet();
+    fetchWallet(); // initial load
+    // Listen to SUPABASE real-time wallet updates
+    const storedUser = localStorage.getItem("walletmaster_user");
+    let email = "";
+    if (storedUser) {
+      try {
+        const userObj = JSON.parse(storedUser);
+        email = userObj.email || "";
+      } catch {}
+    }
+    if (!email) return;
+    const channel = supabase
+      .channel("schema-db-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "wallets",
+          filter: `user_email=eq.${email}`,
+        },
+        (payload) => {
+          if (payload.new) setWallet(payload.new as Wallet);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchWallet]);
 
   // Refetch utility and balanceUpdater

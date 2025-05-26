@@ -1,42 +1,71 @@
-
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Building, CreditCard } from "lucide-react";
 import { toast } from "sonner";
-
-const wallets = [
-  { id: "wallet", name: "Wallet Balance" },
-  { id: "card1", name: "Card 1" },
-  { id: "card2", name: "Card 2" },
-];
+import { supabase } from "@/integrations/supabase/client";
+import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
   const [amount, setAmount] = useState("");
   const [destination, setDestination] = useState("wallet");
-  const [method, setMethod] = useState("bank");
+  const [method, setMethod] = useState("");
   const [details, setDetails] = useState("");
+  const [category, setCategory] = useState("Top-Up");
+  const [tag, setTag] = useState("");
+  const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleTopUp = (e: React.FormEvent) => {
+  const { methods } = usePaymentMethods();
+
+  // Choose default payment method if available
+  useEffect(() => {
+    if (!method && methods.length > 0) setMethod(methods[0].id);
+  }, [methods]);
+
+  const handleTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) {
       toast.error("Enter a valid amount.");
       return;
     }
-    if (!details) {
-      toast.error("Enter account/card details.");
+    if (!method) {
+      toast.error("Choose a payment method.");
       return;
     }
     setLoading(true);
+    const amountValue = parseFloat(amount);
+
+    // Simulate adding a top-up transaction
+    const storedUser = localStorage.getItem("walletmaster_user");
+    let email = "";
+    if (storedUser) {
+      try {
+        const userObj = JSON.parse(storedUser);
+        email = userObj.email || "";
+      } catch {}
+    }
+    await supabase.from("transactions").insert({
+      amount: amountValue,
+      type: "income",
+      name: "Wallet Top-Up",
+      category,
+      tag: tag || null,
+      note: note || null,
+      date: new Date().toISOString().split("T")[0],
+      email,
+      source_method_id: method || null,
+    });
     setTimeout(() => {
-      toast.success(`$${parseFloat(amount).toFixed(2)} added to ${destination}.`);
+      toast.success(`$${amountValue.toFixed(2)} added to your wallet.`);
       setLoading(false);
       setAmount("");
       setDetails("");
+      setNote("");
+      setTag("");
     }, 1200);
   };
 
@@ -62,11 +91,7 @@ const TopUpWallet = () => {
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
               >
-                {wallets.map((wal) => (
-                  <option key={wal.id} value={wal.id}>
-                    {wal.name}
-                  </option>
-                ))}
+                <option value="wallet">Wallet Balance</option>
               </select>
             </div>
             <div>
@@ -79,40 +104,54 @@ const TopUpWallet = () => {
                 onChange={(e) => setAmount(e.target.value)}
               />
             </div>
+            <PaymentMethodPicker value={method} onChange={setMethod} label="Source Method" filterType="all" />
             <div>
-              <label className="block text-sm mb-1">Source Method</label>
-              <div className="flex gap-3 mt-1">
-                <button
-                  type="button"
-                  className={`rounded-lg flex items-center gap-1 p-2 border ${method === "bank" ? "bg-blue-100" : ""}`}
-                  onClick={() => setMethod("bank")}
-                >
-                  <Building className="h-5 w-5" /> Bank
-                </button>
-                <button
-                  type="button"
-                  className={`rounded-lg flex items-center gap-1 p-2 border ${method === "card" ? "bg-orange-100" : ""}`}
-                  onClick={() => setMethod("card")}
-                >
-                  <CreditCard className="h-5 w-5" /> Card
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm mb-1">
-                {method === "bank" ? "Bank Account Number" : "Card Number"}
-              </label>
+              <label className="block text-xs">Note</label>
               <Input
                 type="text"
-                placeholder={method === "bank" ? "Enter account number" : "Enter card number"}
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
+                value={note}
+                placeholder="Optional note"
+                onChange={(e) => setNote(e.target.value)}
               />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-xs">Category</label>
+                <select
+                  className="w-full rounded-md p-2 border"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  <option>Top-Up</option>
+                  <option>Cash</option>
+                  <option>Savings</option>
+                  <option>Promotion</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs">Tag</label>
+                <select
+                  className="w-full rounded-md p-2 border"
+                  value={tag}
+                  onChange={(e) => setTag(e.target.value)}
+                >
+                  <option value="">(None)</option>
+                  <option value="bonus">Bonus</option>
+                  <option value="gift">Gift</option>
+                  <option value="salary">Salary</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </div>
             </div>
             <Button type="submit" className="w-full mt-3" disabled={loading}>
               {loading ? "Processing..." : "Top Up"}
             </Button>
           </form>
+          {/* Recurring/Scheduled/FaceID Placeholder */}
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            <strong>Coming soon:</strong> <span>Schedule/Recurring Top-Ups • FaceID Auth</span>
+          </div>
         </CardContent>
       </Card>
     </div>

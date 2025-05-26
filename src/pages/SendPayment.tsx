@@ -8,96 +8,77 @@ import { CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+
+const CATEGORY_OPTIONS = [
+  "Transfer", "Food", "Bills", "Shopping", "Transport", "Misc"
+];
+
+const TAG_OPTIONS = [
+  "friends", "family", "business", "refund", "split"
+];
 
 const SendPayment = () => {
-  const [cards, setCards] = useState<{ id: string; cardNumber: string; cardHolder: string; balance: number; bank: string; expiryDate: string }[]>([]);
-  const [fromCard, setFromCard] = useState("");
+  const [fromMethod, setFromMethod] = useState<string>("");
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Transfer");
+  const [tag, setTag] = useState("");
+  const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const { methods } = usePaymentMethods();
   const navigate = useNavigate();
 
+  // Set default method when available
   useEffect(() => {
-    // Simulate fetching user's cards (replace with actual cards table later)
-    const fetchCards = async () => {
-      const storedUser = localStorage.getItem("walletmaster_user");
-      let email = "";
-      if (storedUser) {
-        try {
-          const userObj = JSON.parse(storedUser);
-          email = userObj.email || "";
-        } catch {
-          email = "";
-        }
-      }
-      // Demo: Just fetch the registration, present as wallet card for now
-      const { data, error } = await supabase
-        .from("registrations")
-        .select("id, full_name, email")
-        .eq("email", email)
-        .limit(1)
-        .maybeSingle();
-      if (!error && data) {
-        const userCard = {
-          id: "user-wallet",
-          cardNumber: "•••• •••• •••• " + data.id?.slice(-4) || "0000",
-          cardHolder: (data.full_name || "USER").toUpperCase(),
-          bank: "WalletMaster",
-          expiryDate: "12/30",
-          balance: 0
-        };
-        setCards([userCard]);
-        setFromCard(userCard.id);
-      } else {
-        setCards([]);
-        setFromCard("");
-      }
-    };
-    fetchCards();
-  }, []);
+    if (!fromMethod && methods.length > 0) setFromMethod(methods[0].id);
+  }, [methods]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountValue = parseFloat(amount);
-    const card = cards.find((c) => c.id === fromCard);
     if (!amountValue || amountValue <= 0) {
       toast.error("Please enter a valid amount.");
       return;
     }
     if (!recipient) {
-      toast.error("Enter recipient card number.");
+      toast.error("Enter recipient card number or ID.");
       return;
     }
-    if (card && amountValue > card.balance) {
-      toast.error("Insufficient funds.");
+    if (!fromMethod) {
+      toast.error("Choose a payment method.");
       return;
     }
     setLoading(true);
-    // Save transaction to Supabase
     const storedUser = localStorage.getItem("walletmaster_user");
     let email = "";
     if (storedUser) {
       try {
         const userObj = JSON.parse(storedUser);
         email = userObj.email || "";
-      } catch {
-        email = "";
-      }
+      } catch { email = ""; }
     }
     await supabase.from("transactions").insert({
-      id: undefined, // let supabase auto-gen
-      email,
       amount: amountValue,
       type: "expense",
-      name: "Manual Send", // You can customize
-      category: "Transfer",
-      date: new Date().toISOString().split("T")[0]
+      name: "Manual Send",
+      category,
+      tag: tag || null,
+      note: note || null,
+      date: new Date().toISOString().split("T")[0],
+      email,
+      source_method_id: fromMethod || null,
+      recipient_email: recipient,
     });
     setTimeout(() => {
       toast.success(`Payment of $${amountValue.toFixed(2)} sent!`);
       setLoading(false);
       setAmount("");
       setRecipient("");
+      setNote("");
+      setTag("");
     }, 1000);
   };
 
@@ -116,25 +97,12 @@ const SendPayment = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSend} className="space-y-5">
+            <PaymentMethodPicker value={fromMethod} onChange={setFromMethod} />
             <div>
-              <label className="block text-sm mb-1">From</label>
-              <select
-                className="w-full rounded-md p-2 border"
-                value={fromCard}
-                onChange={(e) => setFromCard(e.target.value)}
-              >
-                {cards.map((card) => (
-                  <option value={card.id} key={card.id}>
-                    {card.bank} — {card.cardNumber} (${card.balance.toFixed(2)})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Recipient Card</label>
+              <label className="block text-sm mb-1">Recipient (Card/email/ID)</label>
               <Input
                 type="text"
-                placeholder="Enter card number"
+                placeholder="Enter recipient"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
                 autoFocus
@@ -150,10 +118,45 @@ const SendPayment = () => {
                 onChange={(e) => setAmount(e.target.value)}
               />
             </div>
-            <Button type="submit" className="w-full mt-4" disabled={loading}>
-              {loading ? "Sending..." : "Send Payment"}
-            </Button>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-xs">Category</label>
+                <select
+                  className="w-full rounded-md p-2 border"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  {CATEGORY_OPTIONS.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs">Tag</label>
+                <select
+                  className="w-full rounded-md p-2 border"
+                  value={tag}
+                  onChange={(e) => setTag(e.target.value)}
+                >
+                  <option value="">(None)</option>
+                  {TAG_OPTIONS.map((tagOpt) => <option key={tagOpt} value={tagOpt}>{tagOpt}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs">Note</label>
+              <Input
+                type="text"
+                value={note}
+                placeholder="Optional note"
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
+
+            <Button type="submit" className="w-full mt-4" disabled={loading}> {loading ? "Sending..." : "Send Payment"} </Button>
           </form>
+          {/* Recurring/Scheduled/FaceID Placeholder */}
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            <strong>Coming soon:</strong> <span>Schedule/Recurring Payments • FaceID Auth</span>
+          </div>
         </CardContent>
       </Card>
     </div>

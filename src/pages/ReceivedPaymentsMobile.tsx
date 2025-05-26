@@ -2,29 +2,48 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Building, Wallet } from "lucide-react";
+import { Wallet, Banknote } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
-const receivedPayments = [
-  {
-    id: "p1",
-    sender: "John Doe",
-    amount: 120.8,
-    date: "2025-05-26",
-    description: "Lunch split",
-    source: "bank",
-  },
-  {
-    id: "p2",
-    sender: "Alice Smith",
-    amount: 85.0,
-    date: "2025-05-24",
-    description: "Project refund",
-    source: "wallet",
-  },
-];
+// Helper for short display
+function shortLabel(desc: string, len = 12) {
+  return desc.length > len ? desc.slice(0, len) + "…" : desc;
+}
 
 const ReceivedPaymentsMobile = () => {
   const navigate = useNavigate();
+  const [received, setReceived] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReceived = async () => {
+      setLoading(true);
+      const storedUser = localStorage.getItem("walletmaster_user");
+      let email = "";
+      if (storedUser) {
+        try {
+          const userObj = JSON.parse(storedUser);
+          email = userObj.email || "";
+        } catch {}
+      }
+      if (!email) {
+        setReceived([]);
+        setLoading(false);
+        return;
+      }
+      // Show payments where user is recipient_email (including wallet top-ups etc)
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("id, sender_email, amount, date, name, source_method_id, note, tag")
+        .eq("recipient_email", email)
+        .order("date", { ascending: false })
+        .limit(15);
+      setReceived(error || !data ? [] : data);
+      setLoading(false);
+    };
+    fetchReceived();
+  }, []);
 
   return (
     <div className="min-h-screen bg-muted pt-3 px-2 animate-fade-in">
@@ -41,24 +60,24 @@ const ReceivedPaymentsMobile = () => {
         </CardHeader>
         <CardContent>
           <div className="divide-y">
-            {receivedPayments.length === 0 ? (
+            {loading ? (
+              <div className="text-center text-muted-foreground py-4">Loading…</div>
+            ) : received.length === 0 ? (
               <p className="text-muted-foreground">No payments yet.</p>
             ) : (
-              receivedPayments.map((pay) => (
+              received.map((pay) => (
                 <div key={pay.id} className="flex items-center justify-between py-3">
                   <div>
-                    <div className="font-semibold">{pay.sender}</div>
+                    <div className="font-semibold">
+                      {pay.sender_email ? shortLabel(pay.sender_email) : "Top-Up"}
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {pay.description} • {new Date(pay.date).toLocaleDateString()}
+                      {pay.name || "Incoming"}{pay.tag ? <span> • #{pay.tag}</span> : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {pay.source === "bank" ? (
-                      <Building className="text-blue-500" size={18} />
-                    ) : (
-                      <Wallet className="text-green-500" size={18} />
-                    )}
-                    <span className="font-bold text-base">${pay.amount.toFixed(2)}</span>
+                    <Wallet className="text-green-500" size={18} />
+                    <span className="font-bold text-base">${Number(pay.amount).toFixed(2)}</span>
                   </div>
                 </div>
               ))
