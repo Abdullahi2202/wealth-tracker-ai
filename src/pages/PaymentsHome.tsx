@@ -1,7 +1,8 @@
-
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CreditCard, Download, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import AddCardDrawer from "@/components/payments/AddCardDrawer";
+import { useState } from "react";
 
 // Action cards for Payments Home
 const actionCards = [
@@ -30,6 +31,7 @@ const actionCards = [
 
 const PaymentsHome = () => {
   const navigate = useNavigate();
+  const [addCardOpen, setAddCardOpen] = useState(false);
 
   return (
     <DashboardLayout>
@@ -54,6 +56,14 @@ const PaymentsHome = () => {
               </div>
             </button>
           ))}
+          <button
+            onClick={() => setAddCardOpen(true)}
+            className="border w-full flex items-center justify-center rounded-2xl shadow-sm p-5 text-finance-purple text-lg gap-3 bg-background hover:bg-muted mt-3 transition"
+            style={{ minHeight: 54 }}
+          >
+            <span className="font-bold">＋ Add Card</span>
+          </button>
+          <AddCardDrawer open={addCardOpen} onOpenChange={setAddCardOpen} />
         </div>
       </div>
     </DashboardLayout>
@@ -61,4 +71,3 @@ const PaymentsHome = () => {
 };
 
 export default PaymentsHome;
-
