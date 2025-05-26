@@ -23,7 +23,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
   const [label, setLabel] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Get logged in user's email from localStorage (or from auth context, if available)
+  // Get logged in user's email from localStorage
   const storedUser = typeof window !== "undefined" ? localStorage.getItem("walletmaster_user") : null;
   const email = storedUser ? (() => { try { return JSON.parse(storedUser).email; } catch { return ""; } })() : "";
 
@@ -40,6 +40,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       setLoading(false);
       return;
     }
+
     // 1. Create PaymentMethod with Stripe.js using individual elements
     const { error, paymentMethod } = await stripe.createPaymentMethod({
       type: "card",
@@ -76,44 +77,76 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-2">
-      <label className="block text-sm">Card display name (optional)</label>
-      <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="My Visa Card" />
+    <div className="max-w-xl mx-auto animate-fade-in">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-finance-purple mb-1 flex items-center gap-2">
+          <CreditCard className="text-finance-purple" size={28} />
+          Add your card details
+        </h2>
+        <p className="text-gray-500 text-base">
+          For your convenience, we've separated the fields into three clear sections.
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="wallet-card bg-white shadow-lg border border-gray-200 rounded-2xl px-6 py-7 space-y-6 transition animate-fade-in">
+        <div>
+          <label className="block font-medium text-gray-700 mb-2">
+            Card display name <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <Input
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            placeholder="E.g. My Visa Card"
+            className="mb-1"
+          />
+        </div>
 
-      <div className="space-y-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <CreditCard className="text-finance-purple" size={22} />
-            <span className="font-medium text-base">Card Number</span>
+        <div className="flex flex-col gap-5">
+          {/* Card Number */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition focus-within:ring-2 ring-finance-purple/40">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl mr-1">💳</span>
+              <span className="text-finance-purple font-semibold text-base">
+                Card Number
+              </span>
+            </div>
+            <div className="pl-3">
+              <CardNumberElement options={{ style: { base: { fontSize: "18px" } } }} />
+            </div>
           </div>
-          <div className="border p-2 rounded">
-            <CardNumberElement options={{ style: { base: { fontSize: "16px" } } }} />
+          {/* Expiry Date */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition focus-within:ring-2 ring-finance-purple/40">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl mr-1">📅</span>
+              <span className="text-finance-purple font-semibold text-base">
+                Expiry Date
+              </span>
+            </div>
+            <div className="pl-3">
+              <CardExpiryElement options={{ style: { base: { fontSize: "18px" } } }} />
+            </div>
+          </div>
+          {/* CVC */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition focus-within:ring-2 ring-finance-purple/40">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl mr-1">🔐</span>
+              <span className="text-finance-purple font-semibold text-base">
+                CVC <span className="text-gray-400 font-normal">(Security Code)</span>
+              </span>
+            </div>
+            <div className="pl-3">
+              <CardCvcElement options={{ style: { base: { fontSize: "18px" } } }} />
+            </div>
           </div>
         </div>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Calendar className="text-finance-purple" size={20} />
-            <span className="font-medium text-base">Expiry Date</span>
-          </div>
-          <div className="border p-2 rounded">
-            <CardExpiryElement options={{ style: { base: { fontSize: "16px" } } }} />
-          </div>
+
+        <div className="flex gap-4 mt-2">
+          <Button type="button" variant="outline" onClick={onCancel} className="flex-1 h-11 font-semibold text-base">Cancel</Button>
+          <Button type="submit" className="flex-1 h-11 font-semibold text-base" disabled={loading}>
+            {loading ? "Saving..." : "Save Card"}
+          </Button>
         </div>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Lock className="text-finance-purple" size={20} />
-            <span className="font-medium text-base">CVC (Security Code)</span>
-          </div>
-          <div className="border p-2 rounded">
-            <CardCvcElement options={{ style: { base: { fontSize: "16px" } } }} />
-          </div>
-        </div>
-      </div>
-      <div className="flex gap-3">
-        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">Cancel</Button>
-        <Button type="submit" className="flex-1" disabled={loading}>{loading ? "Saving..." : "Save Card"}</Button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }
 
@@ -126,4 +159,3 @@ export default function StripeCardFormWrapper(props: { onSuccess: () => void; on
     </Elements>
   );
 }
-
