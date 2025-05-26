@@ -39,6 +39,36 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          created_at: string
+          details: Json | null
+          id: string
+          is_active: boolean
+          label: string | null
+          type: string
+          user_email: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          type: string
+          user_email: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          type?: string
+          user_email?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -99,6 +129,12 @@ export type Database = {
           email: string
           id: string
           name: string
+          note: string | null
+          recipient_email: string | null
+          scheduled_for: string | null
+          sender_email: string | null
+          source_method_id: string | null
+          tag: string | null
           type: string
         }
         Insert: {
@@ -109,6 +145,12 @@ export type Database = {
           email: string
           id?: string
           name: string
+          note?: string | null
+          recipient_email?: string | null
+          scheduled_for?: string | null
+          sender_email?: string | null
+          source_method_id?: string | null
+          tag?: string | null
           type: string
         }
         Update: {
@@ -119,9 +161,23 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          note?: string | null
+          recipient_email?: string | null
+          scheduled_for?: string | null
+          sender_email?: string | null
+          source_method_id?: string | null
+          tag?: string | null
           type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_source_method_id_fkey"
+            columns: ["source_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -141,6 +197,27 @@ export type Database = {
           email?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
+      wallets: {
+        Row: {
+          balance: number
+          id: string
+          updated_at: string
+          user_email: string
+        }
+        Insert: {
+          balance?: number
+          id?: string
+          updated_at?: string
+          user_email: string
+        }
+        Update: {
+          balance?: number
+          id?: string
+          updated_at?: string
+          user_email?: string
         }
         Relationships: []
       }
