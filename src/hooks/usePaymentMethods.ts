@@ -13,6 +13,19 @@ export interface PaymentMethod {
   created_at: string;
 }
 
+// Helper: Type guard for allowed payment method strings
+function isPaymentMethodType(
+  value: string
+): value is PaymentMethod["type"] {
+  return [
+    "wallet",
+    "bank",
+    "card",
+    "apple_pay",
+    "google_pay",
+  ].includes(value);
+}
+
 // Return array of methods, loading, and addMethod function
 export function usePaymentMethods() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -43,7 +56,14 @@ export function usePaymentMethods() {
       if (error || !data) {
         setMethods([]);
       } else {
-        setMethods(data);
+        // Type-safe mapping to PaymentMethod[]
+        const validMethods: PaymentMethod[] = data
+          .filter((item) => isPaymentMethodType(item.type))
+          .map((item) => ({
+            ...item,
+            type: item.type as PaymentMethod["type"],
+          }));
+        setMethods(validMethods);
       }
       setLoading(false);
     };
