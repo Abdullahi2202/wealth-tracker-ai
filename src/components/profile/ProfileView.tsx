@@ -45,24 +45,36 @@ export default function ProfileView() {
         .select("email, full_name")
         .eq("email", email)
         .maybeSingle();
-      setProfile(p as ProfileData | null);
+
+      // p can be null or undefined
+      setProfile(
+        p && typeof p.email === "string"
+          ? { email: p.email, full_name: p.full_name ?? null }
+          : null
+      );
+
       // Fetch verification requests
       const { data: requests } = await supabase
         .from("identity_verification_requests")
         .select("*")
         .eq("email", email)
         .order("requested_at", { ascending: false });
+
       // Cast document_type to expected types
       setVerificationRequests(
         (requests ?? []).map((r) => ({
-          ...r,
-          document_type: (r.document_type === "passport" || r.document_type === "license")
-            ? r.document_type
-            : "passport", // fallback
-          status:
-            r.status === "pending" || r.status === "approved" || r.status === "rejected"
-              ? r.status
-              : "pending",
+          id: r.id,
+          document_type: r.document_type === "passport" ? "passport" : "license",
+          new_document_url: r.new_document_url,
+          new_number: r.new_number,
+          status: r.status === "pending" || r.status === "approved" || r.status === "rejected"
+            ? r.status
+            : "pending",
+          feedback: r.feedback,
+          requested_at: r.requested_at,
+          reviewed_at: r.reviewed_at,
+          old_document_url: r.old_document_url,
+          email: r.email
         }))
       );
       setLoading(false);
