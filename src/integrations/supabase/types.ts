@@ -41,29 +41,44 @@ export type Database = {
       }
       payment_methods: {
         Row: {
+          brand: string | null
           created_at: string
+          default_card: boolean | null
           details: Json | null
+          exp_month: number | null
+          exp_year: number | null
           id: string
           is_active: boolean
           label: string | null
+          stripe_payment_method_id: string | null
           type: string
           user_email: string
         }
         Insert: {
+          brand?: string | null
           created_at?: string
+          default_card?: boolean | null
           details?: Json | null
+          exp_month?: number | null
+          exp_year?: number | null
           id?: string
           is_active?: boolean
           label?: string | null
+          stripe_payment_method_id?: string | null
           type: string
           user_email: string
         }
         Update: {
+          brand?: string | null
           created_at?: string
+          default_card?: boolean | null
           details?: Json | null
+          exp_month?: number | null
+          exp_year?: number | null
           id?: string
           is_active?: boolean
           label?: string | null
+          stripe_payment_method_id?: string | null
           type?: string
           user_email?: string
         }
