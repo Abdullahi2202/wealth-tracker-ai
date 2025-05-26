@@ -9,6 +9,53 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      identity_verification_requests: {
+        Row: {
+          document_type: string
+          email: string
+          feedback: string | null
+          id: string
+          new_document_url: string
+          new_number: string | null
+          old_document_url: string | null
+          requested_at: string
+          reviewed_at: string | null
+          status: string
+        }
+        Insert: {
+          document_type: string
+          email: string
+          feedback?: string | null
+          id?: string
+          new_document_url: string
+          new_number?: string | null
+          old_document_url?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          status?: string
+        }
+        Update: {
+          document_type?: string
+          email?: string
+          feedback?: string | null
+          id?: string
+          new_document_url?: string
+          new_number?: string | null
+          old_document_url?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "identity_verification_requests_email_fkey"
+            columns: ["email"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["email"]
+          },
+        ]
+      }
       investments: {
         Row: {
           change_pct: number | null
