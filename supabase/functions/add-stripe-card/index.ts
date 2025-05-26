@@ -24,11 +24,14 @@ serve(async (req) => {
     // 1. Set up Stripe
     const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecret) {
+      console.error("Stripe secret key not found");
       return new Response(JSON.stringify({ error: "Stripe secret key not found" }), {
         status: 500,
         headers: corsHeaders,
       });
     }
+    // Log only the type of key to help debug
+    console.log("[DEBUG] Stripe secret key starts with:", stripeSecret.slice(0, 8));
     const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
     // 2. Find/create Stripe customer for this email
