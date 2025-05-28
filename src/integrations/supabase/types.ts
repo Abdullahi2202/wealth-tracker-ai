@@ -289,7 +289,7 @@ export type Database = {
     }
     Functions: {
       is_admin: {
-        Args: { _user_id: string }
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_admin_by_email: {
