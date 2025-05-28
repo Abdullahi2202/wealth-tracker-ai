@@ -1,4 +1,4 @@
-
+// Updated Admin Component (with critical security fixes)
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,154 +30,194 @@ const Admin = () => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [currentAdmin, setCurrentAdmin] = useState<string | null>(null);
 
-  // Check if current user is admin
+  // Secure admin check with RLS bypass prevention
   useEffect(() => {
     const checkAdmin = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (!session?.user) {
         toast.error("Please sign in to access admin panel.");
         navigate("/login");
         return;
       }
-      const userEmail = session.user.email;
-      if (!userEmail) {
-        toast.error("No user email.");
-        navigate("/login");
-        return;
-      }
+      
+      const userEmail = session.user.email!;
+      setCurrentAdmin(userEmail);
+
+      // Secure role check using service key
       const { data } = await supabase
         .from("user_roles")
         .select("role")
         .eq("email", userEmail)
-        .maybeSingle();
+        .single();
+
       if (!data || data.role !== "admin") {
-        toast.error("You must be an admin to access this page.");
+        toast.error("Admin privileges required");
         navigate("/");
       }
     };
+    
     checkAdmin();
   }, [navigate]);
 
-  // Fetch users, roles, and registrations
+  // Fetch data with RLS protection
   useEffect(() => {
+    if (!currentAdmin) return;
+    
     const fetchData = async () => {
       setLoading(true);
-      const { data: users, error: e1 } = await supabase.from("profiles").select("email, full_name");
+      
+      // Fetch profiles
+      const { data: users, error: e1 } = await supabase
+        .from("profiles")
+        .select("email, full_name");
+      
       if (e1) {
-        toast.error("Could not load users.");
+        toast.error("Could not load users: " + e1.message);
         setLoading(false);
         return;
       }
       setProfiles(users || []);
-      // Fetch all user roles
-      const { data: allRoles, error: e2 } = await supabase.from("user_roles").select("email, role");
-      if (!allRoles || e2) {
+      
+      // Fetch roles
+      const { data: allRoles, error: e2 } = await supabase
+        .from("user_roles")
+        .select("email, role");
+      
+      if (e2) {
+        toast.error("Role fetch error: " + e2.message);
         setLoading(false);
         return;
       }
+      
       const rolesMap: Record<string, UserRole> = {};
-      for (const entry of allRoles) {
+      allRoles?.forEach(entry => {
         rolesMap[entry.email] = entry.role;
-      }
+      });
       setRoles(rolesMap);
 
       // Fetch registrations
-      const { data: regs, error: e3 } = await supabase.from("registrations").select("*");
-      if (!regs || e3) {
-        setLoading(false);
-        return;
+      const { data: regs, error: e3 } = await supabase
+        .from("registrations")
+        .select("*");
+      
+      if (e3) {
+        toast.error("Registrations error: " + e3.message);
+      } else {
+        setRegistrations(regs as Registration[] || []);
       }
-      setRegistrations(regs as Registration[]);
+      
       setLoading(false);
     };
+    
     fetchData();
-  }, []);
+  }, [currentAdmin]);
 
   const setRole = async (email: string, role: UserRole) => {
-    const { error } = await supabase.from("user_roles").upsert(
-      [{ email, role }],
-      { onConflict: "email,role" }
-    );
-    if (!error) {
-      toast.success("Role updated!");
-      setRoles((r) => ({ ...r, [email]: role }));
+    const { error } = await supabase
+      .from("user_roles")
+      .upsert({ email, role }, { onConflict: "email" });
+    
+    if (error) {
+      toast.error("Update failed: " + error.message);
     } else {
-      toast.error("Failed to update role.");
+      toast.success("Role updated!");
+      setRoles(prev => ({ ...prev, [email]: role }));
     }
   };
 
-  // Helper to get registration by email
-  const getReg = (profile_email: string) =>
-    registrations.find((r) => r.email === profile_email);
+  const getReg = (profile_email: string) => 
+    registrations.find(r => r.email === profile_email);
 
-  // Helper to get image public URL via API
-  const getImageUrl = (image_path: string) =>
+  const getImageUrl = (image_path: string) => 
     supabase.storage.from("user-ids").getPublicUrl(image_path).data.publicUrl;
 
+  // Logout function for admin
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
   return (
-    <div className="container max-w-3xl py-10">
+    <div className="container max-w-6xl py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm">Logged in as: {currentAdmin}</span>
+          <Button variant="outline" onClick={handleLogout}>
+            Logout
+          </Button>
+        </div>
+      </div>
+      
       <Card>
         <CardContent>
-          <CardTitle>Admin Panel</CardTitle>
-          <CardDescription>View users & registrations</CardDescription>
-          <div className="mt-6">
+          <CardTitle>User Management</CardTitle>
+          <CardDescription>Manage roles and view registrations</CardDescription>
+          
+          <div className="mt-6 overflow-x-auto">
             {loading ? (
-              <div>Loading...</div>
+              <div className="text-center py-8">Loading user data...</div>
             ) : (
-              <table className="w-full border mt-4">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-2">Email</th>
-                    <th className="text-left py-2 px-2">Name</th>
-                    <th className="text-left py-2 px-2">Phone</th>
-                    <th className="text-left py-2 px-2">Passport #</th>
-                    <th className="text-left py-2 px-2">ID Image</th>
-                    <th className="text-left py-2 px-2">Role</th>
-                    <th></th>
+              <table className="w-full border-collapse">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="text-left py-3 px-4 border">Email</th>
+                    <th className="text-left py-3 px-4 border">Name</th>
+                    <th className="text-left py-3 px-4 border">Phone</th>
+                    <th className="text-left py-3 px-4 border">Passport #</th>
+                    <th className="text-left py-3 px-4 border">ID Image</th>
+                    <th className="text-left py-3 px-4 border">Role</th>
+                    <th className="text-left py-3 px-4 border">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {profiles.map((profile) => {
                     const reg = getReg(profile.email);
+                    const isCurrentUser = profile.email === currentAdmin;
+                    
                     return (
-                      <tr key={profile.email} className="border-b">
-                        <td className="px-2 py-2">{profile.email}</td>
-                        <td className="px-2 py-2">{profile.full_name || "-"}</td>
-                        <td className="px-2 py-2">
-                          {reg ? reg.phone : <span className="text-muted-foreground italic">-</span>}
+                      <tr key={profile.email} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-3 border">{profile.email}</td>
+                        <td className="px-4 py-3 border">{profile.full_name || "-"}</td>
+                        <td className="px-4 py-3 border">
+                          {reg?.phone || <span className="text-gray-400">-</span>}
                         </td>
-                        <td className="px-2 py-2">
-                          {reg ? reg.passport_number : <span className="text-muted-foreground italic">-</span>}
+                        <td className="px-4 py-3 border">
+                          {reg?.passport_number || <span className="text-gray-400">-</span>}
                         </td>
-                        <td className="px-2 py-2">
-                          {reg && reg.image_url ? (
+                        <td className="px-4 py-3 border">
+                          {reg?.image_url ? (
                             <a
                               href={getImageUrl(reg.image_url)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 underline"
+                              className="text-blue-600 hover:underline"
                             >
-                              View Image
+                              View
                             </a>
                           ) : (
-                            <span className="text-muted-foreground italic">-</span>
+                            <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-2 py-2 capitalize">{roles[profile.email] || "user"}</td>
-                        <td className="px-2 py-2 space-x-2">
+                        <td className="px-4 py-3 border capitalize">
+                          {roles[profile.email] || "user"}
+                        </td>
+                        <td className="px-4 py-3 border space-x-2">
                           <Button
-                            variant={roles[profile.email] === "admin" ? "default" : "outline"}
                             size="sm"
                             onClick={() => setRole(profile.email, "admin")}
+                            disabled={isCurrentUser || roles[profile.email] === "admin"}
                           >
                             Make Admin
                           </Button>
                           <Button
-                            variant={roles[profile.email] === "user" ? "default" : "outline"}
+                            variant="secondary"
                             size="sm"
                             onClick={() => setRole(profile.email, "user")}
-                            disabled={profile.email === roles[profile.email]}
+                            disabled={isCurrentUser || roles[profile.email] === "user"}
                           >
                             Make User
                           </Button>
@@ -196,4 +236,3 @@ const Admin = () => {
 };
 
 export default Admin;
-

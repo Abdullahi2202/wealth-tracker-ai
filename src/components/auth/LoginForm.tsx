@@ -1,3 +1,4 @@
+// Updated Login Component
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,23 +31,42 @@ const Login = () => {
 
     if (error) {
       toast.error("Login failed: " + error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Check user role after successful login
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      toast.error("Login successful but session not found");
+      setLoading(false);
+      return;
+    }
+
+    // Fetch user role from database
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("email", session.user.email!)
+      .single();
+
+    // Store user data (without sensitive info)
+    localStorage.setItem(
+      "walletmaster_user",
+      JSON.stringify({
+        name: session.user.user_metadata?.full_name ?? "",
+        email: session.user.email,
+        role: roleData?.role || "user",
+      })
+    );
+
+    toast.success("Logged in successfully!");
+
+    // Redirect based on role
+    if (roleData?.role === "admin") {
+      navigate("/admin");
     } else {
-      // After successful login, fetch user info and store in localStorage
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // Store minimal info for UI (don't include password or tokens!)
-        localStorage.setItem(
-          "walletmaster_user",
-          JSON.stringify({
-            name: session.user.user_metadata?.full_name ?? "",
-            email: session.user.email,
-          })
-        );
-        toast.success("Logged in successfully!");
-        navigate("/dashboard");
-      } else {
-        toast.error("Login successful but no user session found.");
-      }
+      navigate("/dashboard");
     }
 
     setLoading(false);
