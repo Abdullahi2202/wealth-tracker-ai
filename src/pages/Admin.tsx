@@ -1,3 +1,4 @@
+
 // Updated Admin Component (with critical security fixes)
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -31,10 +32,27 @@ const Admin = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [currentAdmin, setCurrentAdmin] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Secure admin check with RLS bypass prevention
+  // Check admin authentication from localStorage or Supabase session
   useEffect(() => {
     const checkAdmin = async () => {
+      // First check localStorage for admin user
+      const storedUser = localStorage.getItem("walletmaster_user");
+      if (storedUser) {
+        try {
+          const userObj = JSON.parse(storedUser);
+          if (userObj.isAdmin && userObj.role === "admin") {
+            setCurrentAdmin(userObj.email);
+            setIsAdmin(true);
+            return;
+          }
+        } catch (error) {
+          console.error("Error parsing stored user:", error);
+        }
+      }
+
+      // Fallback to Supabase session check
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.user) {
@@ -56,7 +74,10 @@ const Admin = () => {
       if (!data || data.role !== "admin") {
         toast.error("Admin privileges required");
         navigate("/");
+        return;
       }
+
+      setIsAdmin(true);
     };
     
     checkAdmin();
@@ -64,7 +85,7 @@ const Admin = () => {
 
   // Fetch data with RLS protection
   useEffect(() => {
-    if (!currentAdmin) return;
+    if (!currentAdmin || !isAdmin) return;
     
     const fetchData = async () => {
       setLoading(true);
@@ -113,7 +134,7 @@ const Admin = () => {
     };
     
     fetchData();
-  }, [currentAdmin]);
+  }, [currentAdmin, isAdmin]);
 
   const setRole = async (email: string, role: UserRole) => {
     const { error } = await supabase
@@ -136,9 +157,25 @@ const Admin = () => {
 
   // Logout function for admin
   const handleLogout = async () => {
+    // Clear localStorage
+    localStorage.removeItem("walletmaster_user");
+    
+    // Sign out from Supabase if there's a session
     await supabase.auth.signOut();
+    
     navigate("/login");
   };
+
+  // Show loading or redirect if not admin
+  if (!isAdmin) {
+    return (
+      <div className="container max-w-6xl py-8">
+        <div className="text-center">
+          <p>Checking admin privileges...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-6xl py-8">
