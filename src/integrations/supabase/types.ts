@@ -136,18 +136,21 @@ export type Database = {
           created_at: string | null
           email: string
           full_name: string | null
+          id: string | null
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           email: string
           full_name?: string | null
+          id?: string | null
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           email?: string
           full_name?: string | null
+          id?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -295,6 +298,10 @@ export type Database = {
       is_admin_by_email: {
         Args: { _email: string }
         Returns: boolean
+      }
+      make_user_admin: {
+        Args: { user_email: string }
+        Returns: undefined
       }
     }
     Enums: {

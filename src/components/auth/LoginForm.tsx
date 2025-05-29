@@ -33,12 +33,20 @@ const Login = () => {
       if (error) {
         console.error("Login error:", error);
         
-        // Handle specific database errors
-        if (error.message.includes("Database error querying schema") || 
-            error.message.includes("confirmation_token")) {
-          toast.error("Account setup issue. Please contact support or try registering again.");
-        } else if (error.message.includes("Invalid login credentials")) {
-          toast.error("Invalid email or password.");
+        // Handle specific error cases
+        if (error.message.includes("Invalid login credentials")) {
+          // Check if this is the admin user trying to log in
+          if (email === "kingabdalla982@gmail.com") {
+            toast.error("Admin account not found. Please register first using the registration form.");
+          } else {
+            toast.error("Invalid email or password. Please check your credentials or register if you don't have an account.");
+          }
+        } else if (error.message.includes("Database error") || 
+                   error.message.includes("confirmation_token") ||
+                   error.message.includes("email_change")) {
+          toast.error("Account setup issue detected. Please try registering again or contact support.");
+        } else if (error.message.includes("Email not confirmed")) {
+          toast.error("Please check your email and confirm your account before logging in.");
         } else {
           toast.error("Login failed: " + error.message);
         }
@@ -47,10 +55,12 @@ const Login = () => {
       }
 
       if (!data.session?.user) {
-        toast.error("Login successful but session not found");
+        toast.error("Login successful but session not found. Please try again.");
         setLoading(false);
         return;
       }
+
+      console.log("Login successful for user:", data.session.user.email);
 
       // Fetch user role from database
       const { data: roleData, error: roleError } = await supabase
@@ -137,6 +147,15 @@ const Login = () => {
             Register
           </Button>
         </form>
+
+        {/* Admin setup guidance */}
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Admin Setup:</strong> If you're the admin user (kingabdalla982@gmail.com), 
+            please register first using the registration form above. Your account will 
+            automatically be granted admin privileges.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

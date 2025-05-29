@@ -33,82 +33,76 @@ const RegistrationForm = () => {
 
     setLoading(true);
 
-    // Step 1: Create user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    // If the user is not confirmed (email verification required), inform the user and return
-    if (authError) {
-      toast.error(authError?.message || "Failed to register user.");
-      setLoading(false);
-      return;
-    }
-
-    // Try to ensure we are authenticated for the RLS check:
-    // Try sign in right after signup (in case auto-login is not enabled)
-    let userSession = (await supabase.auth.getSession()).data.session;
-
-    if (!userSession) {
-      // Try to login (this only works if confirmation is not required)
-      const { error: loginError } = await supabase.auth.signInWithPassword({
+    try {
+      // Step 1: Create user account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
-        password
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          }
+        }
       });
-      if (loginError) {
-        toast.error("Registration successful! Please check your email for confirmation before logging in.");
+
+      if (authError) {
+        console.error("Registration error:", authError);
+        if (authError.message.includes("already registered")) {
+          toast.error("This email is already registered. Please try logging in instead.");
+          navigate("/login");
+        } else {
+          toast.error("Registration failed: " + authError.message);
+        }
         setLoading(false);
-        navigate("/login");
         return;
       }
-      // Recheck session
-      userSession = (await supabase.auth.getSession()).data.session;
-    }
 
-    // At this point, user is signed in, can store registration info
-    if (!userSession || !userSession.user?.email) {
-      toast.error("Error: You must verify your email before proceeding.");
+      if (!authData.user) {
+        toast.error("Registration failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("User created successfully:", authData.user.email);
+
+      // Step 2: Save additional registration info
+      const { error: dbError } = await supabase.from("registrations").insert({
+        email: authData.user.email!,
+        full_name: fullName,
+        phone,
+        passport_number: passportNumber,
+        image_url: "",
+      });
+
+      if (dbError) {
+        console.error("Error saving registration data:", dbError);
+        // Don't fail the entire registration if this fails
+        toast.error("Registration completed but some data may not have been saved properly.");
+      }
+
+      // Step 3: Check if this is an admin user and update role if needed
+      if (email === "kingabdalla982@gmail.com") {
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .update({ role: "admin" })
+          .eq("email", email);
+
+        if (roleError) {
+          console.error("Error setting admin role:", roleError);
+        } else {
+          console.log("Admin role set successfully");
+        }
+      }
+
+      toast.success("Registration successful! Please check your email for verification, then log in.");
+      navigate("/login");
+
+    } catch (error) {
+      console.error("Unexpected registration error:", error);
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
       setLoading(false);
-      navigate("/login");
-      return;
     }
-
-    // Step 2: Save extra info to registrations (use email as key)
-    const { error: dbError } = await supabase.from("registrations").insert({
-      email: userSession.user.email,
-      full_name: fullName,
-      phone,
-      passport_number: passportNumber,
-      image_url: "",
-    });
-
-    // Optionally, update 'profiles' table with full name if you use it (by email)
-    await supabase
-      .from("profiles")
-      .update({ full_name: fullName })
-      .eq("email", userSession.user.email);
-
-    if (dbError) {
-      console.error("Error inserting into registrations:", dbError);
-      // Special case: duplicate key error
-      if (dbError.code === "23505") {
-        toast.error("This email is already registered. Please log in instead.");
-        setLoading(false);
-        navigate("/login");
-        return;
-      }
-      toast.error(
-        "Failed to store registration data." +
-        (dbError.details ? " Details: " + dbError.details : "") +
-        (dbError.message ? " Message: " + dbError.message : "")
-      );
-    } else {
-      toast.success("Registered successfully! Please log in.");
-      navigate("/login");
-    }
-
-    setLoading(false);
   };
 
   return (
@@ -153,6 +147,16 @@ const RegistrationForm = () => {
             {loading ? "Registering..." : "Register"}
           </Button>
         </form>
+
+        {/* Admin user guidance */}
+        {form.email === "kingabdalla982@gmail.com" && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-800">
+              <strong>Admin Account:</strong> You're registering as an admin user. 
+              Your account will automatically receive admin privileges.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
