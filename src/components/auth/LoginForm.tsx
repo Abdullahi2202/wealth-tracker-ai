@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,14 +39,6 @@ const Login = () => {
         );
 
       if (roleError) throw roleError;
-
-      // 3. Manually confirm the email (bypass email confirmation)
-      const { error: confirmError } = await supabase
-        .from('auth.users')
-        .update({ email_confirmed_at: new Date().toISOString() })
-        .eq('email', ADMIN_EMAIL);
-
-      if (confirmError) throw confirmError;
 
       return true;
     } catch (error) {
@@ -95,7 +88,7 @@ const Login = () => {
       // Proceed with normal login
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password: email === ADMIN_EMAIL ? ADMIN_PASSWORD : password,
+        password,
       });
 
       if (error) throw error;
@@ -161,7 +154,7 @@ const Login = () => {
             variant="outline"
             className="w-full"
             onClick={() => navigate("/register")}
-            disabled={loading || email === ADMIN_EMAIL}
+            disabled={loading}
           >
             Register
           </Button>
