@@ -18,31 +18,40 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleAdminAutoSetup = async () => {
+  const handleAdminLogin = async () => {
     try {
-      // 1. Sign up the admin user
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-      });
-
-      if (signUpError && !signUpError.message.includes('User already registered')) {
-        throw signUpError;
-      }
-
-      // 2. Ensure admin role exists in user_roles table
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert(
-          { email: ADMIN_EMAIL, role: 'admin' },
-          { onConflict: 'email' }
+      // For admin, create a session without going through Supabase auth
+      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+        // Store admin session data directly
+        localStorage.setItem(
+          "walletmaster_user",
+          JSON.stringify({
+            email: ADMIN_EMAIL,
+            role: "admin",
+            isAdmin: true,
+          })
         );
 
-      if (roleError) throw roleError;
+        // Ensure admin role exists in user_roles table
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .upsert(
+            { email: ADMIN_EMAIL, role: 'admin' },
+            { onConflict: 'email' }
+          );
 
-      return true;
+        if (roleError) {
+          console.error("Error setting admin role:", roleError);
+          // Don't fail login if role setting fails - admin is already authenticated
+        }
+
+        toast.success("Admin logged in successfully!");
+        navigate("/admin");
+        return true;
+      }
+      return false;
     } catch (error) {
-      console.error("Admin auto-setup failed:", error);
+      console.error("Admin login error:", error);
       return false;
     }
   };
@@ -60,32 +69,18 @@ const Login = () => {
     try {
       // Special handling for admin login
       if (email === ADMIN_EMAIL) {
-        // First check if admin exists
-        const { data: adminCheck, error: adminCheckError } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('email', ADMIN_EMAIL)
-          .single();
-
-        // If admin doesn't exist, create automatically
-        if (!adminCheck || adminCheckError) {
-          const setupSuccess = await handleAdminAutoSetup();
-          if (!setupSuccess) {
-            toast.error("Admin setup failed. Please contact support.");
-            setLoading(false);
-            return;
-          }
-        }
-
-        // Verify admin password
-        if (password !== ADMIN_PASSWORD) {
-          toast.error("Invalid admin password.");
+        const adminLoginSuccess = await handleAdminLogin();
+        if (adminLoginSuccess) {
+          setLoading(false);
+          return;
+        } else {
+          toast.error("Invalid admin credentials.");
           setLoading(false);
           return;
         }
       }
 
-      // Proceed with normal login
+      // Proceed with normal login for non-admin users
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -98,12 +93,12 @@ const Login = () => {
         "walletmaster_user",
         JSON.stringify({
           email: data.user.email,
-          role: email === ADMIN_EMAIL ? "admin" : "user",
+          role: "user",
         })
       );
 
       toast.success("Logged in successfully!");
-      navigate(email === ADMIN_EMAIL ? "/admin" : "/dashboard");
+      navigate("/dashboard");
 
     } catch (error) {
       console.error("Login error:", error);
