@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,11 +7,52 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 
+// Admin credentials (should ideally be in environment variables)
+const ADMIN_EMAIL = "kingabdalla982@gmail.com";
+const ADMIN_PASSWORD = "Ali@2202";
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleAdminAutoSetup = async () => {
+    try {
+      // 1. Sign up the admin user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+      });
+
+      if (signUpError && !signUpError.message.includes('User already registered')) {
+        throw signUpError;
+      }
+
+      // 2. Ensure admin role exists in user_roles table
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert(
+          { email: ADMIN_EMAIL, role: 'admin' },
+          { onConflict: 'email' }
+        );
+
+      if (roleError) throw roleError;
+
+      // 3. Manually confirm the email (bypass email confirmation)
+      const { error: confirmError } = await supabase
+        .from('auth.users')
+        .update({ email_confirmed_at: new Date().toISOString() })
+        .eq('email', ADMIN_EMAIL);
+
+      if (confirmError) throw confirmError;
+
+      return true;
+    } catch (error) {
+      console.error("Admin auto-setup failed:", error);
+      return false;
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,77 +65,56 @@ const Login = () => {
     setLoading(true);
 
     try {
+      // Special handling for admin login
+      if (email === ADMIN_EMAIL) {
+        // First check if admin exists
+        const { data: adminCheck, error: adminCheckError } = await supabase
+          .from('user_roles')
+          .select('*')
+          .eq('email', ADMIN_EMAIL)
+          .single();
+
+        // If admin doesn't exist, create automatically
+        if (!adminCheck || adminCheckError) {
+          const setupSuccess = await handleAdminAutoSetup();
+          if (!setupSuccess) {
+            toast.error("Admin setup failed. Please contact support.");
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Verify admin password
+        if (password !== ADMIN_PASSWORD) {
+          toast.error("Invalid admin password.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Proceed with normal login
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password: email === ADMIN_EMAIL ? ADMIN_PASSWORD : password,
       });
 
-      if (error) {
-        console.error("Login error:", error);
-        
-        // Handle specific error cases
-        if (error.message.includes("Invalid login credentials")) {
-          // Check if this is the admin user trying to log in
-          if (email === "kingabdalla982@gmail.com") {
-            toast.error("Admin account not found. Please register first using the registration form.");
-          } else {
-            toast.error("Invalid email or password. Please check your credentials or register if you don't have an account.");
-          }
-        } else if (error.message.includes("Database error") || 
-                   error.message.includes("confirmation_token") ||
-                   error.message.includes("email_change")) {
-          toast.error("Account setup issue detected. Please try registering again or contact support.");
-        } else if (error.message.includes("Email not confirmed")) {
-          toast.error("Please check your email and confirm your account before logging in.");
-        } else {
-          toast.error("Login failed: " + error.message);
-        }
-        setLoading(false);
-        return;
-      }
+      if (error) throw error;
 
-      if (!data.session?.user) {
-        toast.error("Login successful but session not found. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      console.log("Login successful for user:", data.session.user.email);
-
-      // Fetch user role from database
-      const { data: roleData, error: roleError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("email", data.session.user.email!)
-        .single();
-
-      if (roleError) {
-        console.error("Role fetch error:", roleError);
-        // Default to user role if role fetch fails
-      }
-
-      // Store user data (without sensitive info)
+      // Store user data
       localStorage.setItem(
         "walletmaster_user",
         JSON.stringify({
-          name: data.session.user.user_metadata?.full_name ?? "",
-          email: data.session.user.email,
-          role: roleData?.role || "user",
+          email: data.user.email,
+          role: email === ADMIN_EMAIL ? "admin" : "user",
         })
       );
 
       toast.success("Logged in successfully!");
+      navigate(email === ADMIN_EMAIL ? "/admin" : "/dashboard");
 
-      // Redirect based on role
-      if (roleData?.role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/dashboard");
-      }
-
-    } catch (err) {
-      console.error("Unexpected login error:", err);
-      toast.error("An unexpected error occurred. Please try again.");
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error(error instanceof Error ? error.message : "Login failed");
     } finally {
       setLoading(false);
     }
@@ -142,20 +161,19 @@ const Login = () => {
             variant="outline"
             className="w-full"
             onClick={() => navigate("/register")}
-            disabled={loading}
+            disabled={loading || email === ADMIN_EMAIL}
           >
             Register
           </Button>
         </form>
 
-        {/* Admin setup guidance */}
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Admin Setup:</strong> If you're the admin user (kingabdalla982@gmail.com), 
-            please register first using the registration form above. Your account will 
-            automatically be granted admin privileges.
-          </p>
-        </div>
+        {email === ADMIN_EMAIL && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Admin Login:</strong> Using predefined admin credentials.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
