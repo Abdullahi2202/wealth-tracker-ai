@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -5,10 +6,12 @@ import IdentityVerificationUpload from "./IdentityVerificationUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-// Use only existing fields on the profiles table (no date_of_birth, no profile_photo_url)
+// Combined profile data from both profiles and registrations tables
 type ProfileData = {
   email: string;
   full_name: string | null;
+  phone?: string;
+  passport_number?: string;
 };
 
 type VerificationRequest = {
@@ -27,37 +30,64 @@ export default function ProfileView() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
 
   useEffect(() => {
     async function fetchProfileAndRequests() {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.email) {
-        setProfile(null);
-        setLoading(false);
-        return;
+      
+      // Get user email from localStorage first
+      const storedUser = localStorage.getItem("walletmaster_user");
+      let userEmail = "";
+      
+      if (storedUser) {
+        try {
+          const userObj = JSON.parse(storedUser);
+          userEmail = userObj.email;
+        } catch (error) {
+          console.error("Error parsing stored user:", error);
+        }
       }
-      const email = session.user.email;
-      // Only get valid profile fields
-      const { data: p } = await supabase
+
+      // If no email from localStorage, try getting from Supabase session
+      if (!userEmail) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.email) {
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+        userEmail = session.user.email;
+      }
+
+      // Fetch from profiles table
+      const { data: profileData } = await supabase
         .from("profiles")
         .select("email, full_name")
-        .eq("email", email)
+        .eq("email", userEmail)
         .maybeSingle();
 
-      // p can be null or undefined
-      setProfile(
-        p && typeof p.email === "string"
-          ? { email: p.email, full_name: p.full_name ?? null }
-          : null
-      );
+      // Fetch from registrations table for additional data
+      const { data: registrationData } = await supabase
+        .from("registrations")
+        .select("email, full_name, phone, passport_number")
+        .eq("email", userEmail)
+        .maybeSingle();
+
+      // Combine data from both sources
+      const combinedProfile: ProfileData = {
+        email: userEmail,
+        full_name: profileData?.full_name || registrationData?.full_name || null,
+        phone: registrationData?.phone || undefined,
+        passport_number: registrationData?.passport_number || undefined,
+      };
+
+      setProfile(combinedProfile);
 
       // Fetch verification requests
       const { data: requests } = await supabase
         .from("identity_verification_requests")
         .select("*")
-        .eq("email", email)
+        .eq("email", userEmail)
         .order("requested_at", { ascending: false });
 
       // Cast document_type to expected types
@@ -113,14 +143,13 @@ export default function ProfileView() {
         </div>
         {/* Main profile details */}
         <div className="flex flex-col gap-3 min-w-[220px] w-full max-w-[330px]">
-          {/* No date of birth field */}
           <div>
-            <span className="font-semibold mr-2">Date of Birth:</span>
-            <span className="italic text-muted-foreground">Not set</span>
+            <span className="font-semibold mr-2">Phone:</span>
+            <span>{profile.phone || <span className="italic text-muted-foreground">Not provided</span>}</span>
           </div>
           <div>
             <span className="font-semibold mr-2">Passport Number:</span>
-            <span>-</span>
+            <span>{profile.passport_number || <span className="italic text-muted-foreground">Not provided</span>}</span>
           </div>
         </div>
       </div>
