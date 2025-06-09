@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,6 +22,7 @@ import Budget from "./pages/Budget";
 import Settings from "./pages/Settings";
 import Investments from "./pages/Investments";
 import Admin from "./pages/Admin";
+import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
@@ -34,11 +36,10 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} /> {/* Correct usage! */}
+          <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/cards" element={<Cards />} />
           <Route path="/payments" element={<Payments />} />
-          {/* Mobile-first redesign routes below */}
           <Route path="/payments/home" element={<PaymentsHome />} />
           <Route path="/payments/send" element={<SendPayment />} />
           <Route path="/payments/topup" element={<TopUpWallet />} />
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/settings" element={<Settings />} />
           <Route path="/investments" element={<Investments />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
