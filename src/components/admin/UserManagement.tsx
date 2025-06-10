@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Search, Eye, UserCheck, UserX, AlertCircle } from "lucide-react";
+import { Search, Eye, UserCheck, UserX, AlertCircle, CheckCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 type Profile = {
@@ -33,6 +33,8 @@ type VerificationRequest = {
   document_type: string;
   status: string;
   requested_at: string;
+  new_document_url?: string;
+  new_number?: string;
 };
 
 const UserManagement = () => {
@@ -43,6 +45,7 @@ const UserManagement = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -107,7 +110,10 @@ const UserManagement = () => {
   };
 
   const approveVerification = async (email: string) => {
+    setProcessingAction(`approve-${email}`);
     try {
+      console.log("Approving verification for:", email);
+      
       const { error } = await supabase
         .from("identity_verification_requests")
         .update({ 
@@ -122,17 +128,21 @@ const UserManagement = () => {
         console.error("Error approving verification:", error);
         toast.error("Failed to approve verification");
       } else {
-        toast.success("User verification approved");
-        fetchData();
+        toast.success(`User ${email} verification approved successfully!`);
+        await fetchData();
       }
     } catch (error) {
       console.error("Error approving verification:", error);
       toast.error("Failed to approve verification");
     }
+    setProcessingAction(null);
   };
 
   const rejectVerification = async (email: string) => {
+    setProcessingAction(`reject-${email}`);
     try {
+      console.log("Rejecting verification for:", email);
+      
       const { error } = await supabase
         .from("identity_verification_requests")
         .update({ 
@@ -147,12 +157,39 @@ const UserManagement = () => {
         console.error("Error rejecting verification:", error);
         toast.error("Failed to reject verification");
       } else {
-        toast.success("User verification rejected");
-        fetchData();
+        toast.success(`User ${email} verification rejected`);
+        await fetchData();
       }
     } catch (error) {
       console.error("Error rejecting verification:", error);
       toast.error("Failed to reject verification");
+    }
+    setProcessingAction(null);
+  };
+
+  const createTestVerificationRequest = async () => {
+    try {
+      const testEmail = "test@example.com";
+      const { error } = await supabase
+        .from("identity_verification_requests")
+        .insert({
+          email: testEmail,
+          document_type: "passport",
+          status: "pending",
+          new_document_url: "https://example.com/document.jpg",
+          new_number: "A12345678"
+        });
+
+      if (error) {
+        console.error("Error creating test verification:", error);
+        toast.error("Failed to create test verification request");
+      } else {
+        toast.success("Test verification request created");
+        await fetchData();
+      }
+    } catch (error) {
+      console.error("Error creating test verification:", error);
+      toast.error("Failed to create test verification request");
     }
   };
 
@@ -166,6 +203,10 @@ const UserManagement = () => {
     return latest.status;
   };
 
+  const getPendingVerifications = () => {
+    return verificationRequests.filter(v => v.status === "pending");
+  };
+
   const filteredProfiles = profiles.filter(profile => {
     const matchesSearch = profile.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          profile.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -176,10 +217,19 @@ const UserManagement = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "approved": return "bg-green-100 text-green-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      case "rejected": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "approved": return "bg-green-100 text-green-800 border-green-200";
+      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "rejected": return "bg-red-100 text-red-800 border-red-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "approved": return <CheckCircle className="h-4 w-4" />;
+      case "pending": return <AlertCircle className="h-4 w-4" />;
+      case "rejected": return <UserX className="h-4 w-4" />;
+      default: return <AlertCircle className="h-4 w-4" />;
     }
   };
 
@@ -189,6 +239,33 @@ const UserManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Actions */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">User Management</h2>
+          <p className="text-gray-600">Manage user verifications and account status</p>
+        </div>
+        <Button onClick={createTestVerificationRequest} variant="outline">
+          Create Test Verification
+        </Button>
+      </div>
+
+      {/* Pending Verifications Alert */}
+      {getPendingVerifications().length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-yellow-600" />
+            <h3 className="font-semibold text-yellow-800">
+              {getPendingVerifications().length} Pending Verification{getPendingVerifications().length !== 1 ? 's' : ''}
+            </h3>
+          </div>
+          <p className="text-yellow-700 mt-1">
+            There are users waiting for verification approval. Please review and take action.
+          </p>
+        </div>
+      )}
+
+      {/* Search and Filters */}
       <div className="flex gap-4 items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -213,30 +290,33 @@ const UserManagement = () => {
         </Select>
       </div>
 
-      <div className="rounded-md border">
+      {/* Users Table */}
+      <div className="rounded-md border bg-white">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-gray-50">
               <TableHead>Email</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Verification Status</TableHead>
               <TableHead>Registration Date</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredProfiles.map((profile) => {
               const registration = getRegistration(profile.email);
               const status = getVerificationStatus(profile.email);
+              const isProcessing = processingAction?.includes(profile.email);
               
               return (
-                <TableRow key={profile.email}>
+                <TableRow key={profile.email} className="hover:bg-gray-50">
                   <TableCell className="font-medium">{profile.email}</TableCell>
                   <TableCell>{profile.full_name || registration?.full_name || "-"}</TableCell>
                   <TableCell>{registration?.phone || "-"}</TableCell>
                   <TableCell>
-                    <Badge className={getStatusColor(status)}>
+                    <Badge className={`${getStatusColor(status)} border flex items-center gap-1 w-fit`}>
+                      {getStatusIcon(status)}
                       {status}
                     </Badge>
                   </TableCell>
@@ -247,7 +327,8 @@ const UserManagement = () => {
                     }
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex justify-center gap-2">
+                      {/* View Details Button */}
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button 
@@ -258,53 +339,66 @@ const UserManagement = () => {
                             <Eye className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-md">
                           <DialogHeader>
                             <DialogTitle>User Details</DialogTitle>
                           </DialogHeader>
                           <div className="space-y-4">
                             <div>
-                              <label className="font-medium">Email:</label>
-                              <p>{profile.email}</p>
+                              <label className="font-medium text-sm text-gray-700">Email:</label>
+                              <p className="text-gray-900">{profile.email}</p>
                             </div>
                             <div>
-                              <label className="font-medium">Full Name:</label>
-                              <p>{profile.full_name || registration?.full_name || "N/A"}</p>
+                              <label className="font-medium text-sm text-gray-700">Full Name:</label>
+                              <p className="text-gray-900">{profile.full_name || registration?.full_name || "N/A"}</p>
                             </div>
                             <div>
-                              <label className="font-medium">Phone:</label>
-                              <p>{registration?.phone || "N/A"}</p>
+                              <label className="font-medium text-sm text-gray-700">Phone:</label>
+                              <p className="text-gray-900">{registration?.phone || "N/A"}</p>
                             </div>
                             <div>
-                              <label className="font-medium">Passport Number:</label>
-                              <p>{registration?.passport_number || "N/A"}</p>
+                              <label className="font-medium text-sm text-gray-700">Passport Number:</label>
+                              <p className="text-gray-900">{registration?.passport_number || "N/A"}</p>
                             </div>
                             <div>
-                              <label className="font-medium">Status:</label>
-                              <Badge className={getStatusColor(status)}>
+                              <label className="font-medium text-sm text-gray-700">Status:</label>
+                              <Badge className={`${getStatusColor(status)} border flex items-center gap-1 w-fit mt-1`}>
+                                {getStatusIcon(status)}
                                 {status}
                               </Badge>
                             </div>
                           </div>
                         </DialogContent>
                       </Dialog>
+
+                      {/* Action Buttons for Pending Verifications */}
                       {status === "pending" && (
                         <>
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="text-green-600 hover:bg-green-50"
+                            className="text-green-700 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-300"
                             onClick={() => approveVerification(profile.email)}
+                            disabled={isProcessing}
                           >
-                            <UserCheck className="h-4 w-4" />
+                            {processingAction === `approve-${profile.email}` ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600" />
+                            ) : (
+                              <UserCheck className="h-4 w-4" />
+                            )}
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="text-red-600 hover:bg-red-50"
+                            className="text-red-700 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300"
                             onClick={() => rejectVerification(profile.email)}
+                            disabled={isProcessing}
                           >
-                            <UserX className="h-4 w-4" />
+                            {processingAction === `reject-${profile.email}` ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+                            ) : (
+                              <UserX className="h-4 w-4" />
+                            )}
                           </Button>
                         </>
                       )}
@@ -317,25 +411,26 @@ const UserManagement = () => {
         </Table>
       </div>
 
+      {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-blue-600">{profiles.length}</div>
+        <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+          <div className="text-2xl font-bold text-blue-700">{profiles.length}</div>
           <div className="text-sm text-blue-600">Total Users</div>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-green-600">
+        <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <div className="text-2xl font-bold text-green-700">
             {profiles.filter(p => getVerificationStatus(p.email) === "approved").length}
           </div>
           <div className="text-sm text-green-600">Verified Users</div>
         </div>
-        <div className="bg-yellow-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-yellow-600">
+        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+          <div className="text-2xl font-bold text-yellow-700">
             {profiles.filter(p => getVerificationStatus(p.email) === "pending").length}
           </div>
           <div className="text-sm text-yellow-600">Pending Verification</div>
         </div>
-        <div className="bg-red-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-red-600">
+        <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+          <div className="text-2xl font-bold text-red-700">
             {profiles.filter(p => getVerificationStatus(p.email) === "rejected").length}
           </div>
           <div className="text-sm text-red-600">Rejected</div>
