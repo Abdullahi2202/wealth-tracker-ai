@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, Users, Activity, DollarSign, Shield, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { BarChart3, TrendingUp, Users, Activity, RefreshCw } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
 type SystemMetric = {
   id: string;
@@ -17,54 +18,99 @@ type SystemMetric = {
 const SystemMetrics = () => {
   const [metrics, setMetrics] = useState<SystemMetric[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchMetrics();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('system-metrics-changes')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'system_metrics' },
+        (payload) => {
+          console.log('New metric:', payload);
+          setMetrics(prev => [payload.new as SystemMetric, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchMetrics = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("system_metrics")
-      .select("*")
-      .order("recorded_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("system_metrics")
+        .select("*")
+        .order("recorded_at", { ascending: false })
+        .limit(100);
 
-    if (error) {
+      if (error) {
+        console.error("Error fetching system metrics:", error);
+        toast.error("Failed to fetch system metrics");
+      } else {
+        setMetrics(data || []);
+      }
+    } catch (error) {
       console.error("Error fetching system metrics:", error);
-    } else {
-      setMetrics(data || []);
+      toast.error("Failed to fetch system metrics");
     }
     setLoading(false);
   };
 
-  const getMetricsByType = (type: string) => 
-    metrics.filter(m => m.metric_type === type);
+  const generateSampleMetrics = async () => {
+    setRefreshing(true);
+    try {
+      const sampleMetrics = [
+        { metric_name: "active_users_daily", metric_value: Math.floor(Math.random() * 2000) + 1000, metric_type: "user_metric" },
+        { metric_name: "transactions_per_hour", metric_value: Math.floor(Math.random() * 100) + 20, metric_type: "transaction_metric" },
+        { metric_name: "api_response_time_ms", metric_value: Math.floor(Math.random() * 200) + 50, metric_type: "performance_metric" },
+        { metric_name: "fraud_detection_rate", metric_value: Math.floor(Math.random() * 10) + 90, metric_type: "security_metric" },
+        { metric_name: "system_uptime_percent", metric_value: 99.5 + Math.random() * 0.5, metric_type: "system_metric" },
+      ];
 
-  const getLatestMetric = (name: string) => 
-    metrics.find(m => m.metric_name === name)?.metric_value || 0;
+      for (const metric of sampleMetrics) {
+        await supabase.from("system_metrics").insert(metric);
+      }
 
-  const userMetrics = getMetricsByType("user_metric");
-  const transactionMetrics = getMetricsByType("transaction_metric");
-  const performanceMetrics = getMetricsByType("performance_metric");
-  const securityMetrics = getMetricsByType("security_metric");
-  const systemMetrics = getMetricsByType("system_metric");
+      toast.success("Sample metrics generated");
+      fetchMetrics();
+    } catch (error) {
+      console.error("Error generating metrics:", error);
+      toast.error("Failed to generate metrics");
+    }
+    setRefreshing(false);
+  };
 
-  // Chart data
-  const chartData = [
-    { name: 'Users', value: getLatestMetric('active_users_daily'), color: '#3b82f6' },
-    { name: 'Transactions', value: getLatestMetric('transactions_per_hour'), color: '#10b981' },
-    { name: 'Response Time', value: getLatestMetric('api_response_time_ms'), color: '#f59e0b' },
-    { name: 'Uptime', value: getLatestMetric('system_uptime_percent'), color: '#8b5cf6' }
-  ];
+  const getLatestMetrics = () => {
+    const latestMetrics: { [key: string]: SystemMetric } = {};
+    
+    metrics.forEach(metric => {
+      if (!latestMetrics[metric.metric_name] || 
+          new Date(metric.recorded_at) > new Date(latestMetrics[metric.metric_name].recorded_at)) {
+        latestMetrics[metric.metric_name] = metric;
+      }
+    });
+    
+    return Object.values(latestMetrics);
+  };
 
-  const performanceData = [
-    { time: '00:00', response_time: 120, uptime: 99.8 },
-    { time: '04:00', response_time: 135, uptime: 99.9 },
-    { time: '08:00', response_time: 110, uptime: 99.7 },
-    { time: '12:00', response_time: 145, uptime: 99.8 },
-    { time: '16:00', response_time: 125, uptime: 99.9 },
-    { time: '20:00', response_time: 115, uptime: 99.8 }
-  ];
+  const getChartData = (metricName: string) => {
+    return metrics
+      .filter(m => m.metric_name === metricName)
+      .slice(0, 10)
+      .reverse()
+      .map(m => ({
+        time: new Date(m.recorded_at).toLocaleTimeString(),
+        value: m.metric_value
+      }));
+  };
+
+  const latestMetrics = getLatestMetrics();
 
   if (loading) {
     return <div className="text-center py-8">Loading system metrics...</div>;
@@ -72,178 +118,133 @@ const SystemMetrics = () => {
 
   return (
     <div className="space-y-6">
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getLatestMetric('active_users_daily')}</div>
-            <p className="text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3 inline mr-1" />
-              +12% from yesterday
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Transactions/Hour</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getLatestMetric('transactions_per_hour')}</div>
-            <p className="text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3 inline mr-1" />
-              +8% from last hour
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">API Response Time</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getLatestMetric('api_response_time_ms')}ms</div>
-            <p className="text-xs text-muted-foreground">
-              Target: &lt;200ms
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Uptime</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getLatestMetric('system_uptime_percent')}%</div>
-            <p className="text-xs text-muted-foreground">
-              SLA: 99.9%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Fraud Detection Rate</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getLatestMetric('fraud_detection_rate')}%</div>
-            <p className="text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3 inline mr-1" />
-              AI-powered detection
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Health</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              <Badge className="bg-green-100 text-green-800">Healthy</Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              All systems operational
-            </p>
-          </CardContent>
-        </Card>
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">System Performance Metrics</h3>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={fetchMetrics}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button 
+            onClick={generateSampleMetrics}
+            disabled={refreshing}
+          >
+            Generate Sample Data
+          </Button>
+        </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance Over Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={performanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
-                <Tooltip />
-                <Line 
-                  yAxisId="left" 
-                  type="monotone" 
-                  dataKey="response_time" 
-                  stroke="#3b82f6" 
-                  name="Response Time (ms)"
-                />
-                <Line 
-                  yAxisId="right" 
-                  type="monotone" 
-                  dataKey="uptime" 
-                  stroke="#10b981" 
-                  name="Uptime (%)"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>System Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Metrics Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Metrics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {['user_metric', 'transaction_metric', 'performance_metric', 'security_metric'].map(type => (
-              <div key={type} className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-2 capitalize">{type.replace('_', ' ')}</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {getMetricsByType(type).slice(0, 3).map(metric => (
-                    <div key={metric.id} className="bg-gray-50 p-3 rounded">
-                      <div className="font-medium">{metric.metric_name.replace('_', ' ')}</div>
-                      <div className="text-2xl font-bold">{metric.metric_value}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(metric.recorded_at).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {latestMetrics.map((metric) => (
+          <Card key={metric.id}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {metric.metric_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </CardTitle>
+              {metric.metric_type === "user_metric" && <Users className="h-4 w-4 text-muted-foreground" />}
+              {metric.metric_type === "transaction_metric" && <Activity className="h-4 w-4 text-muted-foreground" />}
+              {metric.metric_type === "performance_metric" && <TrendingUp className="h-4 w-4 text-muted-foreground" />}
+              {metric.metric_type === "security_metric" && <BarChart3 className="h-4 w-4 text-muted-foreground" />}
+              {metric.metric_type === "system_metric" && <Activity className="h-4 w-4 text-muted-foreground" />}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {metric.metric_name.includes('percent') || metric.metric_name.includes('rate') 
+                  ? `${metric.metric_value.toFixed(1)}%`
+                  : metric.metric_name.includes('time') 
+                    ? `${metric.metric_value.toFixed(0)}ms`
+                    : metric.metric_value.toFixed(0)
+                }
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <p className="text-xs text-muted-foreground">
+                {new Date(metric.recorded_at).toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {metrics.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Users Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={getChartData("active_users_daily")}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>API Response Time</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={getChartData("api_response_time_ms")}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#82ca9d" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaction Volume</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={getChartData("transactions_per_hour")}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="value" stroke="#ffc658" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>System Uptime</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={getChartData("system_uptime_percent")}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis domain={[99, 100]} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="value" stroke="#ff7300" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {metrics.length === 0 && !loading && (
+        <div className="text-center py-8 text-gray-500">
+          No metrics data available. Click "Generate Sample Data" to create some sample metrics.
+        </div>
+      )}
     </div>
   );
 };

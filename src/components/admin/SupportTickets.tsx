@@ -4,10 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { MessageSquare, Eye, CheckCircle, Clock, RefreshCw } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 type SupportTicket = {
   id: string;
@@ -24,74 +27,119 @@ type SupportTicket = {
 
 const SupportTickets = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
 
   useEffect(() => {
     fetchTickets();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('support-tickets-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'support_tickets' },
+        (payload) => {
+          console.log('Support ticket change:', payload);
+          if (payload.eventType === 'INSERT') {
+            setTickets(prev => [payload.new as SupportTicket, ...prev]);
+            toast.info("New support ticket created");
+          } else if (payload.eventType === 'UPDATE') {
+            setTickets(prev => prev.map(ticket => 
+              ticket.id === payload.new.id ? payload.new as SupportTicket : ticket
+            ));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchTickets = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("support_tickets")
-      .select("*")
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    if (error) {
+      if (error) {
+        console.error("Error fetching support tickets:", error);
+        toast.error("Failed to fetch support tickets");
+      } else {
+        setTickets(data || []);
+      }
+    } catch (error) {
       console.error("Error fetching support tickets:", error);
-    } else {
-      setTickets(data || []);
+      toast.error("Failed to fetch support tickets");
     }
     setLoading(false);
   };
 
   const updateTicketStatus = async (ticketId: string, status: string) => {
-    const updateData: any = { 
-      status, 
-      updated_at: new Date().toISOString()
-    };
-    
-    if (status === "resolved" || status === "closed") {
-      updateData.resolved_at = new Date().toISOString();
-    }
+    try {
+      const updateData: any = { 
+        status,
+        updated_at: new Date().toISOString()
+      };
 
-    const { error } = await supabase
-      .from("support_tickets")
-      .update(updateData)
-      .eq("id", ticketId);
+      if (status === "resolved" || status === "closed") {
+        updateData.resolved_at = new Date().toISOString();
+      }
 
-    if (error) {
+      const { error } = await supabase
+        .from("support_tickets")
+        .update(updateData)
+        .eq("id", ticketId);
+
+      if (error) {
+        console.error("Error updating ticket status:", error);
+        toast.error("Failed to update ticket status");
+      } else {
+        toast.success(`Ticket marked as ${status}`);
+        fetchTickets();
+      }
+    } catch (error) {
+      console.error("Error updating ticket status:", error);
       toast.error("Failed to update ticket status");
-    } else {
-      toast.success(`Ticket ${status}`);
-      fetchTickets();
     }
   };
 
-  const assignTicket = async (ticketId: string, assignee: string) => {
-    const { error } = await supabase
-      .from("support_tickets")
-      .update({ 
-        assigned_to: assignee,
-        status: "in_progress",
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", ticketId);
+  const assignTicket = async (ticketId: string, assignedTo: string) => {
+    try {
+      const { error } = await supabase
+        .from("support_tickets")
+        .update({ 
+          assigned_to: assignedTo,
+          status: "in_progress",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", ticketId);
 
-    if (error) {
+      if (error) {
+        console.error("Error assigning ticket:", error);
+        toast.error("Failed to assign ticket");
+      } else {
+        toast.success("Ticket assigned successfully");
+        fetchTickets();
+      }
+    } catch (error) {
+      console.error("Error assigning ticket:", error);
       toast.error("Failed to assign ticket");
-    } else {
-      toast.success("Ticket assigned");
-      fetchTickets();
     }
   };
 
   const filteredTickets = tickets.filter(ticket => {
+    const matchesSearch = ticket.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         ticket.subject.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
-    return matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus && matchesPriority;
   });
 
   const getStatusColor = (status: string) => {
@@ -114,16 +162,15 @@ const SupportTickets = () => {
     }
   };
 
-  const calculateMetrics = () => {
+  const calculateStats = () => {
     const openTickets = tickets.filter(t => t.status === "open").length;
     const inProgressTickets = tickets.filter(t => t.status === "in_progress").length;
-    const resolvedTickets = tickets.filter(t => t.status === "resolved").length;
-    const criticalTickets = tickets.filter(t => t.priority === "critical" && t.status !== "resolved").length;
+    const criticalTickets = tickets.filter(t => t.priority === "critical").length;
     
-    return { openTickets, inProgressTickets, resolvedTickets, criticalTickets };
+    return { openTickets, inProgressTickets, criticalTickets };
   };
 
-  const metrics = calculateMetrics();
+  const stats = calculateStats();
 
   if (loading) {
     return <div className="text-center py-8">Loading support tickets...</div>;
@@ -134,12 +181,22 @@ const SupportTickets = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Open Tickets</CardTitle>
-            <FileText className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium">Total Tickets</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{metrics.openTickets}</div>
-            <p className="text-xs text-muted-foreground">Awaiting assignment</p>
+            <div className="text-2xl font-bold">{tickets.length}</div>
+            <p className="text-xs text-muted-foreground">All support tickets</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Open Tickets</CardTitle>
+            <Clock className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.openTickets}</div>
+            <p className="text-xs text-muted-foreground">Awaiting response</p>
           </CardContent>
         </Card>
         <Card>
@@ -148,33 +205,29 @@ const SupportTickets = () => {
             <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{metrics.inProgressTickets}</div>
+            <div className="text-2xl font-bold text-yellow-600">{stats.inProgressTickets}</div>
             <p className="text-xs text-muted-foreground">Being worked on</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{metrics.resolvedTickets}</div>
-            <p className="text-xs text-muted-foreground">This month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Critical</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
+            <MessageSquare className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{metrics.criticalTickets}</div>
-            <p className="text-xs text-muted-foreground">Need immediate attention</p>
+            <div className="text-2xl font-bold text-red-600">{stats.criticalTickets}</div>
+            <p className="text-xs text-muted-foreground">High priority</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex gap-4 items-center">
+        <Input
+          placeholder="Search by email or subject..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1"
+        />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Filter by status" />
@@ -199,6 +252,10 @@ const SupportTickets = () => {
             <SelectItem value="low">Low</SelectItem>
           </SelectContent>
         </Select>
+        <Button variant="outline" onClick={fetchTickets}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
       <div className="rounded-md border">
@@ -221,12 +278,7 @@ const SupportTickets = () => {
                   {new Date(ticket.created_at).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="font-medium">{ticket.user_email}</TableCell>
-                <TableCell className="max-w-xs">
-                  <div className="truncate font-medium">{ticket.subject}</div>
-                  <div className="text-sm text-muted-foreground truncate">
-                    {ticket.description}
-                  </div>
-                </TableCell>
+                <TableCell>{ticket.subject}</TableCell>
                 <TableCell>
                   <Badge className={getPriorityColor(ticket.priority)}>
                     {ticket.priority}
@@ -234,28 +286,84 @@ const SupportTickets = () => {
                 </TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(ticket.status)}>
-                    {ticket.status.replace("_", " ")}
+                    {ticket.status.replace('_', ' ')}
                   </Badge>
                 </TableCell>
                 <TableCell>{ticket.assigned_to || "Unassigned"}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => setSelectedTicket(ticket)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Support Ticket Details</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="font-medium">User:</label>
+                            <p>{ticket.user_email}</p>
+                          </div>
+                          <div>
+                            <label className="font-medium">Subject:</label>
+                            <p>{ticket.subject}</p>
+                          </div>
+                          <div>
+                            <label className="font-medium">Description:</label>
+                            <p className="whitespace-pre-wrap">{ticket.description}</p>
+                          </div>
+                          <div className="flex gap-4">
+                            <div>
+                              <label className="font-medium">Priority:</label>
+                              <Badge className={getPriorityColor(ticket.priority)}>
+                                {ticket.priority}
+                              </Badge>
+                            </div>
+                            <div>
+                              <label className="font-medium">Status:</label>
+                              <Badge className={getStatusColor(ticket.status)}>
+                                {ticket.status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {ticket.status !== "resolved" && ticket.status !== "closed" && (
+                              <>
+                                <Button 
+                                  size="sm"
+                                  onClick={() => updateTicketStatus(ticket.id, "in_progress")}
+                                  disabled={ticket.status === "in_progress"}
+                                >
+                                  Start Working
+                                </Button>
+                                <Button 
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateTicketStatus(ticket.id, "resolved")}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Resolve
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                     {ticket.status === "open" && (
                       <Button 
                         size="sm" 
-                        variant="outline"
+                        variant="outline" 
                         onClick={() => assignTicket(ticket.id, "admin@walletmaster.com")}
                       >
                         Assign
-                      </Button>
-                    )}
-                    {ticket.status === "in_progress" && (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => updateTicketStatus(ticket.id, "resolved")}
-                      >
-                        Resolve
                       </Button>
                     )}
                   </div>
@@ -265,6 +373,12 @@ const SupportTickets = () => {
           </TableBody>
         </Table>
       </div>
+
+      {filteredTickets.length === 0 && !loading && (
+        <div className="text-center py-8 text-gray-500">
+          No support tickets found matching your criteria.
+        </div>
+      )}
     </div>
   );
 };
