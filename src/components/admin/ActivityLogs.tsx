@@ -15,7 +15,7 @@ type AdminActivityLog = {
   target_id: string | null;
   old_values: any;
   new_values: any;
-  ip_address: string | null;
+  ip_address: unknown | null;
   user_agent: string | null;
   created_at: string;
 };
@@ -204,7 +204,7 @@ const ActivityLogs = () => {
                   )}
                 </TableCell>
                 <TableCell className="font-mono text-xs">
-                  {log.ip_address || "-"}
+                  {log.ip_address ? String(log.ip_address) : "-"}
                 </TableCell>
               </TableRow>
             ))}
