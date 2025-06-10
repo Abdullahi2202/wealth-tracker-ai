@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import UserManagement from "@/components/admin/UserManagement";
 import TransactionMonitoring from "@/components/admin/TransactionMonitoring";
@@ -13,12 +12,15 @@ import SupportTickets from "@/components/admin/SupportTickets";
 import ChatbotLogs from "@/components/admin/ChatbotLogs";
 import SystemMetrics from "@/components/admin/SystemMetrics";
 import ActivityLogs from "@/components/admin/ActivityLogs";
-import { Shield, Users, CreditCard, AlertTriangle, MessageSquare, BarChart3, FileText, Activity } from "lucide-react";
+import AdminSidebar from "@/components/admin/AdminSidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { Shield, LogOut } from "lucide-react";
 
 const AdminDashboard = () => {
   const [currentAdmin, setCurrentAdmin] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("users");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -74,11 +76,103 @@ const AdminDashboard = () => {
     navigate("/login");
   };
 
+  const renderContent = () => {
+    switch (activeTab) {
+      case "users":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">User Management</CardTitle>
+              <CardDescription>Manage users, verification, and account status</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <UserManagement />
+            </CardContent>
+          </Card>
+        );
+      case "transactions":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">Transaction Monitoring</CardTitle>
+              <CardDescription>Real-time transaction monitoring and analysis</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <TransactionMonitoring />
+            </CardContent>
+          </Card>
+        );
+      case "fraud":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">Fraud Detection & Alerts</CardTitle>
+              <CardDescription>AI-powered fraud detection and risk management</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <FraudAlerts />
+            </CardContent>
+          </Card>
+        );
+      case "support":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">Support Ticket Management</CardTitle>
+              <CardDescription>Handle user support requests and disputes</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <SupportTickets />
+            </CardContent>
+          </Card>
+        );
+      case "chatbot":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">AI Chatbot Analytics</CardTitle>
+              <CardDescription>Monitor chatbot interactions and performance</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <ChatbotLogs />
+            </CardContent>
+          </Card>
+        );
+      case "metrics":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">System Metrics & Reports</CardTitle>
+              <CardDescription>Platform analytics and performance metrics</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <SystemMetrics />
+            </CardContent>
+          </Card>
+        );
+      case "logs":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">Admin Activity Logs</CardTitle>
+              <CardDescription>Security audit trail and admin actions</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <ActivityLogs />
+            </CardContent>
+          </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
   if (loading) {
     return (
-      <div className="container max-w-7xl py-8">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <div className="text-center">
-          <p>Loading admin dashboard...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading admin dashboard...</p>
         </div>
       </div>
     );
@@ -86,149 +180,52 @@ const AdminDashboard = () => {
 
   if (!isAdmin) {
     return (
-      <div className="container max-w-7xl py-8">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <div className="text-center">
-          <p>Checking admin privileges...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Checking admin privileges...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container max-w-7xl py-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Shield className="h-8 w-8 text-blue-600" />
-            Wallet Master Admin Panel
-          </h1>
-          <p className="text-muted-foreground mt-1">Complete system administration and monitoring</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <span className="text-sm">Admin: {currentAdmin}</span>
-          <Button variant="outline" onClick={handleLogout}>
-            Logout
-          </Button>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-slate-50">
+        <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <header className="bg-white border-b border-slate-200 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className="h-8 w-8 text-blue-600" />
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+                  <p className="text-sm text-slate-600">Wallet Master Administration Panel</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-slate-900">{currentAdmin}</p>
+                  <p className="text-xs text-slate-500">Administrator</p>
+                </div>
+                <Button variant="outline" onClick={handleLogout} className="gap-2">
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <main className="flex-1 p-6">
+            {renderContent()}
+          </main>
         </div>
       </div>
-
-      <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-7 mb-6">
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="transactions" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Transactions
-          </TabsTrigger>
-          <TabsTrigger value="fraud" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Fraud Alerts
-          </TabsTrigger>
-          <TabsTrigger value="support" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Support
-          </TabsTrigger>
-          <TabsTrigger value="chatbot" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Chatbot
-          </TabsTrigger>
-          <TabsTrigger value="metrics" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Metrics
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Audit Logs
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage users, verification, and account status</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UserManagement />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="transactions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction Monitoring</CardTitle>
-              <CardDescription>Real-time transaction monitoring and analysis</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TransactionMonitoring />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="fraud">
-          <Card>
-            <CardHeader>
-              <CardTitle>Fraud Detection & Alerts</CardTitle>
-              <CardDescription>AI-powered fraud detection and risk management</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FraudAlerts />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="support">
-          <Card>
-            <CardHeader>
-              <CardTitle>Support Ticket Management</CardTitle>
-              <CardDescription>Handle user support requests and disputes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SupportTickets />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="chatbot">
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Chatbot Analytics</CardTitle>
-              <CardDescription>Monitor chatbot interactions and performance</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChatbotLogs />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="metrics">
-          <Card>
-            <CardHeader>
-              <CardTitle>System Metrics & Reports</CardTitle>
-              <CardDescription>Platform analytics and performance metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SystemMetrics />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="logs">
-          <Card>
-            <CardHeader>
-              <CardTitle>Admin Activity Logs</CardTitle>
-              <CardDescription>Security audit trail and admin actions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ActivityLogs />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+    </SidebarProvider>
   );
 };
 
