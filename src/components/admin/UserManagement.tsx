@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -46,6 +45,7 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -130,6 +130,7 @@ const UserManagement = () => {
       } else {
         toast.success(`User ${email} verification approved successfully!`);
         await fetchData();
+        setIsDialogOpen(false);
       }
     } catch (error) {
       console.error("Error approving verification:", error);
@@ -159,10 +160,61 @@ const UserManagement = () => {
       } else {
         toast.success(`User ${email} verification rejected`);
         await fetchData();
+        setIsDialogOpen(false);
       }
     } catch (error) {
       console.error("Error rejecting verification:", error);
       toast.error("Failed to reject verification");
+    }
+    setProcessingAction(null);
+  };
+
+  const markAsVerified = async (email: string) => {
+    setProcessingAction(`verify-${email}`);
+    try {
+      console.log("Marking user as verified:", email);
+      
+      // First check if there's already a verification request
+      const { data: existingRequest } = await supabase
+        .from("identity_verification_requests")
+        .select("*")
+        .eq("email", email)
+        .single();
+
+      if (existingRequest) {
+        // Update existing request
+        const { error } = await supabase
+          .from("identity_verification_requests")
+          .update({ 
+            status: "approved", 
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: (await supabase.auth.getUser()).data.user?.email 
+          })
+          .eq("email", email);
+
+        if (error) throw error;
+      } else {
+        // Create new verification request and approve it
+        const { error } = await supabase
+          .from("identity_verification_requests")
+          .insert({
+            email: email,
+            document_type: "manual_verification",
+            status: "approved",
+            new_document_url: "manual_verification_by_admin",
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: (await supabase.auth.getUser()).data.user?.email
+          });
+
+        if (error) throw error;
+      }
+
+      toast.success(`User ${email} marked as verified!`);
+      await fetchData();
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error("Error marking user as verified:", error);
+      toast.error("Failed to mark user as verified");
     }
     setProcessingAction(null);
   };
@@ -329,7 +381,7 @@ const UserManagement = () => {
                   <TableCell>
                     <div className="flex justify-center gap-2">
                       {/* View Details Button */}
-                      <Dialog>
+                      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
                           <Button 
                             size="sm" 
@@ -343,35 +395,92 @@ const UserManagement = () => {
                           <DialogHeader>
                             <DialogTitle>User Details</DialogTitle>
                           </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <label className="font-medium text-sm text-gray-700">Email:</label>
-                              <p className="text-gray-900">{profile.email}</p>
+                          {selectedUser && (
+                            <div className="space-y-4">
+                              <div>
+                                <label className="font-medium text-sm text-gray-700">Email:</label>
+                                <p className="text-gray-900">{selectedUser.email}</p>
+                              </div>
+                              <div>
+                                <label className="font-medium text-sm text-gray-700">Full Name:</label>
+                                <p className="text-gray-900">{selectedUser.full_name || getRegistration(selectedUser.email)?.full_name || "N/A"}</p>
+                              </div>
+                              <div>
+                                <label className="font-medium text-sm text-gray-700">Phone:</label>
+                                <p className="text-gray-900">{getRegistration(selectedUser.email)?.phone || "N/A"}</p>
+                              </div>
+                              <div>
+                                <label className="font-medium text-sm text-gray-700">Passport Number:</label>
+                                <p className="text-gray-900">{getRegistration(selectedUser.email)?.passport_number || "N/A"}</p>
+                              </div>
+                              <div>
+                                <label className="font-medium text-sm text-gray-700">Status:</label>
+                                <Badge className={`${getStatusColor(getVerificationStatus(selectedUser.email))} border flex items-center gap-1 w-fit mt-1`}>
+                                  {getStatusIcon(getVerificationStatus(selectedUser.email))}
+                                  {getVerificationStatus(selectedUser.email)}
+                                </Badge>
+                              </div>
+                              
+                              {/* Action Buttons in Modal */}
+                              <div className="flex flex-col gap-2 pt-4 border-t">
+                                <h4 className="font-medium text-sm text-gray-700">Admin Actions:</h4>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="flex-1 text-green-700 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-300"
+                                    onClick={() => approveVerification(selectedUser.email)}
+                                    disabled={processingAction === `approve-${selectedUser.email}`}
+                                  >
+                                    {processingAction === `approve-${selectedUser.email}` ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600" />
+                                    ) : (
+                                      <>
+                                        <UserCheck className="h-4 w-4 mr-1" />
+                                        Approve
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="flex-1 text-red-700 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300"
+                                    onClick={() => rejectVerification(selectedUser.email)}
+                                    disabled={processingAction === `reject-${selectedUser.email}`}
+                                  >
+                                    {processingAction === `reject-${selectedUser.email}` ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+                                    ) : (
+                                      <>
+                                        <UserX className="h-4 w-4 mr-1" />
+                                        Reject
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300"
+                                  onClick={() => markAsVerified(selectedUser.email)}
+                                  disabled={processingAction === `verify-${selectedUser.email}`}
+                                >
+                                  {processingAction === `verify-${selectedUser.email}` ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="h-4 w-4 mr-1" />
+                                      Mark as Verified
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
                             </div>
-                            <div>
-                              <label className="font-medium text-sm text-gray-700">Full Name:</label>
-                              <p className="text-gray-900">{profile.full_name || registration?.full_name || "N/A"}</p>
-                            </div>
-                            <div>
-                              <label className="font-medium text-sm text-gray-700">Phone:</label>
-                              <p className="text-gray-900">{registration?.phone || "N/A"}</p>
-                            </div>
-                            <div>
-                              <label className="font-medium text-sm text-gray-700">Passport Number:</label>
-                              <p className="text-gray-900">{registration?.passport_number || "N/A"}</p>
-                            </div>
-                            <div>
-                              <label className="font-medium text-sm text-gray-700">Status:</label>
-                              <Badge className={`${getStatusColor(status)} border flex items-center gap-1 w-fit mt-1`}>
-                                {getStatusIcon(status)}
-                                {status}
-                              </Badge>
-                            </div>
-                          </div>
+                          )}
                         </DialogContent>
                       </Dialog>
 
-                      {/* Action Buttons for Pending Verifications */}
+                      {/* Quick Action Buttons for Pending Verifications */}
                       {status === "pending" && (
                         <>
                           <Button 
