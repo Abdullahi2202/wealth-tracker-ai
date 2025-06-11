@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -15,8 +16,8 @@ import { CreditCard, Calendar, Lock } from "lucide-react";
 import { CardTypeSelect, CardType } from "./CardTypeSelect";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
-// Publishable key for frontend - you need to set this in your Stripe dashboard. For test: pk_test_51RSyix... (replace with your own if using live)
-const STRIPE_PUBLISHABLE_KEY = "pk_test_51RSyixH7QCvjpuoqmL9..."; // TODO: Replace with your pk_test key
+// Get the publishable key from environment or use a placeholder
+const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder";
 
 export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
   const stripe = useStripe();
@@ -31,7 +32,10 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe || !elements) {
+      toast.error("Stripe is not loaded. Please check your Stripe configuration.");
+      return;
+    }
     setLoading(true);
 
     const numberElement = elements.getElement(CardNumberElement);
@@ -54,26 +58,37 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       setLoading(false);
       return;
     }
+    
     // 2. Call Supabase Edge Function to vault and save method
-    const res = await fetch(
-      "https://cbhtifqmlkdoevxmbjmm.functions.supabase.co/add-stripe-card",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          label,
-          paymentMethodId: paymentMethod.id,
-        }),
+    try {
+      const res = await fetch(
+        "https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/add-stripe-card",
+        {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("sb-cbhtifqmlkdoevxmbjmm-auth-token") || ""}`
+          },
+          body: JSON.stringify({
+            email,
+            label: label || `${cardType} Card`,
+            paymentMethodId: paymentMethod.id,
+          }),
+        }
+      );
+      
+      if (res.ok) {
+        toast.success("Card added securely! You can now use it for payments.");
+        setLoading(false);
+        onSuccess();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Card addition failed.");
+        setLoading(false);
       }
-    );
-    if (res.ok) {
-      toast.success("Card added securely! You can now use it for payments.");
-      setLoading(false);
-      onSuccess();
-    } else {
-      const data = await res.json();
-      toast.error(data.error || "Card addition failed.");
+    } catch (error) {
+      console.error("Error adding card:", error);
+      toast.error("Failed to add card. Please try again.");
       setLoading(false);
     }
   };
