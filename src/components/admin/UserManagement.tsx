@@ -34,6 +34,8 @@ type VerificationRequest = {
   requested_at: string;
   new_document_url?: string;
   new_number?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
 };
 
 const UserManagement = () => {
@@ -54,6 +56,7 @@ const UserManagement = () => {
     const profilesChannel = supabase
       .channel('profiles-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        console.log('Profiles changed, refetching data...');
         fetchData();
       })
       .subscribe();
@@ -61,6 +64,7 @@ const UserManagement = () => {
     const verificationsChannel = supabase
       .channel('verifications-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'identity_verification_requests' }, () => {
+        console.log('Verification requests changed, refetching data...');
         fetchData();
       })
       .subscribe();
@@ -73,6 +77,7 @@ const UserManagement = () => {
 
   const fetchData = async () => {
     setLoading(true);
+    console.log('Fetching all data...');
     
     try {
       const [profilesResult, registrationsResult, verificationsResult] = await Promise.all([
@@ -85,6 +90,7 @@ const UserManagement = () => {
         console.error("Error fetching profiles:", profilesResult.error);
         toast.error("Failed to fetch user profiles");
       } else {
+        console.log('Fetched profiles:', profilesResult.data);
         setProfiles(profilesResult.data || []);
       }
 
@@ -92,6 +98,7 @@ const UserManagement = () => {
         console.error("Error fetching registrations:", registrationsResult.error);
         toast.error("Failed to fetch registrations");
       } else {
+        console.log('Fetched registrations:', registrationsResult.data);
         setRegistrations(registrationsResult.data as Registration[] || []);
       }
 
@@ -99,6 +106,7 @@ const UserManagement = () => {
         console.error("Error fetching verifications:", verificationsResult.error);
         toast.error("Failed to fetch verification requests");
       } else {
+        console.log('Fetched verifications:', verificationsResult.data);
         setVerificationRequests(verificationsResult.data as VerificationRequest[] || []);
       }
     } catch (error) {
@@ -111,91 +119,212 @@ const UserManagement = () => {
 
   const approveVerification = async (email: string) => {
     setProcessingAction(`approve-${email}`);
+    console.log("Starting approval process for:", email);
+    
     try {
-      console.log("Approving verification for:", email);
+      // Get current admin user
+      const { data: { user } } = await supabase.auth.getUser();
+      const adminEmail = user?.email;
       
-      const { error } = await supabase
+      console.log("Admin approving:", adminEmail);
+      
+      // Check if there's an existing pending verification request
+      const { data: existingRequest, error: fetchError } = await supabase
         .from("identity_verification_requests")
-        .update({ 
-          status: "approved", 
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: (await supabase.auth.getUser()).data.user?.email 
-        })
+        .select("*")
         .eq("email", email)
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .order("requested_at", { ascending: false })
+        .limit(1);
 
-      if (error) {
-        console.error("Error approving verification:", error);
-        toast.error("Failed to approve verification");
-      } else {
-        toast.success(`User ${email} verification approved successfully!`);
-        await fetchData();
-        setIsDialogOpen(false);
+      if (fetchError) {
+        console.error("Error fetching verification request:", fetchError);
+        throw fetchError;
       }
+
+      console.log("Existing pending requests:", existingRequest);
+
+      if (existingRequest && existingRequest.length > 0) {
+        // Update existing pending request
+        const { error: updateError } = await supabase
+          .from("identity_verification_requests")
+          .update({ 
+            status: "approved", 
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: adminEmail || "admin"
+          })
+          .eq("id", existingRequest[0].id);
+
+        if (updateError) {
+          console.error("Error updating verification request:", updateError);
+          throw updateError;
+        }
+
+        console.log("Successfully updated verification request");
+      } else {
+        // Create new verification request and approve it immediately
+        const { error: insertError } = await supabase
+          .from("identity_verification_requests")
+          .insert({
+            email: email,
+            document_type: "admin_approval",
+            status: "approved",
+            new_document_url: "approved_by_admin",
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: adminEmail || "admin"
+          });
+
+        if (insertError) {
+          console.error("Error creating verification request:", insertError);
+          throw insertError;
+        }
+
+        console.log("Successfully created and approved new verification request");
+      }
+
+      toast.success(`User ${email} verification approved successfully!`);
+      await fetchData(); // Refresh data to show changes
+      setIsDialogOpen(false);
+      
     } catch (error) {
       console.error("Error approving verification:", error);
       toast.error("Failed to approve verification");
     }
+    
     setProcessingAction(null);
   };
 
   const rejectVerification = async (email: string) => {
     setProcessingAction(`reject-${email}`);
+    console.log("Starting rejection process for:", email);
+    
     try {
-      console.log("Rejecting verification for:", email);
+      // Get current admin user
+      const { data: { user } } = await supabase.auth.getUser();
+      const adminEmail = user?.email;
       
-      const { error } = await supabase
+      console.log("Admin rejecting:", adminEmail);
+      
+      // Check if there's an existing pending verification request
+      const { data: existingRequest, error: fetchError } = await supabase
         .from("identity_verification_requests")
-        .update({ 
-          status: "rejected", 
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: (await supabase.auth.getUser()).data.user?.email 
-        })
+        .select("*")
         .eq("email", email)
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .order("requested_at", { ascending: false })
+        .limit(1);
 
-      if (error) {
-        console.error("Error rejecting verification:", error);
-        toast.error("Failed to reject verification");
-      } else {
-        toast.success(`User ${email} verification rejected`);
-        await fetchData();
-        setIsDialogOpen(false);
+      if (fetchError) {
+        console.error("Error fetching verification request:", fetchError);
+        throw fetchError;
       }
+
+      console.log("Existing pending requests for rejection:", existingRequest);
+
+      if (existingRequest && existingRequest.length > 0) {
+        // Update existing pending request
+        const { error: updateError } = await supabase
+          .from("identity_verification_requests")
+          .update({ 
+            status: "rejected", 
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: adminEmail || "admin"
+          })
+          .eq("id", existingRequest[0].id);
+
+        if (updateError) {
+          console.error("Error updating verification request:", updateError);
+          throw updateError;
+        }
+
+        console.log("Successfully rejected verification request");
+      } else {
+        // Create new verification request and reject it immediately
+        const { error: insertError } = await supabase
+          .from("identity_verification_requests")
+          .insert({
+            email: email,
+            document_type: "admin_rejection",
+            status: "rejected",
+            new_document_url: "rejected_by_admin",
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: adminEmail || "admin"
+          });
+
+        if (insertError) {
+          console.error("Error creating verification request:", insertError);
+          throw insertError;
+        }
+
+        console.log("Successfully created and rejected verification request");
+      }
+
+      toast.success(`User ${email} verification rejected`);
+      await fetchData(); // Refresh data to show changes
+      setIsDialogOpen(false);
+      
     } catch (error) {
       console.error("Error rejecting verification:", error);
       toast.error("Failed to reject verification");
     }
+    
     setProcessingAction(null);
   };
 
   const markAsVerified = async (email: string) => {
     setProcessingAction(`verify-${email}`);
+    console.log("Starting manual verification process for:", email);
+    
     try {
-      console.log("Marking user as verified:", email);
+      // Get current admin user
+      const { data: { user } } = await supabase.auth.getUser();
+      const adminEmail = user?.email;
       
-      // First check if there's already a verification request
-      const { data: existingRequest } = await supabase
+      console.log("Admin manually verifying:", adminEmail);
+      
+      // First check if there's already any verification request for this user
+      const { data: existingRequests, error: fetchError } = await supabase
         .from("identity_verification_requests")
         .select("*")
         .eq("email", email)
-        .single();
+        .order("requested_at", { ascending: false });
 
-      if (existingRequest) {
-        // Update existing request
-        const { error } = await supabase
+      if (fetchError) {
+        console.error("Error fetching verification requests:", fetchError);
+        throw fetchError;
+      }
+
+      console.log("All existing requests for user:", existingRequests);
+
+      if (existingRequests && existingRequests.length > 0) {
+        // Check if there's already an approved request
+        const approvedRequest = existingRequests.find(req => req.status === "approved");
+        
+        if (approvedRequest) {
+          toast.info(`User ${email} is already verified`);
+          setProcessingAction(null);
+          return;
+        }
+
+        // Update the most recent request to approved
+        const { error: updateError } = await supabase
           .from("identity_verification_requests")
           .update({ 
             status: "approved", 
             reviewed_at: new Date().toISOString(),
-            reviewed_by: (await supabase.auth.getUser()).data.user?.email 
+            reviewed_by: adminEmail || "admin"
           })
-          .eq("email", email);
+          .eq("id", existingRequests[0].id);
 
-        if (error) throw error;
+        if (updateError) {
+          console.error("Error updating verification request:", updateError);
+          throw updateError;
+        }
+
+        console.log("Successfully updated existing verification request to approved");
       } else {
         // Create new verification request and approve it
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from("identity_verification_requests")
           .insert({
             email: email,
@@ -203,25 +332,34 @@ const UserManagement = () => {
             status: "approved",
             new_document_url: "manual_verification_by_admin",
             reviewed_at: new Date().toISOString(),
-            reviewed_by: (await supabase.auth.getUser()).data.user?.email
+            reviewed_by: adminEmail || "admin"
           });
 
-        if (error) throw error;
+        if (insertError) {
+          console.error("Error creating verification request:", insertError);
+          throw insertError;
+        }
+
+        console.log("Successfully created new manual verification request");
       }
 
       toast.success(`User ${email} marked as verified!`);
-      await fetchData();
+      await fetchData(); // Refresh data to show changes
       setIsDialogOpen(false);
+      
     } catch (error) {
       console.error("Error marking user as verified:", error);
       toast.error("Failed to mark user as verified");
     }
+    
     setProcessingAction(null);
   };
 
   const createTestVerificationRequest = async () => {
     try {
       const testEmail = "test@example.com";
+      console.log("Creating test verification request for:", testEmail);
+      
       const { error } = await supabase
         .from("identity_verification_requests")
         .insert({
@@ -236,8 +374,9 @@ const UserManagement = () => {
         console.error("Error creating test verification:", error);
         toast.error("Failed to create test verification request");
       } else {
+        console.log("Test verification request created successfully");
         toast.success("Test verification request created");
-        await fetchData();
+        await fetchData(); // Refresh data to show the new request
       }
     } catch (error) {
       console.error("Error creating test verification:", error);
@@ -393,7 +532,7 @@ const UserManagement = () => {
                         </DialogTrigger>
                         <DialogContent className="max-w-md">
                           <DialogHeader>
-                            <DialogTitle>User Details</DialogTitle>
+                            <DialogTitle>User Details & Actions</DialogTitle>
                           </DialogHeader>
                           {selectedUser && (
                             <div className="space-y-4">
@@ -414,7 +553,7 @@ const UserManagement = () => {
                                 <p className="text-gray-900">{getRegistration(selectedUser.email)?.passport_number || "N/A"}</p>
                               </div>
                               <div>
-                                <label className="font-medium text-sm text-gray-700">Status:</label>
+                                <label className="font-medium text-sm text-gray-700">Current Status:</label>
                                 <Badge className={`${getStatusColor(getVerificationStatus(selectedUser.email))} border flex items-center gap-1 w-fit mt-1`}>
                                   {getStatusIcon(getVerificationStatus(selectedUser.email))}
                                   {getVerificationStatus(selectedUser.email)}
