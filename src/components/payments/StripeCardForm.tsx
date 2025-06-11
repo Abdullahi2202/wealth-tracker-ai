@@ -1,4 +1,5 @@
 
+
 import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -16,8 +17,8 @@ import { CreditCard, Calendar, Lock } from "lucide-react";
 import { CardTypeSelect, CardType } from "./CardTypeSelect";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
-// Get the publishable key from environment or use a placeholder
-const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder";
+// Use your actual Stripe publishable key
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51RXgVBRhotlUiiXdPUuoNpTNFEyH8HNLK9jFVg4lcrobEoNKtwH1QFUI4pWLCsMUFurVQEfrFxPahW8lDilmrp2j00iibXBiw8";
 
 export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
   const stripe = useStripe();
@@ -217,3 +218,4 @@ export default function StripeCardFormWrapper(props: { onSuccess: () => void; on
     </Elements>
   );
 }
+
