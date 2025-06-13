@@ -171,6 +171,7 @@ export type Database = {
           old_document_url: string | null
           requested_at: string
           reviewed_at: string | null
+          reviewed_by: string | null
           status: string
         }
         Insert: {
@@ -183,6 +184,7 @@ export type Database = {
           old_document_url?: string | null
           requested_at?: string
           reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
         }
         Update: {
@@ -195,6 +197,7 @@ export type Database = {
           old_document_url?: string | null
           requested_at?: string
           reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
         }
         Relationships: [
