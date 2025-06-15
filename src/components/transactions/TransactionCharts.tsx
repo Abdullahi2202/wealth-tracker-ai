@@ -1,4 +1,3 @@
-
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -68,33 +67,32 @@ const TransactionCharts = () => {
         Object.assign(colorsMap, fallbackCategoryColors);
         
         if (categoriesData) {
-          categoriesData.forEach(category => {
+          categoriesData.forEach((category: any) => {
             colorsMap[category.name] = category.color;
           });
         }
         setCategoryColors(colorsMap);
 
-        // Fetch transactions with explicit typing
+        // Fetch transactions with NO complicated generic mapping
         const { data: rawTransactions, error } = await supabase
           .from("transactions")
-          .select("id, amount, category, type")
-          .eq("email", email);
+          .select("id, amount, category, type");
 
-        if (!error && rawTransactions) {
-          // Convert raw data to simple transaction objects
-          const transactions = rawTransactions.map(tx => {
-            return {
+        if (!error && Array.isArray(rawTransactions)) {
+          // Explicitly type all raw transactions as 'any'
+          const transactions: { amount: number; category: string | null; type: string }[] =
+            rawTransactions.map((tx: any) => ({
               amount: Number(tx.amount),
               category: tx.category,
               type: tx.type
-            };
-          });
+            }));
 
-          // Process income and expense data using simple objects
+          // Use plain objects, no fancy generics
           const incomeCategories: Record<string, number> = {};
           const expenseCategories: Record<string, number> = {};
 
-          transactions.forEach(tx => {
+          transactions.forEach((tx) => {
+            // Fallback to "Miscellaneous" if missing/legacy
             const categoryName = (tx.category && colorsMap[tx.category]) ? tx.category : "Miscellaneous";
             const amount = tx.amount;
             
@@ -105,26 +103,20 @@ const TransactionCharts = () => {
             }
           });
 
-          // Convert to chart data with explicit typing
-          const incomeChartData: ChartData[] = [];
-          for (const categoryName in incomeCategories) {
-            incomeChartData.push({
-              name: categoryName,
-              value: incomeCategories[categoryName],
-              color: colorsMap[categoryName] || "#6b7280",
-              icon: categoryName,
-            });
-          }
+          // Build chart data (explicitly typed)
+          const incomeChartData: ChartData[] = Object.keys(incomeCategories).map((categoryName) => ({
+            name: categoryName,
+            value: incomeCategories[categoryName],
+            color: colorsMap[categoryName] || "#6b7280",
+            icon: categoryName,
+          }));
 
-          const expenseChartData: ChartData[] = [];
-          for (const categoryName in expenseCategories) {
-            expenseChartData.push({
-              name: categoryName,
-              value: expenseCategories[categoryName],
-              color: colorsMap[categoryName] || "#6b7280",
-              icon: categoryName,
-            });
-          }
+          const expenseChartData: ChartData[] = Object.keys(expenseCategories).map((categoryName) => ({
+            name: categoryName,
+            value: expenseCategories[categoryName],
+            color: colorsMap[categoryName] || "#6b7280",
+            icon: categoryName,
+          }));
 
           setIncomeData(incomeChartData);
           setExpenseData(expenseChartData);
