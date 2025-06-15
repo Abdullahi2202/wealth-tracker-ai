@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +10,6 @@ import { Activity, Eye, Edit, Trash2, Plus } from "lucide-react";
 type AdminActivityLog = {
   id: string;
   admin_user_id: string;
-  admin_email?: string;
   action: string;
   target_table: string | null;
   target_id: string | null;
@@ -33,21 +33,14 @@ const ActivityLogs = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("admin_activity_logs")
-      .select(`
-        *,
-        admin_user:users!admin_activity_logs_admin_user_id_fkey(email)
-      `)
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(100);
 
     if (error) {
       console.error("Error fetching admin activity logs:", error);
     } else {
-      const transformedLogs = (data || []).map(log => ({
-        ...log,
-        admin_email: log.admin_user?.email || 'Unknown'
-      }));
-      setLogs(transformedLogs);
+      setLogs(data || []);
     }
     setLoading(false);
   };
@@ -75,11 +68,10 @@ const ActivityLogs = () => {
   const calculateMetrics = () => {
     const today = new Date().toDateString();
     const todayLogs = logs.filter(log => new Date(log.created_at).toDateString() === today);
-    const uniqueAdmins = [...new Set(logs.map(log => log.admin_email))].length;
+    const uniqueAdmins = [...new Set(logs.map(log => log.admin_user_id))].length;
     const criticalActions = logs.filter(log => 
       log.action.includes("delete") || log.action.includes("remove")
     ).length;
-    
     return {
       totalLogs: logs.length,
       todayLogs: todayLogs.length,
@@ -88,7 +80,6 @@ const ActivityLogs = () => {
     };
   };
 
-  const uniqueActions = [...new Set(logs.map(log => log.action))];
   const metrics = calculateMetrics();
 
   if (loading) {
@@ -125,7 +116,7 @@ const ActivityLogs = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.uniqueAdmins}</div>
-            <p className="text-xs text-muted-foreground">Unique administrators</p>
+            <p className="text-xs text-muted-foreground">Unique admin_user_id</p>
           </CardContent>
         </Card>
         <Card>
@@ -161,7 +152,7 @@ const ActivityLogs = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Timestamp</TableHead>
-              <TableHead>Admin</TableHead>
+              <TableHead>Admin User ID</TableHead>
               <TableHead>Action</TableHead>
               <TableHead>Target</TableHead>
               <TableHead>Changes</TableHead>
@@ -175,7 +166,7 @@ const ActivityLogs = () => {
                   {new Date(log.created_at).toLocaleDateString()} {' '}
                   {new Date(log.created_at).toLocaleTimeString()}
                 </TableCell>
-                <TableCell className="font-medium">{log.admin_email}</TableCell>
+                <TableCell className="font-medium">{log.admin_user_id || "Unknown"}</TableCell>
                 <TableCell>
                   <Badge className={getActionColor(log.action)}>
                     <span className="flex items-center gap-1">
@@ -190,7 +181,7 @@ const ActivityLogs = () => {
                       <div className="font-medium">{log.target_table}</div>
                       {log.target_id && (
                         <div className="text-xs text-muted-foreground">
-                          ID: {log.target_id.substring(0, 8)}...
+                          ID: {String(log.target_id).substring(0, 8)}...
                         </div>
                       )}
                     </div>
