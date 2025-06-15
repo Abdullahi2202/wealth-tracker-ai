@@ -22,12 +22,6 @@ interface ChartData {
   icon: string;
 }
 
-interface Category {
-  name: string;
-  color: string;
-  icon: string;
-}
-
 // Fallback colors for legacy categories
 const fallbackCategoryColors: Record<string, string> = {
   'Food': '#F59E0B',
@@ -69,50 +63,57 @@ const TransactionCharts = () => {
           .select('name, color, icon')
           .eq('is_active', true);
 
-        // Build category colors map with explicit typing
-        const colorsMap: Record<string, string> = { ...fallbackCategoryColors };
+        // Build category colors map
+        const colorsMap = { ...fallbackCategoryColors };
         if (categoriesData) {
-          categoriesData.forEach((category) => {
+          for (const category of categoriesData) {
             colorsMap[category.name] = category.color;
-          });
+          }
         }
         setCategoryColors(colorsMap);
 
-        // Fetch transactions with explicit typing
+        // Fetch transactions
         const { data: transactions, error } = await supabase
           .from("transactions")
           .select("id, amount, category, type")
           .eq("email", email);
 
         if (!error && transactions) {
-          // Process income and expense data with explicit typing
-          const incomeMap = new Map<string, number>();
-          const expenseMap = new Map<string, number>();
+          // Process income and expense data
+          const incomeCategories: Record<string, number> = {};
+          const expenseCategories: Record<string, number> = {};
 
-          transactions.forEach((tx) => {
-            const category = (tx.category && colorsMap[tx.category]) ? tx.category : "Miscellaneous";
+          for (const tx of transactions) {
+            const categoryName = (tx.category && colorsMap[tx.category]) ? tx.category : "Miscellaneous";
             const amount = Number(tx.amount);
             
             if (tx.type === "income") {
-              incomeMap.set(category, (incomeMap.get(category) || 0) + amount);
+              incomeCategories[categoryName] = (incomeCategories[categoryName] || 0) + amount;
             } else if (tx.type === "expense") {
-              expenseMap.set(category, (expenseMap.get(category) || 0) + amount);
+              expenseCategories[categoryName] = (expenseCategories[categoryName] || 0) + amount;
             }
-          });
+          }
 
-          const incomeChartData: ChartData[] = Array.from(incomeMap.entries()).map(([name, value]) => ({
-            name,
-            value,
-            color: colorsMap[name] || "#6b7280",
-            icon: name,
-          }));
+          // Convert to chart data
+          const incomeChartData: ChartData[] = [];
+          for (const [name, value] of Object.entries(incomeCategories)) {
+            incomeChartData.push({
+              name,
+              value,
+              color: colorsMap[name] || "#6b7280",
+              icon: name,
+            });
+          }
 
-          const expenseChartData: ChartData[] = Array.from(expenseMap.entries()).map(([name, value]) => ({
-            name,
-            value,
-            color: colorsMap[name] || "#6b7280",
-            icon: name,
-          }));
+          const expenseChartData: ChartData[] = [];
+          for (const [name, value] of Object.entries(expenseCategories)) {
+            expenseChartData.push({
+              name,
+              value,
+              color: colorsMap[name] || "#6b7280",
+              icon: name,
+            });
+          }
 
           setIncomeData(incomeChartData);
           setExpenseData(expenseChartData);
