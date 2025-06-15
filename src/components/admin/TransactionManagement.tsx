@@ -20,10 +20,6 @@ type Transaction = {
   category: string | null;
   note: string | null;
   created_at: string;
-  user: {
-    email: string;
-    full_name: string;
-  };
 };
 
 const TransactionManagement = () => {
@@ -51,8 +47,7 @@ const TransactionManagement = () => {
           name,
           category,
           note,
-          created_at,
-          user:users!transactions_user_id_fkey(email, full_name)
+          created_at
         `)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -91,9 +86,10 @@ const TransactionManagement = () => {
   };
 
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      transaction.user_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
     const matchesType = typeFilter === "all" || transaction.type === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
@@ -182,7 +178,7 @@ const TransactionManagement = () => {
       {/* Search and Filters */}
       <div className="flex gap-4 items-center">
         <Input
-          placeholder="Search by user email, transaction name, or ID..."
+          placeholder="Search by user id, transaction name, or ID..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="flex-1"
@@ -234,8 +230,7 @@ const TransactionManagement = () => {
                 </TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{transaction.user?.full_name}</div>
-                    <div className="text-sm text-muted-foreground">{transaction.user?.email}</div>
+                    <div className="font-medium">{transaction.user_id || "Unknown"}</div>
                   </div>
                 </TableCell>
                 <TableCell>

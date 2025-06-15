@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,10 +18,6 @@ interface Transaction {
   category: string | null;
   note: string | null;
   created_at: string;
-  user: {
-    email: string;
-    full_name: string;
-  };
 }
 
 const TransactionMonitoring = () => {
@@ -71,8 +66,7 @@ const TransactionMonitoring = () => {
           name,
           category,
           note,
-          created_at,
-          user:users!transactions_user_id_fkey(email, full_name)
+          created_at
         `)
         .order('created_at', { ascending: false })
         .limit(500);
@@ -114,7 +108,7 @@ const TransactionMonitoring = () => {
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(t => 
-        t.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.user_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.id.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -336,8 +330,7 @@ const TransactionMonitoring = () => {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{transaction.user?.full_name}</div>
-                      <div className="text-sm text-muted-foreground">{transaction.user?.email}</div>
+                      <div className="font-medium">{transaction.user_id || "Unknown"}</div>
                     </div>
                   </TableCell>
                   <TableCell>
