@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, Download, Eye, Edit, Trash2, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Search, Filter, Download, Eye, Edit, Trash2, CheckCircle, XCircle, Clock, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -45,13 +45,38 @@ const UserManagement = () => {
 
       if (error) {
         console.error('Error fetching users from edge function:', error);
-        toast.error('Failed to fetch users: ' + (error.message || 'Unknown error'));
-        setUsers([]);
-        return;
-      }
+        
+        // Fallback: try direct query
+        console.log('Trying direct query as fallback...');
+        const { data: directData, error: directError } = await supabase
+          .from('users')
+          .select(`
+            id,
+            email,
+            full_name,
+            phone,
+            passport_number,
+            image_url,
+            verification_status,
+            document_type,
+            created_at,
+            is_active,
+            updated_at
+          `)
+          .order('created_at', { ascending: false });
 
-      console.log('Users fetched successfully:', data?.length || 0);
-      setUsers(Array.isArray(data) ? data : []);
+        if (directError) {
+          console.error('Direct query also failed:', directError);
+          toast.error('Failed to fetch users: ' + (directError.message || 'Unknown error'));
+          setUsers([]);
+        } else {
+          console.log('Direct query successful:', directData?.length || 0);
+          setUsers(Array.isArray(directData) ? directData : []);
+        }
+      } else {
+        console.log('Edge function successful:', data?.length || 0);
+        setUsers(Array.isArray(data) ? data : []);
+      }
     } catch (error: any) {
       console.error('Error:', error);
       toast.error('Failed to fetch users: ' + (error.message || 'Unknown error'));
@@ -59,6 +84,10 @@ const UserManagement = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = () => {
+    fetchUsers();
   };
 
   const handleVerifyUser = async (userId: string) => {
@@ -148,6 +177,10 @@ const UserManagement = () => {
           <p className="text-sm text-muted-foreground">Manage users, verification, and account status</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -300,6 +333,10 @@ const UserManagement = () => {
           {filteredUsers.length === 0 && !loading && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No users found</p>
+              <Button variant="outline" className="mt-2" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh to reload users
+              </Button>
             </div>
           )}
         </CardContent>

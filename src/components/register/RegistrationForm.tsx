@@ -42,13 +42,18 @@ const RegistrationForm = () => {
     setLoading(true);
 
     try {
-      // Step 1: Create user account
+      console.log("Starting registration process for:", email);
+
+      // Step 1: Create user account with proper metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
+            phone: phone,
+            passport_number: passportNumber,
+            document_type: documentType
           }
         }
       });
@@ -71,48 +76,98 @@ const RegistrationForm = () => {
         return;
       }
 
-      console.log("User created successfully:", authData.user.email);
+      console.log("Auth user created successfully:", authData.user.id);
 
-      // Step 2: Save user data to users table
-      const { error: dbError } = await supabase.from("users").insert({
-        id: authData.user.id,
-        email: authData.user.email!,
-        full_name: fullName,
-        phone,
-        passport_number: passportNumber,
-        document_type: documentType,
-        verification_status: "pending"
-      });
+      // Step 2: Use the user-management edge function to create the user record
+      try {
+        const { data: userData, error: userCreateError } = await supabase.functions.invoke('user-management', {
+          method: 'POST',
+          body: {
+            email: email,
+            full_name: fullName,
+            phone: phone,
+            passport_number: passportNumber,
+            document_type: documentType,
+            image_url: null // Will be updated when document is uploaded
+          }
+        });
 
-      if (dbError) {
-        console.error("Error saving user data:", dbError);
-        toast.error("Registration completed but some data may not have been saved properly.");
+        if (userCreateError) {
+          console.error("Error creating user record via edge function:", userCreateError);
+          // Fallback: try direct insertion
+          const { error: directInsertError } = await supabase.from("users").insert({
+            id: authData.user.id,
+            email: email,
+            full_name: fullName,
+            phone: phone,
+            passport_number: passportNumber,
+            document_type: documentType,
+            verification_status: "pending",
+            is_active: true
+          });
+
+          if (directInsertError) {
+            console.error("Direct insert also failed:", directInsertError);
+            toast.error("User account created but profile setup incomplete. Please contact support.");
+          } else {
+            console.log("User record created via direct insert");
+          }
+        } else {
+          console.log("User record created successfully via edge function");
+        }
+      } catch (userRecordError) {
+        console.error("Error in user record creation:", userRecordError);
+        // Try fallback direct insertion
+        const { error: fallbackError } = await supabase.from("users").insert({
+          id: authData.user.id,
+          email: email,
+          full_name: fullName,
+          phone: phone,
+          passport_number: passportNumber,
+          document_type: documentType,
+          verification_status: "pending",
+          is_active: true
+        });
+
+        if (fallbackError) {
+          console.error("Fallback insert failed:", fallbackError);
+        }
       }
 
       // Step 3: Check if this is an admin user and update role if needed
       if (email === "kingabdalla982@gmail.com") {
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({ user_id: authData.user.id, role: "admin" })
-          .single();
+        try {
+          const { error: roleError } = await supabase
+            .from("user_roles")
+            .insert({ user_id: authData.user.id, role: "admin" })
+            .single();
 
-        if (roleError) {
-          console.error("Error setting admin role:", roleError);
-        } else {
-          console.log("Admin role set successfully");
+          if (roleError) {
+            console.error("Error setting admin role:", roleError);
+          } else {
+            console.log("Admin role set successfully");
+          }
+        } catch (roleSetError) {
+          console.error("Admin role setting failed:", roleSetError);
         }
       }
 
       // Step 4: Create wallet for the user
-      const { error: walletError } = await supabase.from("wallets").insert({
-        user_id: authData.user.id,
-        balance: 0,
-        currency: "USD"
-      });
+      try {
+        const { error: walletError } = await supabase.from("wallets").insert({
+          user_id: authData.user.id,
+          balance: 0,
+          currency: "USD"
+        });
 
-      if (walletError) {
-        console.error("Error creating wallet:", walletError);
-        // Don't show error to user as this is not critical for registration
+        if (walletError) {
+          console.error("Error creating wallet:", walletError);
+          // Don't show error to user as this is not critical for registration
+        } else {
+          console.log("Wallet created successfully");
+        }
+      } catch (walletCreateError) {
+        console.error("Wallet creation failed:", walletCreateError);
       }
 
       toast.success("Registration successful! Your identity is being verified. You'll receive an email notification once verification is complete.");

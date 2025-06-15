@@ -107,34 +107,53 @@ Deno.serve(async (req) => {
         const createBody = await req.json()
         console.log('Create request body:', createBody)
         
-        const { email, full_name, phone, passport_number, image_url } = createBody
+        const { email, full_name, phone, passport_number, image_url, document_type } = createBody
         
-        // Create user in auth
-        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-          email,
-          password: Math.random().toString(36).slice(-8), // Temporary password
-          email_confirm: true,
-          user_metadata: { full_name }
-        })
+        // Try to get the auth user first to get their ID
+        const { data: authUser, error: authFetchError } = await supabase.auth.admin.listUsers()
+        
+        let userId = null
+        if (!authFetchError && authUser?.users) {
+          const foundUser = authUser.users.find(user => user.email === email)
+          if (foundUser) {
+            userId = foundUser.id
+            console.log('Found existing auth user:', userId)
+          }
+        }
 
-        if (authError) {
-          console.error('Error creating auth user:', authError)
-          return new Response(JSON.stringify({ error: authError.message }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        if (!userId) {
+          // If no auth user found, create one
+          const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
+            email,
+            password: Math.random().toString(36).slice(-8), // Temporary password
+            email_confirm: true,
+            user_metadata: { full_name, phone, passport_number, document_type }
           })
+
+          if (authError) {
+            console.error('Error creating auth user:', authError)
+            return new Response(JSON.stringify({ error: authError.message }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+          userId = newAuthUser.user.id
+          console.log('Created new auth user:', userId)
         }
 
         // Create user in public.users table
         const { data: user, error: userError } = await supabase
           .from('users')
           .insert({
-            id: authUser.user.id,
+            id: userId,
             email,
             full_name,
             phone,
             passport_number,
-            image_url
+            image_url: image_url || null,
+            document_type: document_type || 'passport',
+            verification_status: 'pending',
+            is_active: true
           })
           .select()
           .single()
@@ -151,17 +170,20 @@ Deno.serve(async (req) => {
         const { error: walletError } = await supabase
           .from('wallets')
           .insert({
-            user_id: authUser.user.id,
-            balance: 0
+            user_id: userId,
+            balance: 0,
+            currency: 'USD'
           })
 
         if (walletError) {
           console.error('Error creating user wallet:', walletError)
           // Don't throw here, user is created successfully
+        } else {
+          console.log('Wallet created successfully for user:', userId)
         }
 
         console.log('User created successfully:', user)
-        return new Response(JSON.stringify({ user, auth_user: authUser.user }), {
+        return new Response(JSON.stringify({ user, user_id: userId }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
     }
