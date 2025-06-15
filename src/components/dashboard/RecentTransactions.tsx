@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface Transaction {
+interface TransactionData {
   id: string;
   name: string;
   category: string;
@@ -15,7 +15,7 @@ interface Transaction {
 }
 
 const RecentTransactions = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionList, setTransactionList] = useState<TransactionData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ const RecentTransactions = () => {
       }
       setLoading(true);
       if (!email) {
-        setTransactions([]);
+        setTransactionList([]);
         setLoading(false);
         return;
       }
@@ -44,9 +44,9 @@ const RecentTransactions = () => {
         .order("date", { ascending: false })
         .limit(10);
       if (!error && Array.isArray(data)) {
-        setTransactions(data as Transaction[]);
+        setTransactionList(data as TransactionData[]);
       } else {
-        setTransactions([]);
+        setTransactionList([]);
       }
       setLoading(false);
     };
@@ -62,10 +62,10 @@ const RecentTransactions = () => {
         <div className="space-y-4">
           {loading ? (
             <div className="text-center text-muted-foreground">Loading...</div>
-          ) : transactions.length === 0 ? (
+          ) : transactionList.length === 0 ? (
             <div className="text-center text-muted-foreground">No transactions found.</div>
           ) : (
-            transactions.map((transaction) => (
+            transactionList.map((transaction) => (
               <div
                 key={transaction.id}
                 className="flex items-center justify-between border-b border-border pb-4 last:border-0 last:pb-0"
