@@ -12,12 +12,15 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setApiError(null);
     if (!email || !password) {
       toast.error("Please enter email and password.");
+      setApiError("Email and password are required.");
       return;
     }
     setLoading(true);
@@ -29,8 +32,18 @@ const Login = () => {
         .eq("email", email)
         .maybeSingle();
 
-      if (error || !user) {
-        toast.error("Invalid email or password.");
+      console.log("Login user lookup", { user, error });
+
+      if (error) {
+        toast.error("Login error: " + error.message);
+        setApiError("Login error: " + error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!user) {
+        toast.error("No account found with this email.");
+        setApiError("No account found with this email. Please register first.");
         setLoading(false);
         return;
       }
@@ -38,6 +51,7 @@ const Login = () => {
       // 2. Check password (plaintext for now, not secure)
       if (user.password !== password) {
         toast.error("Invalid email or password.");
+        setApiError("Password is incorrect.");
         setLoading(false);
         return;
       }
@@ -59,6 +73,8 @@ const Login = () => {
       navigate("/dashboard");
     } catch (err) {
       toast.error("Login failed, please try again.");
+      setApiError("Login failed due to an unexpected error.");
+      console.error("Unexpected login error:", err);
     } finally {
       setLoading(false);
     }
@@ -74,6 +90,11 @@ const Login = () => {
           Sign in to your account
         </CardDescription>
         <form onSubmit={handleLogin} className="space-y-4">
+          {apiError && (
+            <div className="bg-red-100 text-red-600 border border-red-300 p-2 rounded text-sm">
+              {apiError}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input

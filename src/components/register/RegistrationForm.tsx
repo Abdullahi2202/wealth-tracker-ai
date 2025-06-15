@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,9 +15,9 @@ const RegistrationForm = () => {
     email: "",
     password: "",
     phone: "",
-    // Removed all document and admin fields
   });
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // Helper for detailed error display
   const getErrorMessage = (err: any) => {
@@ -31,6 +30,7 @@ const RegistrationForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setApiError(null); // reset error
     const { fullName, email, password, phone } = form;
     if (!fullName || !email || !password || !phone) {
       toast.error("Please fill in all required fields.");
@@ -44,7 +44,6 @@ const RegistrationForm = () => {
         .select("*")
         .eq("email", email)
         .maybeSingle();
-
       console.log("Exist check", { exist, checkError });
 
       if (exist) {
@@ -67,24 +66,12 @@ const RegistrationForm = () => {
 
       console.log("Insert result", { inserted, error });
 
-      if (error) {
-        // Check for RLS error
-        if (
-          error.message &&
-          error.message.includes("violates row-level security policy")
-        ) {
-          toast.error("Registration is currently unavailable. Please contact support: registration is blocked due to security policy (RLS).");
-          setLoading(false);
-          return;
-        }
-        // Display detailed error for all other issues
-        toast.error("Registration failed: " + getErrorMessage(error));
-        setLoading(false);
-        return;
-      }
-
-      if (!inserted) {
-        toast.error("Registration failed: Could not insert user. Please contact support.");
+      if (error || !inserted) {
+        const message = error
+          ? `Registration failed: ${getErrorMessage(error)}`
+          : "Registration failed: Could not insert user.";
+        toast.error(message);
+        setApiError(message); // show on screen
         setLoading(false);
         return;
       }
@@ -107,8 +94,9 @@ const RegistrationForm = () => {
       );
       setTimeout(() => navigate("/login"), 1800);
     } catch (err: any) {
-      // Unexpected, likely network or supabase client bug
-      toast.error("Registration failed: " + getErrorMessage(err));
+      const msg = "Registration failed: " + getErrorMessage(err);
+      toast.error(msg);
+      setApiError(msg); // show on screen
       console.error("Unexpected registration error:", err);
     } finally {
       setLoading(false);
@@ -119,6 +107,11 @@ const RegistrationForm = () => {
     <Card className="shadow-lg p-4">
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
+          {apiError && (
+            <div className="bg-red-100 text-red-600 border border-red-300 p-2 rounded text-sm">
+              {apiError}
+            </div>
+          )}
           <div>
             <Label htmlFor="fullName">Full Name</Label>
             <Input
@@ -173,4 +166,3 @@ const RegistrationForm = () => {
 };
 
 export default RegistrationForm;
-
