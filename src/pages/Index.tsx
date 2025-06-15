@@ -8,14 +8,27 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is already logged in with Supabase Auth (use real session)
+    // Check if user is already logged in with Supabase Auth and log session for debugging
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log("[Index] Supabase session on mount:", session);
       if (session) {
         navigate("/dashboard");
       }
     };
     checkSession();
+
+    // Listen for auth state changes so redirect happens after login/logout immediately
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("[Index] Supabase session changed:", session);
+      if (session) {
+        navigate("/dashboard");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   return (
