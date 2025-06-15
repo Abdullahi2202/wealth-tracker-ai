@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +18,7 @@ const RegistrationForm = () => {
     phone: "",
     documentType: "passport",
     documentNumber: "",
-    isAdmin: false,
+    // Removed isAdmin
   });
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,7 +39,7 @@ const RegistrationForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { fullName, email, password, phone, documentType, documentNumber, isAdmin } = form;
+    const { fullName, email, password, phone, documentType, documentNumber } = form;
     if (!fullName || !email || !password || !phone || !documentNumber || !file) {
       toast.error("Please fill in all required fields and upload your document.");
       return;
@@ -67,7 +68,7 @@ const RegistrationForm = () => {
         return;
       }
 
-      // 3. Insert user with document info
+      // 3. Insert user with document info (NO is_admin property)
       const { error } = await supabase.from("registration").insert({
         email,
         password,
@@ -76,8 +77,7 @@ const RegistrationForm = () => {
         passport_number: documentNumber,
         image_url: publicURL,
         document_type: documentType,
-        verification_status: "pending",
-        is_admin: isAdmin,
+        verification_status: "pending"
       });
       if (error) throw error;
       toast.success("Registration successful! You can now login.");
@@ -156,15 +156,7 @@ const RegistrationForm = () => {
               required
             />
           </div>
-          <div>
-            <Label htmlFor="isAdmin">Is Admin?</Label>
-            <Input
-              id="isAdmin"
-              type="checkbox"
-              checked={form.isAdmin}
-              onChange={(e) => setForm((f) => ({ ...f, isAdmin: e.target.checked }))}
-            />
-          </div>
+          {/* Removed Is Admin checkbox */}
           <Button type="submit" disabled={loading} className="mt-4">
             {loading ? "Registering..." : "Register"}
           </Button>
@@ -175,3 +167,4 @@ const RegistrationForm = () => {
 };
 
 export default RegistrationForm;
+

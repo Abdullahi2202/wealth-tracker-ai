@@ -269,7 +269,6 @@ export type Database = {
           email: string
           full_name: string
           id: string
-          is_admin: boolean | null
           password: string
           phone: string | null
           updated_at: string | null
@@ -279,7 +278,6 @@ export type Database = {
           email: string
           full_name: string
           id?: string
-          is_admin?: boolean | null
           password: string
           phone?: string | null
           updated_at?: string | null
@@ -289,7 +287,6 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
-          is_admin?: boolean | null
           password?: string
           phone?: string | null
           updated_at?: string | null
