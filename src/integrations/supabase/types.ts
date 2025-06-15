@@ -46,15 +46,7 @@ export type Database = {
           target_table?: string | null
           user_agent?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "admin_activity_logs_admin_user_id_fkey"
-            columns: ["admin_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       admin_users: {
         Row: {
@@ -150,15 +142,7 @@ export type Database = {
           session_id?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "chatbot_conversations_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       fraud_alerts: {
         Row: {
@@ -199,24 +183,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fraud_alerts_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "fraud_alerts_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fraud_alerts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -267,15 +237,7 @@ export type Database = {
           type?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "payment_methods_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -362,22 +324,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "support_tickets_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_tickets_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       system_metrics: {
         Row: {
@@ -448,13 +395,6 @@ export type Database = {
             referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "transaction_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
         ]
       }
       transactions: {
@@ -511,92 +451,7 @@ export type Database = {
             referencedRelation: "payment_methods"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "transactions_recipient_user_id_fkey"
-            columns: ["recipient_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "transactions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
         ]
-      }
-      user_roles: {
-        Row: {
-          created_at: string | null
-          id: string
-          role: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          role?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          role?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_roles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      users: {
-        Row: {
-          created_at: string | null
-          document_type: string | null
-          email: string
-          full_name: string
-          id: string
-          image_url: string | null
-          is_active: boolean | null
-          passport_number: string | null
-          phone: string | null
-          updated_at: string | null
-          verification_status: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          document_type?: string | null
-          email: string
-          full_name: string
-          id?: string
-          image_url?: string | null
-          is_active?: boolean | null
-          passport_number?: string | null
-          phone?: string | null
-          updated_at?: string | null
-          verification_status?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          document_type?: string | null
-          email?: string
-          full_name?: string
-          id?: string
-          image_url?: string | null
-          is_active?: boolean | null
-          passport_number?: string | null
-          phone?: string | null
-          updated_at?: string | null
-          verification_status?: string | null
-        }
-        Relationships: []
       }
       wallets: {
         Row: {
@@ -626,15 +481,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "wallets_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
