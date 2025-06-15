@@ -21,7 +21,6 @@ import Expenses from "./pages/Expenses";
 import Budget from "./pages/Budget";
 import Settings from "./pages/Settings";
 import Investments from "./pages/Investments";
-import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
 
@@ -50,7 +49,6 @@ const App = () => (
           <Route path="/budget" element={<Budget />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/investments" element={<Investments />} />
-          <Route path="/admin" element={<Admin />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
