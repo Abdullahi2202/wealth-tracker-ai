@@ -103,6 +103,18 @@ const RegistrationForm = () => {
         }
       }
 
+      // Step 4: Create wallet for the user
+      const { error: walletError } = await supabase.from("wallets").insert({
+        user_id: authData.user.id,
+        balance: 0,
+        currency: "USD"
+      });
+
+      if (walletError) {
+        console.error("Error creating wallet:", walletError);
+        // Don't show error to user as this is not critical for registration
+      }
+
       toast.success("Registration successful! Your identity is being verified. You'll receive an email notification once verification is complete.");
       navigate("/login");
 
