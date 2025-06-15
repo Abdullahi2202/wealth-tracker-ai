@@ -6,12 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import UserManagement from "@/components/admin/UserManagement";
-import TransactionMonitoring from "@/components/admin/TransactionMonitoring";
-import FraudAlerts from "@/components/admin/FraudAlerts";
-import SupportTickets from "@/components/admin/SupportTickets";
-import ChatbotLogs from "@/components/admin/ChatbotLogs";
 import SystemMetrics from "@/components/admin/SystemMetrics";
-import ActivityLogs from "@/components/admin/ActivityLogs";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Shield, LogOut } from "lucide-react";
@@ -90,75 +85,15 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
         );
-      case "transactions":
-        return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">Transaction Monitoring</CardTitle>
-              <CardDescription>Real-time transaction monitoring and analysis</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <TransactionMonitoring />
-            </CardContent>
-          </Card>
-        );
-      case "fraud":
-        return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">Fraud Detection & Alerts</CardTitle>
-              <CardDescription>AI-powered fraud detection and risk management</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <FraudAlerts />
-            </CardContent>
-          </Card>
-        );
-      case "support":
-        return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">Support Ticket Management</CardTitle>
-              <CardDescription>Handle user support requests and disputes</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <SupportTickets />
-            </CardContent>
-          </Card>
-        );
-      case "chatbot":
-        return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">AI Chatbot Analytics</CardTitle>
-              <CardDescription>Monitor chatbot interactions and performance</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <ChatbotLogs />
-            </CardContent>
-          </Card>
-        );
       case "metrics":
         return (
           <Card className="border-0 shadow-sm">
             <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">System Metrics & Reports</CardTitle>
-              <CardDescription>Platform analytics and performance metrics</CardDescription>
+              <CardTitle className="text-xl font-semibold">System Overview</CardTitle>
+              <CardDescription>Platform analytics and key metrics</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <SystemMetrics />
-            </CardContent>
-          </Card>
-        );
-      case "logs":
-        return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">Admin Activity Logs</CardTitle>
-              <CardDescription>Security audit trail and admin actions</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <ActivityLogs />
             </CardContent>
           </Card>
         );

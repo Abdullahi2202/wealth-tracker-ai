@@ -1,7 +1,7 @@
 
 import { cn } from "@/lib/utils";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Users, CreditCard, AlertTriangle, MessageSquare, BarChart3, FileText, Activity, Shield } from "lucide-react";
+import { Users, BarChart3, Shield } from "lucide-react";
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -13,43 +13,13 @@ const menuItems = [
     id: "users",
     label: "User Management",
     icon: Users,
-    description: "Manage users & accounts",
-  },
-  {
-    id: "transactions",
-    label: "Transactions",
-    icon: CreditCard,
-    description: "Monitor transactions",
-  },
-  {
-    id: "fraud",
-    label: "Fraud Alerts",
-    icon: AlertTriangle,
-    description: "Security & fraud detection",
-  },
-  {
-    id: "support",
-    label: "Support Tickets",
-    icon: FileText,
-    description: "Customer support",
-  },
-  {
-    id: "chatbot",
-    label: "Chatbot Analytics",
-    icon: MessageSquare,
-    description: "AI assistant logs",
+    description: "Manage users & verification",
   },
   {
     id: "metrics",
-    label: "System Metrics",
+    label: "System Overview",
     icon: BarChart3,
-    description: "Performance analytics",
-  },
-  {
-    id: "logs",
-    label: "Activity Logs",
-    icon: Activity,
-    description: "Audit trail",
+    description: "Platform analytics",
   },
 ];
 

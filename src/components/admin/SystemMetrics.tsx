@@ -2,249 +2,224 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { BarChart3, TrendingUp, Users, Activity, RefreshCw } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { Badge } from "@/components/ui/badge";
+import { Users, CreditCard, TrendingUp, AlertCircle, CheckCircle, Clock } from "lucide-react";
 
-type SystemMetric = {
-  id: string;
-  metric_name: string;
-  metric_value: number;
-  metric_type: string;
-  recorded_at: string;
-};
+interface DashboardStats {
+  total_users: number;
+  verified_users: number;
+  total_wallet_balance: number;
+  total_transactions: number;
+  total_payments: number;
+  successful_payments: number;
+  recent_signups: number;
+}
 
 const SystemMetrics = () => {
-  const [metrics, setMetrics] = useState<SystemMetric[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetchMetrics();
-    
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('system-metrics-changes')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'system_metrics' },
-        (payload) => {
-          console.log('New metric:', payload);
-          setMetrics(prev => [payload.new as SystemMetric, ...prev]);
-        }
-      )
-      .subscribe();
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('admin-operations', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-    return () => {
-      supabase.removeChannel(channel);
+        if (error) {
+          console.error('Error fetching stats:', error);
+        } else {
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Error calling admin function:', error);
+      }
+      setLoading(false);
     };
+
+    fetchStats();
   }, []);
 
-  const fetchMetrics = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("system_metrics")
-        .select("*")
-        .order("recorded_at", { ascending: false })
-        .limit(100);
-
-      if (error) {
-        console.error("Error fetching system metrics:", error);
-        toast.error("Failed to fetch system metrics");
-      } else {
-        setMetrics(data || []);
-      }
-    } catch (error) {
-      console.error("Error fetching system metrics:", error);
-      toast.error("Failed to fetch system metrics");
-    }
-    setLoading(false);
-  };
-
-  const generateSampleMetrics = async () => {
-    setRefreshing(true);
-    try {
-      const sampleMetrics = [
-        { metric_name: "active_users_daily", metric_value: Math.floor(Math.random() * 2000) + 1000, metric_type: "user_metric" },
-        { metric_name: "transactions_per_hour", metric_value: Math.floor(Math.random() * 100) + 20, metric_type: "transaction_metric" },
-        { metric_name: "api_response_time_ms", metric_value: Math.floor(Math.random() * 200) + 50, metric_type: "performance_metric" },
-        { metric_name: "fraud_detection_rate", metric_value: Math.floor(Math.random() * 10) + 90, metric_type: "security_metric" },
-        { metric_name: "system_uptime_percent", metric_value: 99.5 + Math.random() * 0.5, metric_type: "system_metric" },
-      ];
-
-      for (const metric of sampleMetrics) {
-        await supabase.from("system_metrics").insert(metric);
-      }
-
-      toast.success("Sample metrics generated");
-      fetchMetrics();
-    } catch (error) {
-      console.error("Error generating metrics:", error);
-      toast.error("Failed to generate metrics");
-    }
-    setRefreshing(false);
-  };
-
-  const getLatestMetrics = () => {
-    const latestMetrics: { [key: string]: SystemMetric } = {};
-    
-    metrics.forEach(metric => {
-      if (!latestMetrics[metric.metric_name] || 
-          new Date(metric.recorded_at) > new Date(latestMetrics[metric.metric_name].recorded_at)) {
-        latestMetrics[metric.metric_name] = metric;
-      }
-    });
-    
-    return Object.values(latestMetrics);
-  };
-
-  const getChartData = (metricName: string) => {
-    return metrics
-      .filter(m => m.metric_name === metricName)
-      .slice(0, 10)
-      .reverse()
-      .map(m => ({
-        time: new Date(m.recorded_at).toLocaleTimeString(),
-        value: m.metric_value
-      }));
-  };
-
-  const latestMetrics = getLatestMetrics();
-
   if (loading) {
-    return <div className="text-center py-8">Loading system metrics...</div>;
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-slate-600">Loading system metrics...</p>
+      </div>
+    );
   }
+
+  if (!stats) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-slate-600">Unable to load system metrics</p>
+      </div>
+    );
+  }
+
+  const verificationRate = stats.total_users > 0 
+    ? ((stats.verified_users / stats.total_users) * 100).toFixed(1)
+    : "0";
+
+  const successRate = stats.total_payments > 0 
+    ? ((stats.successful_payments / stats.total_payments) * 100).toFixed(1)
+    : "0";
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">System Performance Metrics</h3>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={fetchMetrics}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button 
-            onClick={generateSampleMetrics}
-            disabled={refreshing}
-          >
-            Generate Sample Data
-          </Button>
-        </div>
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total_users}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.recent_signups} new this week
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Verified Users</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.verified_users}</div>
+            <p className="text-xs text-muted-foreground">
+              {verificationRate}% verification rate
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Wallet Balance</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${(stats.total_wallet_balance / 100).toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Across all user wallets
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Transactions</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total_transactions}</div>
+            <p className="text-xs text-muted-foreground">
+              Total transaction logs
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {latestMetrics.map((metric) => (
-          <Card key={metric.id}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {metric.metric_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </CardTitle>
-              {metric.metric_type === "user_metric" && <Users className="h-4 w-4 text-muted-foreground" />}
-              {metric.metric_type === "transaction_metric" && <Activity className="h-4 w-4 text-muted-foreground" />}
-              {metric.metric_type === "performance_metric" && <TrendingUp className="h-4 w-4 text-muted-foreground" />}
-              {metric.metric_type === "security_metric" && <BarChart3 className="h-4 w-4 text-muted-foreground" />}
-              {metric.metric_type === "system_metric" && <Activity className="h-4 w-4 text-muted-foreground" />}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metric.metric_name.includes('percent') || metric.metric_name.includes('rate') 
-                  ? `${metric.metric_value.toFixed(1)}%`
-                  : metric.metric_name.includes('time') 
-                    ? `${metric.metric_value.toFixed(0)}ms`
-                    : metric.metric_value.toFixed(0)
-                }
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {new Date(metric.recorded_at).toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Payment Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Payment Overview</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Total Payments</span>
+              <Badge variant="secondary">{stats.total_payments}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Successful</span>
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                {stats.successful_payments}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Success Rate</span>
+              <Badge variant="outline">{successRate}%</Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">User Growth</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">This Week</span>
+              <Badge className="bg-blue-100 text-blue-800">
+                +{stats.recent_signups}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Verification Rate</span>
+              <Badge variant="outline">{verificationRate}%</Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">System Health</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Payment System</span>
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Operational
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">User Registration</span>
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Active
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {metrics.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Users Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={getChartData("active_users_daily")}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>API Response Time</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={getChartData("api_response_time_ms")}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction Volume</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={getChartData("transactions_per_hour")}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="#ffc658" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>System Uptime</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={getChartData("system_uptime_percent")}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis domain={[99, 100]} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="#ff7300" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {metrics.length === 0 && !loading && (
-        <div className="text-center py-8 text-gray-500">
-          No metrics data available. Click "Generate Sample Data" to create some sample metrics.
-        </div>
-      )}
+      {/* Quick Actions Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Administrative Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium mb-2">User Management</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• {stats.total_users} total registered users</li>
+                <li>• {stats.verified_users} verified accounts</li>
+                <li>• {stats.total_users - stats.verified_users} pending verification</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Financial Overview</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• ${(stats.total_wallet_balance / 100).toFixed(2)} total wallet funds</li>
+                <li>• {stats.total_transactions} transaction records</li>
+                <li>• {stats.successful_payments} successful payments</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
