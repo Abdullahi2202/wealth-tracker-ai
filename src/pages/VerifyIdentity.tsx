@@ -48,14 +48,19 @@ const VerifyIdentity = () => {
     fileInputRef.current?.click();
   };
 
+  // Consistent back to Profile
+  const handleBack = () => {
+    navigate("/profile");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userEmail) {
-      toast.error("Could not find your account.");
+      toast.error("Could not find your account email.");
       return;
     }
     if (!number || !file) {
-      toast.error("Please enter your document number and upload the document image.");
+      toast.error("Please enter your document number and upload the photo.");
       return;
     }
     setUploading(true);
@@ -71,19 +76,17 @@ const VerifyIdentity = () => {
         });
 
       if (error) {
-        console.error("Supabase storage upload error:", error);
         toast.error(`Upload failed: ${error.message || "Unknown storage error."}`);
         setUploading(false);
         return;
       }
       if (!data) {
-        console.error("No data returned from storage upload.");
         toast.error("Upload failed, please try again.");
         setUploading(false);
         return;
       }
 
-      // getPublicUrl does not return error, only data
+      // get public url
       const urlResult = supabase.storage
         .from("identity-documents")
         .getPublicUrl(`${userEmail}/${fileName}`);
@@ -91,34 +94,33 @@ const VerifyIdentity = () => {
       const publicUrl = urlResult?.data?.publicUrl || null;
 
       if (!publicUrl) {
-        console.error("Could not get public URL for uploaded file.");
         toast.error("Error getting file URL. Please contact support.");
         setUploading(false);
         return;
       }
 
-      // Update registration table
-      const { error: updateError } = await supabase
-        .from("registration")
-        .update({
-          document_type: documentType,
-          passport_number: number,
-          image_url: publicUrl,
-          verification_status: "pending",
-        })
-        .eq("email", userEmail);
+      // Insert into identity_verification_requests table
+      const { error: insertError } = await supabase
+        .from("identity_verification_requests")
+        .insert([
+          {
+            user_email: userEmail,
+            document_type: documentType,
+            document_number: number,
+            image_url: publicUrl,
+            status: "pending"
+          }
+        ]);
 
-      if (updateError) {
-        console.error("Supabase registration update error:", updateError);
-        toast.error("Failed to update registration: " + (updateError.message ?? "Unknown error."));
+      if (insertError) {
+        toast.error("Failed to submit for review: " + (insertError.message ?? "Unknown error."));
         setUploading(false);
         return;
       }
 
-      toast.success("Document submitted for verification!");
-      navigate("/profile");
+      toast.success("Your document was submitted for verification!");
+      setTimeout(() => navigate("/profile"), 1200);
     } catch (error: any) {
-      console.error("Unexpected upload error:", error);
       toast.error("Upload failed: " + (error?.message || "Unknown error."));
     } finally {
       setUploading(false);
@@ -126,29 +128,30 @@ const VerifyIdentity = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col justify-center items-center bg-muted px-2">
-      <Card className="w-full max-w-md sm:max-w-md md:max-w-md shadow-lg rounded-xl mx-auto mt-8 mb-8 sm:mt-12">
+    <div className="min-h-screen w-full flex flex-col justify-center items-center bg-gradient-to-br from-slate-100 to-blue-100 px-2">
+      <Card className="w-full max-w-md sm:max-w-lg shadow-xl rounded-xl mx-auto mt-16 mb-8 animate-fade-in">
         <CardHeader className="relative pb-3">
           <button
-            className="absolute left-2 top-2 flex items-center text-muted-foreground hover:text-primary transition-colors rounded-lg px-2 py-1 focus:outline-none active:bg-blue-50"
+            className="absolute left-2 top-2 flex items-center text-muted-foreground hover:text-primary transition-colors rounded-lg px-2 py-1 focus:outline-none bg-transparent"
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             aria-label="Go back"
-            style={{ background: "none", border: "none", padding: 0 }}
           >
             <ArrowLeft className="h-5 w-5 mr-1" aria-hidden="true" />
-            <span className="text-sm font-medium">Back</span>
+            <span className="text-sm font-medium">Back to Profile</span>
           </button>
-          <CardTitle className="pl-8 text-xl sm:text-2xl">Identity Verification</CardTitle>
-          <CardDescription className="pl-8 text-base sm:text-sm">
-            Upload your identity document to verify your account.
+          <CardTitle className="pl-8 text-2xl sm:text-3xl font-bold tracking-tight">
+            Verify Your Identity
+          </CardTitle>
+          <CardDescription className="pl-8 pt-1 text-base sm:text-lg text-muted-foreground">
+            For your security, upload an official document.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="grid gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div>
-              <label className="block mb-1 font-medium sm:text-base text-sm" htmlFor="docType">
-                Document Type
+              <label className="block mb-1 font-semibold sm:text-base text-sm" htmlFor="docType">
+                What document are you uploading?
               </label>
               <Select value={documentType} onValueChange={v => setDocumentType(v as "passport" | "license")}>
                 <SelectTrigger>
@@ -161,7 +164,7 @@ const VerifyIdentity = () => {
               </Select>
             </div>
             <div>
-              <label className="block mb-1 font-medium sm:text-base text-sm" htmlFor="docNumber">
+              <label className="block mb-1 font-semibold sm:text-base text-sm" htmlFor="docNumber">
                 {documentType === "passport" ? "Passport Number" : "License Number"}
               </label>
               <Input
@@ -170,13 +173,13 @@ const VerifyIdentity = () => {
                 onChange={e => setNumber(e.target.value)}
                 placeholder={documentType === "passport" ? "Enter passport number" : "Enter license number"}
                 required
-                className="text-base sm:text-sm"
+                className="text-base sm:text-base font-medium bg-slate-50 border-gray-300"
                 autoComplete="off"
               />
             </div>
             <div>
-              <label className="block mb-1 font-medium sm:text-base text-sm" htmlFor="docImg">
-                Document Photo (JPEG/JPG/PNG, max 5MB)
+              <label className="block mb-1 font-semibold sm:text-base text-sm" htmlFor="docImg">
+                Upload Photo (JPG/PNG, max 5MB)
               </label>
               <div className="flex items-center gap-2 flex-wrap">
                 <Button type="button" variant="outline" onClick={handleUploadClick} disabled={uploading} className="sm:px-3 px-2 py-1 sm:py-2">
@@ -196,12 +199,15 @@ const VerifyIdentity = () => {
             </div>
             <Button
               type="submit"
-              className="w-full mt-2 py-3 text-base sm:text-base rounded-lg"
+              className="w-full mt-2 py-3 text-lg sm:text-lg rounded-xl"
               disabled={uploading}
             >
               {uploading ? "Submitting..." : "Submit for Verification"}
             </Button>
           </form>
+          <div className="text-xs text-muted-foreground pt-5 text-center">
+            All information is kept secure and private. For help, contact support.
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -209,3 +215,4 @@ const VerifyIdentity = () => {
 };
 
 export default VerifyIdentity;
+

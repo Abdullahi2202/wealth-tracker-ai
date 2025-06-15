@@ -191,6 +191,42 @@ export type Database = {
           },
         ]
       }
+      identity_verification_requests: {
+        Row: {
+          created_at: string | null
+          document_number: string
+          document_type: string
+          id: string
+          image_url: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_email: string
+        }
+        Insert: {
+          created_at?: string | null
+          document_number: string
+          document_type: string
+          id?: string
+          image_url: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_email: string
+        }
+        Update: {
+          created_at?: string | null
+          document_number?: string
+          document_type?: string
+          id?: string
+          image_url?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_email?: string
+        }
+        Relationships: []
+      }
       payment_methods: {
         Row: {
           brand: string | null
