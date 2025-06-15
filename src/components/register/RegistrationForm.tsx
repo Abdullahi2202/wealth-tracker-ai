@@ -24,22 +24,6 @@ const RegistrationForm = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const uploadDocument = async (file: File, email: string): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${email}-${documentType}-${Date.now()}.${fileExt}`;
-    const filePath = `identity-docs/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('identity-docs')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      throw new Error('Failed to upload document: ' + uploadError.message);
-    }
-
-    return filePath;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -89,46 +73,28 @@ const RegistrationForm = () => {
 
       console.log("User created successfully:", authData.user.email);
 
-      // Step 2: Upload document
-      const documentPath = await uploadDocument(selectedFile, email);
-
-      // Step 3: Save registration data with document info
-      const { error: dbError } = await supabase.from("registrations").insert({
+      // Step 2: Save user data to users table
+      const { error: dbError } = await supabase.from("users").insert({
+        id: authData.user.id,
         email: authData.user.email!,
         full_name: fullName,
         phone,
         passport_number: passportNumber,
-        image_url: documentPath,
         document_type: documentType,
         verification_status: "pending"
       });
 
       if (dbError) {
-        console.error("Error saving registration data:", dbError);
+        console.error("Error saving user data:", dbError);
         toast.error("Registration completed but some data may not have been saved properly.");
       }
 
-      // Step 4: Create verification request
-      const { error: verificationError } = await supabase
-        .from("identity_verification_requests")
-        .insert({
-          email: authData.user.email!,
-          document_type: documentType,
-          new_document_url: documentPath,
-          new_number: passportNumber,
-          status: "pending"
-        });
-
-      if (verificationError) {
-        console.error("Error creating verification request:", verificationError);
-      }
-
-      // Step 5: Check if this is an admin user and update role if needed
+      // Step 3: Check if this is an admin user and update role if needed
       if (email === "kingabdalla982@gmail.com") {
         const { error: roleError } = await supabase
           .from("user_roles")
-          .update({ role: "admin" })
-          .eq("email", email);
+          .insert({ user_id: authData.user.id, role: "admin" })
+          .single();
 
         if (roleError) {
           console.error("Error setting admin role:", roleError);

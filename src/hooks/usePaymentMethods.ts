@@ -5,13 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 export interface PaymentMethod {
   id: string;
   type: string;
-  label: string;
+  label?: string;
   brand?: string;
   exp_month?: number;
   exp_year?: number;
-  details?: any;
+  last4?: string;
   is_active: boolean;
-  default_card?: boolean;
+  is_default: boolean;
+  created_at: string;
 }
 
 export function usePaymentMethods() {
@@ -21,17 +22,9 @@ export function usePaymentMethods() {
   const fetchMethods = async () => {
     setLoading(true);
     try {
-      // Get current user email
-      const storedUser = localStorage.getItem("walletmaster_user");
-      let email = "";
-      if (storedUser) {
-        try {
-          const userObj = JSON.parse(storedUser);
-          email = userObj.email || "";
-        } catch {}
-      }
-
-      if (!email) {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         setMethods([]);
         setLoading(false);
         return;
@@ -39,8 +32,8 @@ export function usePaymentMethods() {
 
       const { data, error } = await supabase
         .from("payment_methods")
-        .select("*")
-        .eq("user_email", email)
+        .select("id, type, label, brand, exp_month, exp_year, last4, is_active, is_default, created_at")
+        .eq("user_id", user.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
 
@@ -59,38 +52,6 @@ export function usePaymentMethods() {
 
   useEffect(() => {
     fetchMethods();
-
-    // Set up real-time subscription for payment methods
-    const storedUser = localStorage.getItem("walletmaster_user");
-    let email = "";
-    if (storedUser) {
-      try {
-        const userObj = JSON.parse(storedUser);
-        email = userObj.email || "";
-      } catch {}
-    }
-
-    if (!email) return;
-
-    const channel = supabase
-      .channel("payment-methods-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "payment_methods",
-          filter: `user_email=eq.${email}`,
-        },
-        () => {
-          fetchMethods();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   return {

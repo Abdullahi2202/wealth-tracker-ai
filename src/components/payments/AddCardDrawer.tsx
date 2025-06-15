@@ -6,11 +6,11 @@ import StripeCardFormWrapper from "./StripeCardForm";
 interface AddCardDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
 /** Real "Add Card" drawer using Stripe Elements */
-export default function AddCardDrawer({ open, onOpenChange }: AddCardDrawerProps) {
-  // Internal state to show Stripe form
+export default function AddCardDrawer({ open, onOpenChange, onSuccess }: AddCardDrawerProps) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
@@ -21,7 +21,10 @@ export default function AddCardDrawer({ open, onOpenChange }: AddCardDrawerProps
           </DrawerDescription>
         </DrawerHeader>
         <StripeCardFormWrapper
-          onSuccess={() => onOpenChange(false)}
+          onSuccess={() => {
+            if (onSuccess) onSuccess();
+            onOpenChange(false);
+          }}
           onCancel={() => onOpenChange(false)}
         />
         <DrawerFooter>

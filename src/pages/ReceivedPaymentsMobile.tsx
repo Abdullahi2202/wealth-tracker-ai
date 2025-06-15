@@ -2,9 +2,18 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Wallet, Banknote } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+
+interface ReceivedPayment {
+  id: string;
+  amount: number;
+  date: string;
+  name: string;
+  note?: string;
+  user_id?: string;
+}
 
 // Helper for short display
 function shortLabel(desc: string, len = 12) {
@@ -13,33 +22,38 @@ function shortLabel(desc: string, len = 12) {
 
 const ReceivedPaymentsMobile = () => {
   const navigate = useNavigate();
-  const [received, setReceived] = useState<any[]>([]);
+  const [received, setReceived] = useState<ReceivedPayment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchReceived = async () => {
       setLoading(true);
-      const storedUser = localStorage.getItem("walletmaster_user");
-      let email = "";
-      if (storedUser) {
-        try {
-          const userObj = JSON.parse(storedUser);
-          email = userObj.email || "";
-        } catch {}
-      }
-      if (!email) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setReceived([]);
+          setLoading(false);
+          return;
+        }
+
+        // Show payments where user is recipient (based on user_id)
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("id, amount, date, name, note, user_id")
+          .eq("recipient_user_id", user.id)
+          .order("date", { ascending: false })
+          .limit(15);
+
+        if (error) {
+          console.error("Error fetching received payments:", error);
+          setReceived([]);
+        } else {
+          setReceived(data || []);
+        }
+      } catch (error) {
+        console.error("Error:", error);
         setReceived([]);
-        setLoading(false);
-        return;
       }
-      // Show payments where user is recipient_email (including wallet top-ups etc)
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("id, sender_email, amount, date, name, source_method_id, note, tag")
-        .eq("recipient_email", email)
-        .order("date", { ascending: false })
-        .limit(15);
-      setReceived(error || !data ? [] : data);
       setLoading(false);
     };
     fetchReceived();
@@ -69,10 +83,10 @@ const ReceivedPaymentsMobile = () => {
                 <div key={pay.id} className="flex items-center justify-between py-3">
                   <div>
                     <div className="font-semibold">
-                      {pay.sender_email ? shortLabel(pay.sender_email) : "Top-Up"}
+                      {pay.name || "Payment"}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {pay.name || "Incoming"}{pay.tag ? <span> • #{pay.tag}</span> : null}
+                      {pay.note && shortLabel(pay.note)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
