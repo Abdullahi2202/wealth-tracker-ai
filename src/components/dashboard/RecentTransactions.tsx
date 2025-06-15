@@ -5,8 +5,17 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+interface TransactionItem {
+  id: string;
+  name: string;
+  category: string | null;
+  amount: number;
+  date: string | null;
+  type: string;
+}
+
 const RecentTransactions = () => {
-  const [transactionList, setTransactionList] = useState<any[]>([]);
+  const [transactionList, setTransactionList] = useState<TransactionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,14 +37,25 @@ const RecentTransactions = () => {
         setLoading(false);
         return;
       }
+      
       const { data, error } = await supabase
         .from("transactions")
         .select("id, name, category, amount, date, type")
         .eq("email", email)
         .order("date", { ascending: false })
         .limit(10);
+      
       if (!error && data) {
-        setTransactionList(data);
+        // Explicitly type cast the data to avoid inference issues
+        const typedData: TransactionItem[] = data.map(item => ({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          amount: Number(item.amount),
+          date: item.date,
+          type: item.type
+        }));
+        setTransactionList(typedData);
       } else {
         setTransactionList([]);
       }
@@ -56,7 +76,7 @@ const RecentTransactions = () => {
           ) : transactionList.length === 0 ? (
             <div className="text-center text-muted-foreground">No transactions found.</div>
           ) : (
-            transactionList.map((transaction: any) => (
+            transactionList.map((transaction) => (
               <div
                 key={transaction.id}
                 className="flex items-center justify-between border-b border-border pb-4 last:border-0 last:pb-0"
@@ -79,7 +99,7 @@ const RecentTransactions = () => {
                   <div className="ml-4">
                     <p className="font-medium">{transaction.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {transaction.category}
+                      {transaction.category || "Uncategorized"}
                     </p>
                   </div>
                 </div>
@@ -92,10 +112,10 @@ const RecentTransactions = () => {
                         : "text-finance-expense"
                     )}
                   >
-                    {transaction.type === "income" ? "+" : "-"} ${Number(transaction.amount).toFixed(2)}
+                    {transaction.type === "income" ? "+" : "-"} ${transaction.amount.toFixed(2)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(transaction.date).toLocaleDateString()}
+                    {transaction.date ? new Date(transaction.date).toLocaleDateString() : "No date"}
                   </p>
                 </div>
               </div>
