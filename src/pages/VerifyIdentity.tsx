@@ -48,7 +48,7 @@ const VerifyIdentity = () => {
     fileInputRef.current?.click();
   };
 
-  // Consistent back to Profile
+  // Back to Profile
   const handleBack = () => {
     navigate("/profile");
   };
@@ -65,18 +65,26 @@ const VerifyIdentity = () => {
     }
     setUploading(true);
     try {
-      // Upload to storage
+      // Upload to "identity-documents" storage
       const ext = file.name.split(".").pop();
       const fileName = `${userEmail}_${Date.now()}.${ext}`;
-      const { data, error } = await supabase.storage
+      const path = `${userEmail}/${fileName}`;
+
+      const { data, error: storageError } = await supabase.storage
         .from("identity-documents")
-        .upload(`${userEmail}/${fileName}`, file, {
+        .upload(path, file, {
           cacheControl: "3600",
           upsert: true,
         });
 
-      if (error) {
-        toast.error(`Upload failed: ${error.message || "Unknown storage error."}`);
+      if (storageError) {
+        if (storageError.message.includes("violates row-level security")) {
+          toast.error("Storage upload failed due to security policy. Please contact support.");
+        } else if (storageError.message.includes("bucket")) {
+          toast.error("Storage bucket not found. Please contact support.");
+        } else {
+          toast.error(`Upload failed: ${storageError.message || "Unknown storage error."}`);
+        }
         setUploading(false);
         return;
       }
@@ -86,12 +94,11 @@ const VerifyIdentity = () => {
         return;
       }
 
-      // get public url
-      const urlResult = supabase.storage
+      const { data: urlResult } = supabase.storage
         .from("identity-documents")
-        .getPublicUrl(`${userEmail}/${fileName}`);
+        .getPublicUrl(path);
 
-      const publicUrl = urlResult?.data?.publicUrl || null;
+      const publicUrl = urlResult?.publicUrl || null;
 
       if (!publicUrl) {
         toast.error("Error getting file URL. Please contact support.");
@@ -216,3 +223,4 @@ const VerifyIdentity = () => {
 
 export default VerifyIdentity;
 
+// ... File is 219 lines, consider refactoring into smaller components for easier maintenance.
