@@ -1,10 +1,10 @@
+
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ShoppingCart, Home, Car, Gamepad2, Utensils, Heart, GraduationCap, 
          Lightbulb, Smartphone, Gift, TrendingUp, Briefcase, CreditCard, Plane } from "lucide-react";
-import { LucideIcon } from "lucide-react";
 
 interface Transaction {
   id: string;
@@ -27,38 +27,6 @@ interface Category {
   color: string;
   icon: string;
 }
-
-// Use type assertion to prevent excessive type instantiation
-const iconMap = {
-  'Food & Dining': Utensils,
-  'Shopping': ShoppingCart,
-  'ShoppingCart': ShoppingCart,
-  'Housing': Home,
-  'Home': Home,
-  'Transportation': Car,
-  'Car': Car,
-  'Entertainment': Gamepad2,
-  'Gamepad2': Gamepad2,
-  'Healthcare': Heart,
-  'Heart': Heart,
-  'Education': GraduationCap,
-  'GraduationCap': GraduationCap,
-  'Utilities': Lightbulb,
-  'Lightbulb': Lightbulb,
-  'Technology': Smartphone,
-  'Smartphone': Smartphone,
-  'Travel': Plane,
-  'Plane': Plane,
-  'Business': Briefcase,
-  'Briefcase': Briefcase,
-  'Gifts & Donations': Gift,
-  'Gift': Gift,
-  'Investment': TrendingUp,
-  'TrendingUp': TrendingUp,
-  'Miscellaneous': CreditCard,
-  'CreditCard': CreditCard,
-  'Utensils': Utensils,
-} as Record<string, LucideIcon>;
 
 // Fallback colors for legacy categories
 const fallbackCategoryColors: Record<string, string> = {
@@ -162,8 +130,54 @@ const TransactionCharts = () => {
     fetchTransactions();
   }, []);
 
+  const getIconComponent = (iconName: string) => {
+    switch (iconName) {
+      case 'Food & Dining':
+      case 'Utensils':
+        return Utensils;
+      case 'Shopping':
+      case 'ShoppingCart':
+        return ShoppingCart;
+      case 'Housing':
+      case 'Home':
+        return Home;
+      case 'Transportation':
+      case 'Car':
+        return Car;
+      case 'Entertainment':
+      case 'Gamepad2':
+        return Gamepad2;
+      case 'Healthcare':
+      case 'Heart':
+        return Heart;
+      case 'Education':
+      case 'GraduationCap':
+        return GraduationCap;
+      case 'Utilities':
+      case 'Lightbulb':
+        return Lightbulb;
+      case 'Technology':
+      case 'Smartphone':
+        return Smartphone;
+      case 'Travel':
+      case 'Plane':
+        return Plane;
+      case 'Business':
+      case 'Briefcase':
+        return Briefcase;
+      case 'Gifts & Donations':
+      case 'Gift':
+        return Gift;
+      case 'Investment':
+      case 'TrendingUp':
+        return TrendingUp;
+      default:
+        return CreditCard;
+    }
+  };
+
   const renderIcon = (iconName: string) => {
-    const IconComponent = iconMap[iconName] || CreditCard;
+    const IconComponent = getIconComponent(iconName);
     return <IconComponent className="h-4 w-4" />;
   };
 
