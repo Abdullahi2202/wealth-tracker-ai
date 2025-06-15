@@ -20,6 +20,16 @@ interface User {
   verification_status?: string;
   document_type?: string;
   created_at: string;
+  user_wallets?: Array<{
+    balance: number;
+    currency: string;
+    is_frozen: boolean;
+  }>;
+  stored_payment_methods?: Array<{
+    id: string;
+    card_brand: string;
+    card_last4: string;
+  }>;
 }
 
 const UserManagement = () => {
@@ -34,18 +44,20 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
+      setLoading(true);
+      console.log('Fetching users via edge function...');
+      
+      const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'GET',
+      });
 
       if (error) {
-        console.error('Error fetching users:', error);
+        console.error('Error fetching users from edge function:', error);
         toast.error('Failed to fetch users');
         return;
       }
 
-      console.log('Fetched users:', data);
+      console.log('Users fetched successfully:', data?.length || 0);
       setUsers(data || []);
     } catch (error) {
       console.error('Error:', error);
@@ -57,10 +69,14 @@ const UserManagement = () => {
 
   const handleVerifyUser = async (userId: string) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ verification_status: 'verified' })
-        .eq('id', userId);
+      const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'PUT',
+        body: {
+          id: userId,
+          action: 'update',
+          verification_status: 'verified'
+        }
+      });
 
       if (error) {
         console.error('Error verifying user:', error);
@@ -82,10 +98,10 @@ const UserManagement = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userId);
+      const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'DELETE',
+        body: { id: userId }
+      });
 
       if (error) {
         console.error('Error deleting user:', error);
