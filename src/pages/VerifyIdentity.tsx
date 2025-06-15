@@ -70,9 +70,9 @@ const VerifyIdentity = () => {
           upsert: true,
         });
       if (error) {
-        // Provide full detail for easy debugging
+        // More detailed error for mobile debug
         console.error("Supabase storage upload error:", error);
-        toast.error("Upload failed, please try again. Ensure your file is JPEG, JPG, or PNG and less than 5MB.");
+        toast.error(`Upload failed: ${error.message || "Unknown storage error."}`);
         setUploading(false);
         return;
       }
@@ -82,12 +82,20 @@ const VerifyIdentity = () => {
         setUploading(false);
         return;
       }
-      const { data: url } = await supabase.storage
+      const { data: url, error: urlError } = await supabase.storage
         .from("identity-documents")
         .getPublicUrl(`${userEmail}/${fileName}`);
+
+      if (urlError) {
+        console.error("Error getting public URL:", urlError);
+        toast.error("Error getting file URL. Please contact support.");
+        setUploading(false);
+        return;
+      }
       const publicUrl = url?.publicUrl || null;
 
       // Update registration table
+      // Confirm your table is called "registration" and not "registrations"
       const { error: updateError } = await supabase
         .from("registration")
         .update({
@@ -97,29 +105,30 @@ const VerifyIdentity = () => {
           verification_status: "pending",
         })
         .eq("email", userEmail);
+
       if (updateError) {
         console.error("Supabase registration update error:", updateError);
-        toast.error("Failed to update registration, please contact support.");
+        toast.error("Failed to update registration: " + (updateError.message ?? "Unknown error."));
         setUploading(false);
         return;
       }
 
       toast.success("Document submitted for verification!");
       navigate("/profile");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Unexpected upload error:", error);
-      toast.error("Upload failed, please try again.");
+      toast.error("Upload failed: " + (error?.message || "Unknown error."));
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-muted">
-      <Card className="max-w-md w-full shadow-lg">
+    <div className="min-h-screen w-full flex flex-col justify-center items-center bg-muted px-2">
+      <Card className="w-full max-w-md sm:max-w-md md:max-w-md shadow-lg rounded-xl mx-auto mt-8 mb-8 sm:mt-12">
         <CardHeader className="relative pb-3">
           <button
-            className="absolute left-2 top-2 flex items-center text-muted-foreground hover:text-primary transition-colors"
+            className="absolute left-2 top-2 flex items-center text-muted-foreground hover:text-primary transition-colors rounded-lg px-2 py-1 focus:outline-none active:bg-blue-50"
             type="button"
             onClick={() => navigate(-1)}
             aria-label="Go back"
@@ -128,15 +137,15 @@ const VerifyIdentity = () => {
             <ArrowLeft className="h-5 w-5 mr-1" aria-hidden="true" />
             <span className="text-sm font-medium">Back</span>
           </button>
-          <CardTitle className="pl-8">Identity Verification</CardTitle>
-          <CardDescription className="pl-8">
+          <CardTitle className="pl-8 text-xl sm:text-2xl">Identity Verification</CardTitle>
+          <CardDescription className="pl-8 text-base sm:text-sm">
             Upload your identity document to verify your account.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="grid gap-4">
             <div>
-              <label className="block mb-1 font-medium" htmlFor="docType">
+              <label className="block mb-1 font-medium sm:text-base text-sm" htmlFor="docType">
                 Document Type
               </label>
               <Select value={documentType} onValueChange={v => setDocumentType(v as "passport" | "license")}>
@@ -150,7 +159,7 @@ const VerifyIdentity = () => {
               </Select>
             </div>
             <div>
-              <label className="block mb-1 font-medium" htmlFor="docNumber">
+              <label className="block mb-1 font-medium sm:text-base text-sm" htmlFor="docNumber">
                 {documentType === "passport" ? "Passport Number" : "License Number"}
               </label>
               <Input
@@ -159,17 +168,19 @@ const VerifyIdentity = () => {
                 onChange={e => setNumber(e.target.value)}
                 placeholder={documentType === "passport" ? "Enter passport number" : "Enter license number"}
                 required
+                className="text-base sm:text-sm"
+                autoComplete="off"
               />
             </div>
             <div>
-              <label className="block mb-1 font-medium" htmlFor="docImg">
+              <label className="block mb-1 font-medium sm:text-base text-sm" htmlFor="docImg">
                 Document Photo (JPEG/JPG/PNG, max 5MB)
               </label>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={handleUploadClick} disabled={uploading}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button type="button" variant="outline" onClick={handleUploadClick} disabled={uploading} className="sm:px-3 px-2 py-1 sm:py-2">
                   {file ? "Change File" : "Choose File"}
                 </Button>
-                {file && <span className="text-sm text-green-700">{file.name}</span>}
+                {file && <span className="text-sm text-green-700 break-all">{file.name}</span>}
               </div>
               <Input
                 ref={fileInputRef}
@@ -181,7 +192,11 @@ const VerifyIdentity = () => {
                 disabled={uploading}
               />
             </div>
-            <Button type="submit" className="w-full mt-2" disabled={uploading}>
+            <Button
+              type="submit"
+              className="w-full mt-2 py-3 text-base sm:text-base rounded-lg"
+              disabled={uploading}
+            >
               {uploading ? "Submitting..." : "Submit for Verification"}
             </Button>
           </form>
