@@ -196,9 +196,12 @@ const AdminDashboard = () => {
   return (
     <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
       <div className="flex min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100">
-        <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        {/* Only show sidebar when open */}
+        {sidebarOpen && (
+          <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        )}
         
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 w-full">
           {/* Header */}
           <header className="bg-white border-b border-slate-200 shadow-sm">
             <div className="flex items-center justify-between px-6 py-4">
