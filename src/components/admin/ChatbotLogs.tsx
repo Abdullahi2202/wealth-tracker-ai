@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 type ChatbotConversation = {
   id: string;
   user_id: string;
-  user_email?: string;
   session_id: string;
   message: string;
   response: string | null;
@@ -58,26 +57,17 @@ const ChatbotLogs = () => {
     try {
       const { data, error } = await supabase
         .from("chatbot_conversations")
-        .select(`
-          *,
-          user:users!chatbot_conversations_user_id_fkey(email)
-        `)
+        .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
 
       if (error) {
         console.error("Error fetching chatbot conversations:", error);
-        toast.error("Failed to fetch chatbot conversations");
       } else {
-        const transformedData = (data || []).map(item => ({
-          ...item,
-          user_email: item.user?.email || 'Unknown'
-        }));
-        setConversations(transformedData);
+        setConversations(data || []);
       }
     } catch (error) {
       console.error("Error fetching chatbot conversations:", error);
-      toast.error("Failed to fetch chatbot conversations");
     }
     setLoading(false);
   };
@@ -140,8 +130,10 @@ const ChatbotLogs = () => {
   };
 
   const filteredConversations = conversations.filter(conversation => {
-    const matchesSearch = conversation.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         conversation.message.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (conversation.user_id || "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase()) ||
+      conversation.message.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesIntent = intentFilter === "all" || conversation.intent_detected === intentFilter;
     return matchesSearch && matchesIntent;
   });
@@ -260,7 +252,7 @@ const ChatbotLogs = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>User</TableHead>
+              <TableHead>User ID</TableHead>
               <TableHead>Message</TableHead>
               <TableHead>Intent</TableHead>
               <TableHead>Satisfaction</TableHead>
@@ -275,7 +267,9 @@ const ChatbotLogs = () => {
                   {new Date(conversation.created_at).toLocaleDateString()} {' '}
                   {new Date(conversation.created_at).toLocaleTimeString()}
                 </TableCell>
-                <TableCell className="font-medium">{conversation.user_email}</TableCell>
+                <TableCell className="font-medium">
+                  {conversation.user_id || "Unknown"}
+                </TableCell>
                 <TableCell className="max-w-xs truncate">{conversation.message}</TableCell>
                 <TableCell>
                   {conversation.intent_detected ? (
@@ -313,8 +307,8 @@ const ChatbotLogs = () => {
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
-                          <label className="font-medium">User:</label>
-                          <p>{conversation.user_email}</p>
+                          <label className="font-medium">User ID:</label>
+                          <p>{conversation.user_id}</p>
                         </div>
                         <div>
                           <label className="font-medium">Session ID:</label>

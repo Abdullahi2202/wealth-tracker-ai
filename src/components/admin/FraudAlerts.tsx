@@ -63,21 +63,14 @@ const FraudAlerts = () => {
     try {
       const { data, error } = await supabase
         .from("fraud_alerts")
-        .select(`
-          *,
-          user:users!fraud_alerts_user_id_fkey(email)
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching fraud alerts:", error);
         toast.error("Failed to fetch fraud alerts");
       } else {
-        const transformedData = (data || []).map(item => ({
-          ...item,
-          user_email: item.user?.email || 'Unknown'
-        }));
-        setAlerts(transformedData);
+        setAlerts(data || []);
       }
     } catch (error) {
       console.error("Error fetching fraud alerts:", error);
@@ -223,7 +216,7 @@ const FraudAlerts = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>User</TableHead>
+              <TableHead>User ID</TableHead>
               <TableHead>Alert Type</TableHead>
               <TableHead>Risk Score</TableHead>
               <TableHead>Status</TableHead>
@@ -234,10 +227,10 @@ const FraudAlerts = () => {
             {filteredAlerts.map((alert) => (
               <TableRow key={alert.id}>
                 <TableCell>
-                  {new Date(alert.created_at).toLocaleDateString()} {' '}
+                  {new Date(alert.created_at).toLocaleDateString()} {" "}
                   {new Date(alert.created_at).toLocaleTimeString()}
                 </TableCell>
-                <TableCell className="font-medium">{alert.user_email}</TableCell>
+                <TableCell className="font-medium">{alert.user_id || "Unknown"}</TableCell>
                 <TableCell>{alert.alert_type}</TableCell>
                 <TableCell>
                   <span className={getRiskColor(alert.risk_score)}>
@@ -268,7 +261,7 @@ const FraudAlerts = () => {
                         <div className="space-y-4">
                           <div>
                             <label className="font-medium">User:</label>
-                            <p>{alert.user_email}</p>
+                            <p>{alert.user_id || "Unknown"}</p>
                           </div>
                           <div>
                             <label className="font-medium">Alert Type:</label>

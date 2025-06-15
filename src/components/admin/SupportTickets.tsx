@@ -64,22 +64,14 @@ const SupportTickets = () => {
     try {
       const { data, error } = await supabase
         .from("support_tickets")
-        .select(`
-          *,
-          user:users!support_tickets_user_id_fkey(email)
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching support tickets:", error);
         toast.error("Failed to fetch support tickets");
       } else {
-        // Transform the data to include user_email
-        const transformedTickets = (data || []).map(ticket => ({
-          ...ticket,
-          user_email: ticket.user?.email || 'Unknown'
-        }));
-        setTickets(transformedTickets);
+        setTickets(data || []);
       }
     } catch (error) {
       console.error("Error fetching support tickets:", error);
@@ -270,7 +262,7 @@ const SupportTickets = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>User</TableHead>
+              <TableHead>User ID</TableHead>
               <TableHead>Subject</TableHead>
               <TableHead>Priority</TableHead>
               <TableHead>Status</TableHead>
@@ -284,7 +276,7 @@ const SupportTickets = () => {
                 <TableCell>
                   {new Date(ticket.created_at).toLocaleDateString()}
                 </TableCell>
-                <TableCell className="font-medium">{ticket.user_email}</TableCell>
+                <TableCell className="font-medium">{ticket.user_id || "Unknown"}</TableCell>
                 <TableCell>{ticket.subject}</TableCell>
                 <TableCell>
                   <Badge className={getPriorityColor(ticket.priority)}>
@@ -316,7 +308,7 @@ const SupportTickets = () => {
                         <div className="space-y-4">
                           <div>
                             <label className="font-medium">User:</label>
-                            <p>{ticket.user_email}</p>
+                            <p>{ticket.user_id || "Unknown"}</p>
                           </div>
                           <div>
                             <label className="font-medium">Subject:</label>

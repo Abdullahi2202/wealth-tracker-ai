@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,7 @@ import { format } from "date-fns";
 interface ActivityLog {
   id: string;
   admin_user_id: string;
-  admin_email?: string;
+  // admin_email?: string; // No longer used
   action: string;
   target_table?: string;
   target_id?: string;
@@ -36,10 +37,7 @@ const ActivityTracking = () => {
     try {
       const { data, error } = await supabase
         .from('admin_activity_logs')
-        .select(`
-          *,
-          admin_user:users!admin_activity_logs_admin_user_id_fkey(email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -48,14 +46,8 @@ const ActivityTracking = () => {
         return;
       }
 
-      // Transform the data to match our interface
-      const transformedData = (data || []).map(item => ({
-        ...item,
-        admin_email: item.admin_user?.email || 'Unknown',
-        ip_address: item.ip_address?.toString() || null,
-      }));
-
-      setActivities(transformedData);
+      // No transformation needed now, just use admin_user_id
+      setActivities(data || []);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -103,12 +95,11 @@ const ActivityTracking = () => {
   };
 
   const filteredActivities = activities.filter(activity => {
-    const matchesSearch = activity.admin_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         activity.action?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         activity.target_table?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const matchesSearch =
+      activity.admin_user_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.action?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.target_table?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesAction = actionFilter === "all" || activity.action?.toLowerCase() === actionFilter;
-    
     return matchesSearch && matchesAction;
   });
 
@@ -140,8 +131,7 @@ const ActivityTracking = () => {
           </Button>
         </div>
       </div>
-
-      {/* Search and Filters */}
+      {/* Search/filter UI */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
@@ -169,7 +159,6 @@ const ActivityTracking = () => {
           </div>
         </CardContent>
       </Card>
-
       {/* Activity Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -221,7 +210,6 @@ const ActivityTracking = () => {
           </CardContent>
         </Card>
       </div>
-
       {/* Activity Table */}
       <Card>
         <CardHeader>
@@ -243,7 +231,8 @@ const ActivityTracking = () => {
               {filteredActivities.map((activity) => (
                 <TableRow key={activity.id}>
                   <TableCell className="font-medium">
-                    {activity.admin_email}
+                    {/* Only show admin_user_id since users is gone */}
+                    {activity.admin_user_id || "Unknown"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -257,7 +246,7 @@ const ActivityTracking = () => {
                         <div className="font-medium">{activity.target_table}</div>
                         {activity.target_id && (
                           <div className="text-sm text-muted-foreground font-mono">
-                            {activity.target_id.slice(0, 8)}...
+                            {String(activity.target_id).slice(0, 8)}...
                           </div>
                         )}
                       </div>
@@ -280,7 +269,6 @@ const ActivityTracking = () => {
               ))}
             </TableBody>
           </Table>
-          
           {filteredActivities.length === 0 && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No activities found</p>
