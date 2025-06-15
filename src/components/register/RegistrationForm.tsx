@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import DocumentUpload from "./DocumentUpload";
 
 const RegistrationForm = () => {
   const navigate = useNavigate();
@@ -19,15 +19,6 @@ const RegistrationForm = () => {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // Helper for detailed error display
-  const getErrorMessage = (err: any) => {
-    if (!err) return "Unknown registration error. Please contact support.";
-    if (typeof err === "string") return err;
-    if (err?.message) return err.message;
-    if (err?.error_description) return err.error_description;
-    return JSON.stringify(err);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setApiError(null); // reset error
@@ -38,63 +29,47 @@ const RegistrationForm = () => {
     }
     setLoading(true);
     try {
-      // 1. Check for duplicates
-      const { data: exist, error: checkError } = await supabase
-        .from("registration")
-        .select("*")
-        .eq("email", email)
-        .maybeSingle();
-      console.log("Exist check", { exist, checkError });
-
-      if (exist) {
-        toast.error("This email is already registered. Please log in instead.");
-        navigate("/login");
+      // 1. Register with Supabase Auth
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          // Only works in hosted environment, but here it's required
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+      if (signUpError) {
+        toast.error("Signup failed: " + signUpError.message);
+        setApiError("Signup failed: " + signUpError.message);
         setLoading(false);
         return;
       }
-      // 2. Insert user (no document info)
-      const { data: inserted, error } = await supabase.from("registration").insert({
+
+      // 2. Add user profile to registration table
+      const { error: dbError } = await supabase.from("registration").insert({
         email,
         password,
         full_name: fullName,
         phone,
         verification_status: "unverified",
-      })
-      .select("*")
-      .single();
-
-      console.log("Insert result", { inserted, error });
-
-      if (error || !inserted) {
-        // Changed this to reveal raw error+code from supabase
-        const message =
-          error
-            ? `Registration failed [${error.code ?? ""}]: ${error.message ?? error}`
-            : "Registration failed: Could not insert user.";
-        toast.error(message);
-        setApiError(message);
+      });
+      if (dbError) {
+        toast.error("Registration failed (database problem): " + dbError.message);
+        setApiError("Registration failed (database problem): " + dbError.message);
         setLoading(false);
         return;
       }
 
       toast.success(
-        "✅ Registration successful! Please check your email for next steps. You can now log in.",
+        "✅ Registration successful! Please check your email to verify. You can now log in.",
         {
-          description: (
-            <div>
-              <div className="text-muted-foreground">Thank you, {fullName}!</div>
-              <div className="text-xs">You’ll be redirected shortly.</div>
-            </div>
-          ),
           duration: 4200,
         }
       );
       setTimeout(() => navigate("/login"), 1800);
     } catch (err: any) {
-      const msg = "Registration failed: " + (err?.message || JSON.stringify(err));
-      toast.error(msg);
-      setApiError(msg);
-      console.error("Unexpected registration error:", err);
+      toast.error("Registration failed: " + (err?.message || JSON.stringify(err)));
+      setApiError("Registration failed: " + (err?.message || JSON.stringify(err)));
     } finally {
       setLoading(false);
     }

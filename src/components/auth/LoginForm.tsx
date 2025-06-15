@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 
-// Remove legacy tables
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,54 +25,24 @@ const Login = () => {
     }
     setLoading(true);
     try {
-      // 1. Fetch user by email from registration table
-      const { data: user, error } = await supabase
-        .from("registration")
-        .select("*")
-        .eq("email", email)
-        .maybeSingle();
+      // Supabase Auth: sign in
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      console.log("Login user lookup", { user, error });
-
-      if (error) {
-        toast.error("Login error: " + error.message);
-        setApiError("Login error: " + error.message);
+      if (error || !data.session) {
+        toast.error("Login error: " + (error?.message ?? "Could not log in."));
+        setApiError("Login error: " + (error?.message ?? "Could not log in."));
         setLoading(false);
         return;
       }
-
-      if (!user) {
-        toast.error("No account found with this email.");
-        setApiError("No account found with this email. Please register first.");
-        setLoading(false);
-        return;
-      }
-
-      // 2. Check password (plaintext for now, not secure)
-      if (user.password !== password) {
-        toast.error("Invalid email or password.");
-        setApiError("Password is incorrect.");
-        setLoading(false);
-        return;
-      }
-
-      localStorage.setItem(
-        "walletmaster_user",
-        JSON.stringify({
-          email: user.email,
-          full_name: user.full_name,
-          isAdmin: false,
-          id: user.id,
-        })
-      );
 
       toast.success("Logged in successfully!");
-
       navigate("/dashboard");
     } catch (err: any) {
       toast.error("Login failed, please try again.");
       setApiError("Login failed due to an unexpected error: " + (err?.message || JSON.stringify(err)));
-      console.error("Unexpected login error:", err);
     } finally {
       setLoading(false);
     }
@@ -134,3 +104,4 @@ const Login = () => {
 };
 
 export default Login;
+

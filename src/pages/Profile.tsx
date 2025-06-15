@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,30 +11,15 @@ const Profile = () => {
 
   useEffect(() => {
     async function checkAuth() {
-      // Check Supabase session first
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (session?.user) {
-        console.log("User authenticated via Supabase:", session.user.email);
         setIsAuthChecked(true);
         return;
       }
 
-      // Fallback to localStorage check
-      const storedUser = localStorage.getItem("walletmaster_user");
-      if (storedUser) {
-        try {
-          const userObj = JSON.parse(storedUser);
-          console.log("User found in localStorage:", userObj.email);
-          setIsAuthChecked(true);
-        } catch (error) {
-          console.error("Error parsing stored user:", error);
-          navigate("/login");
-        }
-      } else {
-        console.log("No user session found, redirecting to login");
-        navigate("/login");
-      }
+      // No session, force login
+      navigate("/login");
     }
 
     checkAuth();

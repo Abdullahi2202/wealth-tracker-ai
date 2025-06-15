@@ -29,16 +29,17 @@ export default function ProfileView() {
   }, []);
 
   const fetchProfileData = async () => {
+    setLoading(true);
     try {
-      // Get current user email from localStorage
-      const storedUser = localStorage.getItem("walletmaster_user");
-      const userEmail = storedUser ? JSON.parse(storedUser)?.email : null;
+      // Get current user from Supabase Auth
+      const { data: { session } } = await supabase.auth.getSession();
+      const userEmail = session?.user?.email ?? null;
       if (!userEmail) {
         setProfile(null);
         setLoading(false);
         return;
       }
-      // Fetch from registration table directly
+      // Fetch from registration table directly using real auth user
       const { data: profileData } = await supabase
         .from("registration")
         .select("*")
