@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +11,6 @@ import { format } from "date-fns";
 interface ActivityLog {
   id: string;
   admin_user_id: string;
-  // admin_email?: string; // No longer used
   action: string;
   target_table?: string;
   target_id?: string;
@@ -46,8 +44,13 @@ const ActivityTracking = () => {
         return;
       }
 
-      // No transformation needed now, just use admin_user_id
-      setActivities(data || []);
+      // Type fix: convert ip_address to string if present
+      setActivities((data || []).map((activity: any) => ({
+        ...activity,
+        ip_address: activity.ip_address !== undefined && activity.ip_address !== null
+          ? String(activity.ip_address)
+          : undefined
+      })));
     } catch (error) {
       console.error('Error:', error);
     } finally {

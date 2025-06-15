@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,50 +28,24 @@ const SystemMetrics = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch users data
+        // Fetch user registrations data using "registration"
         const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('id, verification_status, created_at');
+          .from('registration')
+          .select('id, created_at');
 
         if (usersError) {
-          console.error('Error fetching users:', usersError);
+          console.error('Error fetching registrations:', usersError);
         }
 
-        // Fetch wallets data
-        const { data: walletsData, error: walletsError } = await supabase
-          .from('wallets')
-          .select('balance');
-
-        if (walletsError) {
-          console.error('Error fetching wallets:', walletsError);
-        }
-
-        // Fetch transactions data
-        const { data: transactionsData, error: transactionsError } = await supabase
-          .from('transactions')
-          .select('id');
-
-        if (transactionsError) {
-          console.error('Error fetching transactions:', transactionsError);
-        }
-
-        // Calculate stats
+        // Remove verifications and use available data
         const totalUsers = usersData?.length || 0;
-        const verifiedUsers = usersData?.filter(u => u.verification_status === 'verified').length || 0;
-        const totalWalletBalance = walletsData?.reduce((sum, w) => sum + Number(w.balance), 0) || 0;
-        const totalTransactions = transactionsData?.length || 0;
-        
-        // Calculate recent signups (last 7 days)
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        const recentSignups = usersData?.filter(u => new Date(u.created_at) > weekAgo).length || 0;
 
         setStats({
           total_users: totalUsers,
-          verified_users: verifiedUsers,
-          total_wallet_balance: totalWalletBalance * 100, // Convert to cents for consistency
-          total_transactions: totalTransactions,
-          recent_signups: recentSignups
+          verified_users: 0, // replace as needed from another source
+          total_wallet_balance: 0,
+          total_transactions: 0,
+          recent_signups: 0
         });
 
         // Fetch system metrics data

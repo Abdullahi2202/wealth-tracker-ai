@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,10 +41,7 @@ const OverviewDashboard = () => {
         }
 
         setStats(data);
-
-        // Fetch real chart data
         await fetchChartData();
-
       } catch (error) {
         console.error('Error calling admin function:', error);
       }
@@ -57,9 +53,9 @@ const OverviewDashboard = () => {
 
   const fetchChartData = async () => {
     try {
-      // Fetch user growth data
+      // Fetch user growth data via 'registration'
       const { data: userGrowthData } = await supabase
-        .from('users')
+        .from('registration')
         .select('created_at')
         .order('created_at', { ascending: true });
 

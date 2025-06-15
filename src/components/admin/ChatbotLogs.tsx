@@ -60,7 +60,6 @@ const ChatbotLogs = () => {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
-
       if (error) {
         console.error("Error fetching chatbot conversations:", error);
       } else {
@@ -76,7 +75,7 @@ const ChatbotLogs = () => {
     try {
       // Get a sample user to assign conversations to
       const { data: users } = await supabase
-        .from('users')
+        .from('registration')
         .select('id, email')
         .limit(1);
 
