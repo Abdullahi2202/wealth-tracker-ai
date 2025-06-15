@@ -28,8 +28,8 @@ interface Category {
   icon: string;
 }
 
-// Simplified iconMap to prevent excessive type instantiation
-const iconMap: { [key: string]: LucideIcon } = {
+// Use type assertion to prevent excessive type instantiation
+const iconMap = {
   'Food & Dining': Utensils,
   'Shopping': ShoppingCart,
   'ShoppingCart': ShoppingCart,
@@ -58,7 +58,7 @@ const iconMap: { [key: string]: LucideIcon } = {
   'Miscellaneous': CreditCard,
   'CreditCard': CreditCard,
   'Utensils': Utensils,
-};
+} as Record<string, LucideIcon>;
 
 // Fallback colors for legacy categories
 const fallbackCategoryColors: Record<string, string> = {
