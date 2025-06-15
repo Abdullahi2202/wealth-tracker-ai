@@ -1,40 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const navigate = useNavigate();
-  const [checking, setChecking] = useState(true);
+  const checking = useAuthRedirect("/dashboard");
 
-  useEffect(() => {
-    let redirecting = false;
-
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("[Index] Supabase session on mount:", session);
-      if (session && !redirecting) {
-        redirecting = true;
-        navigate("/dashboard", { replace: true });
-      }
-      setChecking(false);
-    };
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("[Index] Supabase session changed:", session);
-      if (session && !redirecting) {
-        redirecting = true;
-        navigate("/dashboard", { replace: true });
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
-
-  // Show loading while checking session
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
