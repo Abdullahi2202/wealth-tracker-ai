@@ -38,27 +38,36 @@ const RecentTransactions = () => {
         return;
       }
       
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("id, name, category, amount, date, type")
-        .eq("email", email)
-        .order("date", { ascending: false })
-        .limit(10);
-      
-      if (!error && data) {
-        // Explicitly type cast the data to avoid inference issues
-        const typedData: TransactionItem[] = data.map(item => ({
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          amount: Number(item.amount),
-          date: item.date,
-          type: item.type
-        }));
-        setTransactionList(typedData);
-      } else {
+      try {
+        // Use a more direct approach to avoid type inference issues
+        const query = supabase
+          .from("transactions")
+          .select("id, name, category, amount, date, type")
+          .order("date", { ascending: false })
+          .limit(10);
+        
+        const { data, error } = await query.eq("email", email);
+        
+        if (!error && data) {
+          // Map the data with explicit typing
+          const mappedData = data.map((item: any) => ({
+            id: String(item.id),
+            name: String(item.name),
+            category: item.category ? String(item.category) : null,
+            amount: Number(item.amount),
+            date: item.date ? String(item.date) : null,
+            type: String(item.type)
+          })) as TransactionItem[];
+          
+          setTransactionList(mappedData);
+        } else {
+          setTransactionList([]);
+        }
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
         setTransactionList([]);
       }
+      
       setLoading(false);
     };
     fetchData();
