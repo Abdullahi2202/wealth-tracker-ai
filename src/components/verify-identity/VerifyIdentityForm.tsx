@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
@@ -17,19 +18,21 @@ export function VerifyIdentityForm() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("walletmaster_user");
-    if (storedUser) {
-      try {
-        const data = JSON.parse(storedUser);
-        setUserEmail(data.email);
-      } catch {}
+    async function fetchUserEmail() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user) {
+        setUserEmail(session.user.email ?? null);
+      } else {
+        setUserEmail(null);
+      }
     }
+    fetchUserEmail();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!userEmail) {
-      toast.error("Could not find your account email.");
+      toast.error("Could not find your account email. Please log in again.");
       return;
     }
     if (!number || !file) {
@@ -42,7 +45,7 @@ export function VerifyIdentityForm() {
       const fileName = `${userEmail}_${Date.now()}.${ext}`;
       const path = `${userEmail}/${fileName}`;
 
-      // Change storage bucket name to identity-docs
+      // Use only the 'identity-docs' bucket for uploads
       const { data, error: storageError } = await supabase.storage
         .from("identity-docs")
         .upload(path, file, {
@@ -51,9 +54,6 @@ export function VerifyIdentityForm() {
         });
 
       if (storageError || !data) {
-        console.error("Supabase storage upload error:", storageError);
-        console.error("Supabase storage upload result:", data);
-
         if (storageError?.message?.includes("violates row-level security")) {
           toast.error("Storage upload failed due to security policy. Please contact support.");
         } else if (storageError && storageError?.message?.includes("bucket")) {
@@ -67,7 +67,6 @@ export function VerifyIdentityForm() {
         return;
       }
 
-      // Use the updated bucket name to get public URL
       const { data: urlResult } = supabase.storage
         .from("identity-docs")
         .getPublicUrl(path);
@@ -88,7 +87,7 @@ export function VerifyIdentityForm() {
             document_type: documentType,
             document_number: number,
             image_url: publicUrl,
-            status: "pending"
+            status: "pending",
           }
         ]);
 
@@ -101,7 +100,6 @@ export function VerifyIdentityForm() {
       toast.success("Your document was submitted for verification!");
       setTimeout(() => navigate("/profile"), 1200);
     } catch (error: any) {
-      console.error("Generic upload catch error:", error);
       toast.error("Upload failed: " + (error?.message || "Unknown error."));
     } finally {
       setUploading(false);
