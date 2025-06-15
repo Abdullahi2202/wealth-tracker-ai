@@ -1,10 +1,14 @@
-
-// This file now computes real user spending breakdowns by category!
-
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+} from "@/components/ui/chart";
+import type { ChartConfig } from "@/components/ui/chart";
 
 const categoryColors: Record<string, string> = {
   Food: '#f97316',
@@ -50,20 +54,33 @@ const ExpenseChart = () => {
         setLoading(false);
         return;
       }
-      // Fetch user's expense transactions (not income)
+
+      // First, get user_id from email
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (profileError || !profile) {
+        setData([]);
+        setLoading(false);
+        console.error("Profile fetch error for expense chart:", profileError);
+        return;
+      }
+
+      // Fetch user's expense transactions (not income) using user_id
       const { data: txs, error } = await supabase
         .from("transactions")
         .select("id, amount, category, date, type")
-        .eq("email", email)
+        .eq("user_id", profile.id)
         .eq("type", "expense");
+        
       if (!error && Array.isArray(txs)) {
-        // Aggregate by category
         const catMap: Record<string, number> = {};
-        let total = 0;
-        txs.forEach((tx: Transaction) => {
+        txs.forEach((tx) => {
           const cat = tx.category && categoryColors[tx.category] ? tx.category : "Misc";
           catMap[cat] = (catMap[cat] || 0) + Number(tx.amount);
-          total += Number(tx.amount);
         });
         const finalData = Object.entries(catMap).map(([name, value]) => ({
           name,
@@ -72,6 +89,7 @@ const ExpenseChart = () => {
         }));
         setData(finalData);
       } else {
+        if (error) console.error("Transactions fetch error for expense chart:", error);
         setData([]);
       }
       setLoading(false);
@@ -79,6 +97,19 @@ const ExpenseChart = () => {
 
     fetchExpenses();
   }, []);
+
+  const chartConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    if (data.length > 0) {
+      data.forEach((item) => {
+        config[item.name] = {
+          label: item.name,
+          color: item.color,
+        };
+      });
+    }
+    return config;
+  }, [data]);
 
   return (
     <Card className="h-full">
@@ -88,31 +119,37 @@ const ExpenseChart = () => {
       <CardContent className="pt-0">
         <div className="h-[300px]">
           {loading ? (
-            <div className="text-center text-muted-foreground">Loading...</div>
+            <div className="flex h-full items-center justify-center text-muted-foreground">Loading...</div>
           ) : data.length === 0 ? (
-            <div className="text-center text-muted-foreground">No expenses found.</div>
+            <div className="flex h-full items-center justify-center text-muted-foreground">No expenses found.</div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer
+              config={chartConfig}
+              className="mx-auto aspect-square h-full"
+            >
               <PieChart>
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel formatter={(value) => `$${value}`} />}
+                />
                 <Pie
-                  data={data as any} // prevents 'type instantiation is excessively deep' error
+                  data={data}
+                  dataKey="value"
+                  nameKey="name"
                   cx="50%"
                   cy="50%"
                   labelLine={false}
                   outerRadius={100}
-                  innerRadius={60}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, percent }: { name: string, percent: number }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  innerRadius={70}
+                  strokeWidth={2}
+                  label={({ percent }: { percent: number }) => `${(percent * 100).toFixed(0)}%`}
                 >
                   {data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`$${value}`, "Amount"]} />
-                <Legend />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           )}
         </div>
       </CardContent>
