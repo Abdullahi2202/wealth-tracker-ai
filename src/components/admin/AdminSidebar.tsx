@@ -82,31 +82,6 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
       className="border-r-0 bg-white shadow-xl"
     >
       <SidebarContent className="bg-gradient-to-b from-slate-50 to-white">
-        {/* Brand Header */}
-        <div className={cn(
-          "p-6 border-b border-slate-100 bg-white shadow-sm transition-all duration-300",
-          isCollapsed && "p-4"
-        )}>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="p-2.5 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl shadow-lg">
-                <Shield className="h-7 w-7 text-white" />
-              </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-            </div>
-            {!isCollapsed && (
-              <div className="flex-1">
-                <h1 className="font-bold text-xl text-slate-900">
-                  Wallet<span className="text-blue-600">Master</span>
-                </h1>
-                <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">
-                  Control Center
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Navigation Menu */}
         <SidebarGroup className="p-6 flex-1">
           <SidebarGroupContent>
