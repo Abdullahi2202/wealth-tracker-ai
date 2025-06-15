@@ -20,16 +20,6 @@ interface User {
   is_verified?: boolean;
   created_at: string;
   updated_at: string;
-  user_wallets?: Array<{
-    balance: number;
-    currency: string;
-    is_frozen: boolean;
-  }>;
-  stored_payment_methods?: Array<{
-    id: string;
-    card_brand: string;
-    card_last4: string;
-  }>;
 }
 
 const UserManagement = () => {
@@ -44,12 +34,11 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Fetch from the users table directly
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching users:', error);
@@ -57,6 +46,7 @@ const UserManagement = () => {
         return;
       }
 
+      console.log('Fetched users:', data);
       setUsers(data || []);
     } catch (error) {
       console.error('Error:', error);
@@ -68,19 +58,13 @@ const UserManagement = () => {
 
   const handleVerifyUser = async (userId: string) => {
     try {
-      const { error } = await supabase.functions.invoke('user-management', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'update',
-          id: userId,
-          is_verified: true
-        })
-      });
+      const { error } = await supabase
+        .from('users')
+        .update({ is_verified: true })
+        .eq('id', userId);
 
       if (error) {
+        console.error('Error verifying user:', error);
         toast.error('Failed to verify user');
         return;
       }
@@ -99,18 +83,13 @@ const UserManagement = () => {
     }
 
     try {
-      const { error } = await supabase.functions.invoke('user-management', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'delete',
-          id: userId
-        })
-      });
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
 
       if (error) {
+        console.error('Error deleting user:', error);
         toast.error('Failed to delete user');
         return;
       }
@@ -198,7 +177,7 @@ const UserManagement = () => {
       </Card>
 
       {/* User Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{users.length}</div>
@@ -221,20 +200,12 @@ const UserManagement = () => {
             <p className="text-sm text-muted-foreground">Pending</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">
-              {users.filter(u => u.user_wallets && u.user_wallets.length > 0).length}
-            </div>
-            <p className="text-sm text-muted-foreground">With Wallets</p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Users</CardTitle>
+          <CardTitle>Users ({filteredUsers.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -243,7 +214,6 @@ const UserManagement = () => {
                 <TableHead>User</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Wallet Balance</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -275,23 +245,6 @@ const UserManagement = () => {
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(user)}</TableCell>
-                  <TableCell>
-                    {user.user_wallets && user.user_wallets.length > 0 ? (
-                      <div>
-                        <div className="font-medium">
-                          ${(user.user_wallets[0].balance / 100).toFixed(2)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {user.user_wallets[0].currency?.toUpperCase()}
-                          {user.user_wallets[0].is_frozen && (
-                            <Badge variant="destructive" className="ml-1">Frozen</Badge>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">No wallet</span>
-                    )}
-                  </TableCell>
                   <TableCell>
                     {format(new Date(user.created_at), 'MMM dd, yyyy')}
                   </TableCell>

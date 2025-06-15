@@ -38,6 +38,26 @@ const Login = () => {
     }
   };
 
+  const checkUserVerification = async (userEmail: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('is_verified')
+        .eq('email', userEmail)
+        .single();
+
+      if (error) {
+        console.error("Error checking user verification:", error);
+        return false;
+      }
+
+      return data?.is_verified || false;
+    } catch (error) {
+      console.error("Error checking user verification:", error);
+      return false;
+    }
+  };
+
   const handleAdminLogin = async () => {
     try {
       // For admin, create a session without going through Supabase auth
@@ -112,6 +132,16 @@ const Login = () => {
       });
 
       if (error) throw error;
+
+      // Check if user is verified (except for admin)
+      const isVerified = await checkUserVerification(data.user.email!);
+      
+      if (!isVerified) {
+        toast.error("Your account is not verified yet. Please wait for admin approval.");
+        await supabase.auth.signOut(); // Sign them out immediately
+        setLoading(false);
+        return;
+      }
 
       // Check user role after successful login
       const userRole = await checkUserRole(data.user.email!);
@@ -197,6 +227,12 @@ const Login = () => {
             </p>
           </div>
         )}
+
+        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            <strong>Note:</strong> New user accounts require admin verification before login access is granted.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
