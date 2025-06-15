@@ -1,7 +1,7 @@
 
 import { cn } from "@/lib/utils";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Users, BarChart3, Shield } from "lucide-react";
+import { Users, BarChart3, Shield, CreditCard, Settings, Activity, FolderOpen } from "lucide-react";
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -10,16 +10,40 @@ interface AdminSidebarProps {
 
 const menuItems = [
   {
+    id: "overview",
+    label: "Overview Dashboard",
+    icon: BarChart3,
+    description: "Stats and analytics",
+  },
+  {
     id: "users",
     label: "User Management",
     icon: Users,
     description: "Manage users & verification",
   },
   {
-    id: "metrics",
-    label: "System Overview",
-    icon: BarChart3,
-    description: "Platform analytics",
+    id: "transactions",
+    label: "Transaction Management",
+    icon: CreditCard,
+    description: "View & manage transactions",
+  },
+  {
+    id: "content",
+    label: "Content Management",
+    icon: FolderOpen,
+    description: "Categories & content",
+  },
+  {
+    id: "settings",
+    label: "App Settings",
+    icon: Settings,
+    description: "System configuration",
+  },
+  {
+    id: "activity",
+    label: "Activity Tracking",
+    icon: Activity,
+    description: "User activity logs",
   },
 ];
 

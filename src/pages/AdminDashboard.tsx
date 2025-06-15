@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +6,11 @@ import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import UserManagement from "@/components/admin/UserManagement";
 import SystemMetrics from "@/components/admin/SystemMetrics";
+import OverviewDashboard from "@/components/admin/OverviewDashboard";
+import TransactionManagement from "@/components/admin/TransactionManagement";
+import ContentManagement from "@/components/admin/ContentManagement";
+import AppSettings from "@/components/admin/AppSettings";
+import ActivityTracking from "@/components/admin/ActivityTracking";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Shield, LogOut } from "lucide-react";
@@ -15,7 +19,7 @@ const AdminDashboard = () => {
   const [currentAdmin, setCurrentAdmin] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("users");
+  const [activeTab, setActiveTab] = useState("overview");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -73,6 +77,18 @@ const AdminDashboard = () => {
 
   const renderContent = () => {
     switch (activeTab) {
+      case "overview":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">Overview Dashboard</CardTitle>
+              <CardDescription>Platform statistics and analytics</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <OverviewDashboard />
+            </CardContent>
+          </Card>
+        );
       case "users":
         return (
           <Card className="border-0 shadow-sm">
@@ -82,6 +98,54 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent className="p-6">
               <UserManagement />
+            </CardContent>
+          </Card>
+        );
+      case "transactions":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">Transaction Management</CardTitle>
+              <CardDescription>Monitor and manage all platform transactions</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <TransactionManagement />
+            </CardContent>
+          </Card>
+        );
+      case "content":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">Content Management</CardTitle>
+              <CardDescription>Manage categories and app content</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <ContentManagement />
+            </CardContent>
+          </Card>
+        );
+      case "settings":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">App Settings</CardTitle>
+              <CardDescription>Configure system settings and preferences</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <AppSettings />
+            </CardContent>
+          </Card>
+        );
+      case "activity":
+        return (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-semibold">Activity Tracking</CardTitle>
+              <CardDescription>Monitor user and admin activities</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <ActivityTracking />
             </CardContent>
           </Card>
         );
