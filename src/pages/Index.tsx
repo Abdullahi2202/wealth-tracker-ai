@@ -2,16 +2,20 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is already logged in
-    const user = localStorage.getItem("walletmaster_user");
-    if (user) {
-      navigate("/dashboard");
-    }
+    // Check if user is already logged in with Supabase Auth (use real session)
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/dashboard");
+      }
+    };
+    checkSession();
   }, [navigate]);
 
   return (
