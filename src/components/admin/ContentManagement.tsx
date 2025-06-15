@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, Trash2, FolderOpen, Tag, Search, ShoppingCart, Home, Car, Gamepad2, 
+import { Plus, Edit, Trash2, Search, ShoppingCart, Home, Car, Gamepad2, 
          Utensils, Heart, GraduationCap, Lightbulb, Smartphone, Gift, TrendingUp, 
-         Briefcase, CreditCard, Plane, Coffee, Music, Book, Shirt } from "lucide-react";
+         Briefcase, CreditCard, Plane } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -20,8 +20,10 @@ interface Category {
   description?: string;
   color: string;
   icon: string;
-  transaction_count: number;
+  is_active: boolean;
+  transaction_count?: number;
   created_at: string;
+  updated_at: string;
 }
 
 interface Setting {
@@ -34,39 +36,35 @@ interface Setting {
 
 const iconMap = {
   'Shopping': ShoppingCart,
+  'ShoppingCart': ShoppingCart,
   'Food': Utensils,
+  'Utensils': Utensils,
   'Housing': Home,
+  'Home': Home,
   'Transport': Car,
+  'Car': Car,
+  'Transportation': Car,
   'Entertainment': Gamepad2,
+  'Gamepad2': Gamepad2,
   'Healthcare': Heart,
+  'Heart': Heart,
   'Education': GraduationCap,
+  'GraduationCap': GraduationCap,
   'Utilities': Lightbulb,
+  'Lightbulb': Lightbulb,
   'Technology': Smartphone,
+  'Smartphone': Smartphone,
   'Gifts': Gift,
+  'Gift': Gift,
   'Investment': TrendingUp,
+  'TrendingUp': TrendingUp,
   'Business': Briefcase,
+  'Briefcase': Briefcase,
   'Misc': CreditCard,
+  'CreditCard': CreditCard,
   'Travel': Plane,
-  'Coffee': Coffee,
-  'Music': Music,
-  'Books': Book,
-  'Clothing': Shirt,
+  'Plane': Plane,
 };
-
-const predefinedCategories = [
-  { name: 'Food & Dining', icon: 'Food', color: '#F59E0B', description: 'Restaurants, groceries, and food delivery' },
-  { name: 'Shopping', icon: 'Shopping', color: '#EC4899', description: 'Retail purchases and online shopping' },
-  { name: 'Housing', icon: 'Housing', color: '#06B6D4', description: 'Rent, mortgage, and home expenses' },
-  { name: 'Transportation', icon: 'Transport', color: '#8B5CF6', description: 'Gas, public transit, and car expenses' },
-  { name: 'Entertainment', icon: 'Entertainment', color: '#10B981', description: 'Movies, games, and recreation' },
-  { name: 'Healthcare', icon: 'Healthcare', color: '#EF4444', description: 'Medical expenses and insurance' },
-  { name: 'Education', icon: 'Education', color: '#6366F1', description: 'Tuition, books, and courses' },
-  { name: 'Utilities', icon: 'Utilities', color: '#84CC16', description: 'Electricity, water, and internet' },
-  { name: 'Technology', icon: 'Technology', color: '#3B82F6', description: 'Gadgets, software, and tech services' },
-  { name: 'Travel', icon: 'Travel', color: '#F97316', description: 'Flights, hotels, and vacation expenses' },
-  { name: 'Business', icon: 'Business', color: '#1F2937', description: 'Work-related expenses and investments' },
-  { name: 'Gifts & Donations', icon: 'Gifts', color: '#DB2777', description: 'Presents and charitable contributions' },
-];
 
 const ContentManagement = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -79,7 +77,7 @@ const ContentManagement = () => {
     name: "",
     description: "",
     color: "#3B82F6",
-    icon: "Misc"
+    icon: "CreditCard"
   });
 
   useEffect(() => {
@@ -88,49 +86,38 @@ const ContentManagement = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch transaction categories with counts
-      const { data: transactionData } = await supabase
-        .from('transactions')
-        .select('category')
-        .not('category', 'is', null);
+      setLoading(true);
+      
+      // Fetch categories from Supabase
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name', { ascending: true });
 
-      // Process categories from transactions
-      const categoryStats = transactionData?.reduce((acc: Record<string, number>, transaction) => {
-        const category = transaction.category || 'Uncategorized';
-        acc[category] = (acc[category] || 0) + 1;
-        return acc;
-      }, {}) || {};
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError);
+        toast.error('Failed to fetch categories');
+        setCategories([]);
+      } else {
+        // Fetch transaction counts for each category
+        const { data: transactionData } = await supabase
+          .from('transactions')
+          .select('category')
+          .not('category', 'is', null);
 
-      // Merge with predefined categories
-      const categoryList = predefinedCategories.map((predef, index) => {
-        const count = categoryStats[predef.name] || 0;
-        return {
-          id: `cat-${index}`,
-          name: predef.name,
-          description: predef.description,
-          color: predef.color,
-          icon: predef.icon,
-          transaction_count: count,
-          created_at: new Date().toISOString()
-        };
-      });
+        const categoryStats = transactionData?.reduce((acc: Record<string, number>, transaction) => {
+          const category = transaction.category || 'Uncategorized';
+          acc[category] = (acc[category] || 0) + 1;
+          return acc;
+        }, {}) || {};
 
-      // Add any custom categories from transactions that aren't predefined
-      Object.entries(categoryStats).forEach(([name, count], index) => {
-        if (!predefinedCategories.find(p => p.name === name)) {
-          categoryList.push({
-            id: `custom-${index}`,
-            name,
-            description: `Custom category: ${name}`,
-            color: getColorForCategory(name),
-            icon: 'Misc',
-            transaction_count: count,
-            created_at: new Date().toISOString()
-          });
-        }
-      });
+        const categoriesWithCounts = categoriesData?.map(category => ({
+          ...category,
+          transaction_count: categoryStats[category.name] || 0
+        })) || [];
 
-      setCategories(categoryList);
+        setCategories(categoriesWithCounts);
+      }
 
       // Fetch app settings
       const { data: settingsData } = await supabase
@@ -148,15 +135,6 @@ const ContentManagement = () => {
     }
   };
 
-  const getColorForCategory = (name: string) => {
-    const colors = [
-      '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
-      '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
-    ];
-    const index = name.charCodeAt(0) % colors.length;
-    return colors[index];
-  };
-
   const handleAddCategory = async () => {
     if (!newCategory.name.trim()) {
       toast.error('Category name is required');
@@ -164,20 +142,27 @@ const ContentManagement = () => {
     }
 
     try {
-      // In a real app, you'd add this to a categories table
-      const newCat = {
-        id: `new-${Date.now()}`,
-        name: newCategory.name,
-        description: newCategory.description,
-        color: newCategory.color,
-        icon: newCategory.icon,
-        transaction_count: 0,
-        created_at: new Date().toISOString()
-      };
-      
-      setCategories(prev => [...prev, newCat]);
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([{
+          name: newCategory.name,
+          description: newCategory.description,
+          color: newCategory.color,
+          icon: newCategory.icon,
+          is_active: true
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding category:', error);
+        toast.error('Failed to add category');
+        return;
+      }
+
+      setCategories(prev => [...prev, { ...data, transaction_count: 0 }]);
       toast.success('Category added successfully');
-      setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "Misc" });
+      setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "CreditCard" });
       setShowAddCategory(false);
     } catch (error) {
       console.error('Error adding category:', error);
@@ -193,6 +178,7 @@ const ContentManagement = () => {
       color: category.color,
       icon: category.icon
     });
+    setShowAddCategory(true);
   };
 
   const handleUpdateCategory = async () => {
@@ -202,16 +188,34 @@ const ContentManagement = () => {
     }
 
     try {
-      const updatedCategories = categories.map(cat => 
+      const { data, error } = await supabase
+        .from('categories')
+        .update({
+          name: newCategory.name,
+          description: newCategory.description,
+          color: newCategory.color,
+          icon: newCategory.icon
+        })
+        .eq('id', editingCategory.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating category:', error);
+        toast.error('Failed to update category');
+        return;
+      }
+
+      setCategories(prev => prev.map(cat => 
         cat.id === editingCategory.id 
-          ? { ...cat, ...newCategory }
+          ? { ...data, transaction_count: cat.transaction_count }
           : cat
-      );
+      ));
       
-      setCategories(updatedCategories);
       toast.success('Category updated successfully');
       setEditingCategory(null);
-      setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "Misc" });
+      setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "CreditCard" });
+      setShowAddCategory(false);
     } catch (error) {
       console.error('Error updating category:', error);
       toast.error('Failed to update category');
@@ -219,7 +223,22 @@ const ContentManagement = () => {
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
+    if (!confirm('Are you sure you want to delete this category? This action cannot be undone.')) {
+      return;
+    }
+
     try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) {
+        console.error('Error deleting category:', error);
+        toast.error('Failed to delete category');
+        return;
+      }
+
       setCategories(prev => prev.filter(cat => cat.id !== categoryId));
       toast.success('Category deleted successfully');
     } catch (error) {
@@ -292,7 +311,7 @@ const ContentManagement = () => {
                   onChange={(e) => setNewCategory({ ...newCategory, icon: e.target.value })}
                   className="w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
                 >
-                  {Object.keys(iconMap).map(iconName => (
+                  {Object.keys(iconMap).filter(key => !key.includes('Cart') || key === 'ShoppingCart').map(iconName => (
                     <option key={iconName} value={iconName}>{iconName}</option>
                   ))}
                 </select>
@@ -321,7 +340,7 @@ const ContentManagement = () => {
                 <Button variant="outline" onClick={() => {
                   setShowAddCategory(false);
                   setEditingCategory(null);
-                  setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "Misc" });
+                  setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "CreditCard" });
                 }}>
                   Cancel
                 </Button>
@@ -371,12 +390,17 @@ const ContentManagement = () => {
               <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{category.description}</p>
               <div className="flex items-center justify-between">
                 <Badge variant="secondary" className="text-xs">
-                  {category.transaction_count} transactions
+                  {category.transaction_count || 0} transactions
                 </Badge>
-                <div 
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: category.color }}
-                />
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: category.color }}
+                  />
+                  <Badge variant={category.is_active ? "default" : "secondary"} className="text-xs">
+                    {category.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>

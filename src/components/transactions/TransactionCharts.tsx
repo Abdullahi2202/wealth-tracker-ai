@@ -1,3 +1,4 @@
+
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -21,40 +22,45 @@ interface ChartData {
   icon: string;
 }
 
+interface Category {
+  name: string;
+  color: string;
+  icon: string;
+}
+
 const iconMap = {
   'Food & Dining': Utensils,
   'Shopping': ShoppingCart,
+  'ShoppingCart': ShoppingCart,
   'Housing': Home,
+  'Home': Home,
   'Transportation': Car,
+  'Car': Car,
   'Entertainment': Gamepad2,
+  'Gamepad2': Gamepad2,
   'Healthcare': Heart,
+  'Heart': Heart,
   'Education': GraduationCap,
+  'GraduationCap': GraduationCap,
   'Utilities': Lightbulb,
+  'Lightbulb': Lightbulb,
   'Technology': Smartphone,
+  'Smartphone': Smartphone,
   'Travel': Plane,
+  'Plane': Plane,
   'Business': Briefcase,
+  'Briefcase': Briefcase,
   'Gifts & Donations': Gift,
+  'Gift': Gift,
   'Investment': TrendingUp,
+  'TrendingUp': TrendingUp,
   'Miscellaneous': CreditCard,
+  'CreditCard': CreditCard,
+  'Utensils': Utensils,
 };
 
-const categoryColors: Record<string, string> = {
-  'Food & Dining': '#F59E0B',
-  'Shopping': '#EC4899',
-  'Housing': '#06B6D4',
-  'Transportation': '#8B5CF6',
-  'Entertainment': '#10B981',
-  'Healthcare': '#EF4444',
-  'Education': '#6366F1',
-  'Utilities': '#84CC16',
-  'Technology': '#3B82F6',
-  'Travel': '#F97316',
-  'Business': '#1F2937',
-  'Gifts & Donations': '#DB2777',
-  'Investment': '#059669',
-  'Miscellaneous': '#6B7280',
-  
-  // Legacy categories for backward compatibility
+// Fallback colors for legacy categories
+const fallbackCategoryColors: Record<string, string> = {
   'Food': '#F59E0B',
   'Transport': '#8B5CF6',
   'Salary': '#22c55e',
@@ -66,6 +72,7 @@ const TransactionCharts = () => {
   const [incomeData, setIncomeData] = useState<ChartData[]>([]);
   const [expenseData, setExpenseData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categoryColors, setCategoryColors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -86,47 +93,68 @@ const TransactionCharts = () => {
         return;
       }
 
-      const { data: transactions, error } = await supabase
-        .from("transactions")
-        .select("id, amount, category, type")
-        .eq("email", email);
+      try {
+        // Fetch categories from Supabase
+        const { data: categoriesData } = await supabase
+          .from('categories')
+          .select('name, color, icon')
+          .eq('is_active', true);
 
-      if (!error && Array.isArray(transactions)) {
-        // Process income data
-        const incomeMap: Record<string, number> = {};
-        const expenseMap: Record<string, number> = {};
-
-        transactions.forEach((tx: Transaction) => {
-          const category = tx.category && categoryColors[tx.category] ? tx.category : "Miscellaneous";
-          const amount = Number(tx.amount);
-          
-          if (tx.type === "income") {
-            incomeMap[category] = (incomeMap[category] || 0) + amount;
-          } else if (tx.type === "expense") {
-            expenseMap[category] = (expenseMap[category] || 0) + amount;
-          }
+        // Build category colors map
+        const colorsMap: Record<string, string> = { ...fallbackCategoryColors };
+        categoriesData?.forEach((category: Category) => {
+          colorsMap[category.name] = category.color;
         });
+        setCategoryColors(colorsMap);
 
-        const incomeChartData = Object.entries(incomeMap).map(([name, value]) => ({
-          name,
-          value,
-          color: categoryColors[name] || "#6b7280",
-          icon: name,
-        }));
+        // Fetch transactions
+        const { data: transactions, error } = await supabase
+          .from("transactions")
+          .select("id, amount, category, type")
+          .eq("email", email);
 
-        const expenseChartData = Object.entries(expenseMap).map(([name, value]) => ({
-          name,
-          value,
-          color: categoryColors[name] || "#6b7280",
-          icon: name,
-        }));
+        if (!error && Array.isArray(transactions)) {
+          // Process income and expense data
+          const incomeMap: Record<string, number> = {};
+          const expenseMap: Record<string, number> = {};
 
-        setIncomeData(incomeChartData);
-        setExpenseData(expenseChartData);
-      } else {
+          transactions.forEach((tx: Transaction) => {
+            const category = tx.category && colorsMap[tx.category] ? tx.category : "Miscellaneous";
+            const amount = Number(tx.amount);
+            
+            if (tx.type === "income") {
+              incomeMap[category] = (incomeMap[category] || 0) + amount;
+            } else if (tx.type === "expense") {
+              expenseMap[category] = (expenseMap[category] || 0) + amount;
+            }
+          });
+
+          const incomeChartData = Object.entries(incomeMap).map(([name, value]) => ({
+            name,
+            value,
+            color: colorsMap[name] || "#6b7280",
+            icon: name,
+          }));
+
+          const expenseChartData = Object.entries(expenseMap).map(([name, value]) => ({
+            name,
+            value,
+            color: colorsMap[name] || "#6b7280",
+            icon: name,
+          }));
+
+          setIncomeData(incomeChartData);
+          setExpenseData(expenseChartData);
+        } else {
+          setIncomeData([]);
+          setExpenseData([]);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
         setIncomeData([]);
         setExpenseData([]);
       }
+      
       setLoading(false);
     };
 
