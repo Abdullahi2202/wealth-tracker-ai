@@ -1,5 +1,4 @@
 
-// Unify mobile nav to match all web sidebar nav order
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Home, CreditCard, BarChart3, User
@@ -17,7 +16,7 @@ const MobileNavigation = () => {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t h-16 flex items-center justify-around z-50 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-16 flex items-center justify-around z-50 md:hidden shadow-lg">
       {NAV_ITEMS.map((item) => {
         const isActive = item.path === "/dashboard"
           ? location.pathname === "/dashboard"
@@ -25,25 +24,25 @@ const MobileNavigation = () => {
         return (
           <button
             key={item.name}
-            className="flex flex-col items-center justify-center w-1/4 p-1 group focus:outline-none"
+            className="flex flex-col items-center justify-center w-1/4 p-1 group focus:outline-none transition-all duration-200"
             onClick={() => navigate(item.path)}
             aria-current={isActive ? "page" : undefined}
           >
             <div
-              className={`rounded-full transition-all duration-200 flex items-center justify-center ${
+              className={`rounded-full transition-all duration-200 flex items-center justify-center shadow-sm ${
                 isActive
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "text-muted-foreground group-hover:text-blue-600"
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-500 group-hover:text-blue-600 group-hover:bg-blue-50"
               }`}
               style={{
                 width: isActive ? 42 : 36,
                 height: isActive ? 42 : 36,
               }}
             >
-              <item.icon size={22} strokeWidth={isActive ? 2.2 : 1.7} />
+              <item.icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
             </div>
-            <span className={`mt-0.5 text-xs font-semibold transition-colors ${
-              isActive ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+            <span className={`mt-1 text-xs font-medium transition-colors ${
+              isActive ? "text-blue-600" : "text-gray-500 group-hover:text-blue-600"
             }`}>
               {item.name}
             </span>

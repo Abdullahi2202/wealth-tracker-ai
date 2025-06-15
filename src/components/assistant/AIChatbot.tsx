@@ -1,104 +1,31 @@
+
 import { useState, useRef, useEffect } from "react";
-import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
+import { Send, Bot, User, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
   content: string;
-  sender: "user" | "bot";
+  role: "user" | "assistant";
   timestamp: Date;
 }
 
-// Sample responses for the AI chatbot
-const botResponses: { [key: string]: string } = {
-  default: "I'm your financial assistant. I can help you with budgeting, expense tracking, and financial advice.",
-  hello: "Hello! How can I assist with your finances today?",
-  hi: "Hi there! How can I help you manage your money better?",
-  budget: "Based on your recent spending, I recommend allocating 30% for housing, 15% for food, 10% for transport, and saving at least 20% of your monthly income.",
-  save: "To improve your savings, consider the 50/30/20 rule: 50% for needs, 30% for wants, and 20% for savings. I can help you create a detailed savings plan if you'd like.",
-  spend: "I've analyzed your spending patterns. Your highest expense categories are Housing, Food, and Transport this month.",
-  invest: "For beginners, I recommend starting with low-cost index funds. With your current profile, a mix of 70% stocks and 30% bonds might be suitable. Would you like more specific investment advice?",
-  card: "You currently have cards linked to your Wallet Master account. Want details or to link a new card?",
-  help: "I can help you with budgeting, expense tracking, saving tips, investment advice, and analyzing your spending patterns. What would you like assistance with?",
-};
-
-const AIChatbot = () => {
-  const [messages, setMessages] = useState([
+export default function AIChatbot() {
+  const [messages, setMessages] = useState<Message[]>([
     {
-      id: "initial",
-      content: "Hi there! I'm your AI financial assistant. How can I help you today?",
-      sender: "bot",
+      id: "welcome",
+      content: "Hello! I'm your WalletMaster AI assistant. I can help you with financial questions, payment issues, and general wallet management. How can I assist you today?",
+      role: "assistant",
       timestamp: new Date(),
     },
   ]);
-
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // New: Most recent spending and investment summaries
-  const [spendingSummary, setSpendingSummary] = useState<string | null>(null);
-  const [investmentSummary, setInvestmentSummary] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Fetch a simple breakdown of spending and investments for chatbot context
-    const loadData = async () => {
-      let email = "";
-      const storedUser = localStorage.getItem("walletmaster_user");
-      if (storedUser) {
-        try {
-          const userObj = JSON.parse(storedUser);
-          email = userObj.email || "";
-        } catch {}
-      }
-      if (!email) return;
-
-      // Fetch top spending categories (last 30 days expenses)
-      const { data: txs } = await supabase
-        .from("transactions")
-        .select("amount, category, date")
-        .eq("email", email)
-        .eq("type", "expense");
-
-      if (Array.isArray(txs)) {
-        // Find top 2 categories and their sums
-        const catMap: Record<string, number> = {};
-        txs.forEach((t) => {
-          const cat = t.category || "Misc";
-          catMap[cat] = (catMap[cat] || 0) + Number(t.amount);
-        });
-        const sortedCats = Object.entries(catMap)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 2);
-        if (sortedCats.length) {
-          setSpendingSummary(
-            `Your highest expenses are ${sortedCats
-              .map(([c, v]) => `${c} ($${v.toFixed(2)})`)
-              .join(" and ")}.`
-          );
-        }
-      }
-
-      // Fetch investments
-      const { data: investments } = await supabase
-        .from("investments")
-        .select("name, value, change_pct")
-        .eq("email", email);
-      if (Array.isArray(investments) && investments.length > 0) {
-        const total = investments.reduce((s, i) => s + (i.value || 0), 0);
-        setInvestmentSummary(
-          `You have ${investments.length} investments with a total value of $${total.toFixed(
-            2
-          )}.`
-        );
-      }
-    };
-    loadData();
-  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -108,124 +35,158 @@ const AIChatbot = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return;
 
-    // Add user message
-    const userMessage = {
-      id: `user-${Date.now()}`,
-      content: input,
-      sender: "user" as const,
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: input.trim(),
+      role: "user",
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInput("");
-    setIsTyping(true);
+    setIsLoading(true);
 
-    setTimeout(async () => {
-      const lowerInput = input.toLowerCase();
-      let botResponse = "";
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: { 
+          prompt: input.trim(),
+          context: "financial assistant for WalletMaster app"
+        },
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (lowerInput.includes("hello") || lowerInput.includes("hi")) {
-        botResponse = botResponses.hello;
-      } else if (lowerInput.includes("budget")) {
-        botResponse = botResponses.budget;
-      } else if (lowerInput.includes("save") || lowerInput.includes("savings")) {
-        botResponse = botResponses.save;
-      } else if (lowerInput.includes("spend") || lowerInput.includes("spending") || lowerInput.includes("expense")) {
-        // Custom: fetch real data from spendingSummary
-        botResponse =
-          spendingSummary ||
-          "I'm fetching your spending data, please try again in a moment.";
-      } else if (lowerInput.includes("invest") || lowerInput.includes("investment")) {
-        // Custom: fetch real data from investmentSummary
-        botResponse =
-          investmentSummary ||
-          "I'm fetching your investments, please try again in a moment.";
-      } else if (lowerInput.includes("card")) {
-        botResponse = botResponses.card;
-      } else if (lowerInput.includes("help")) {
-        botResponse = botResponses.help;
-      } else {
-        botResponse = botResponses.default;
-      }
+      if (error) throw error;
 
-      const aiMessage = {
-        id: `bot-${Date.now()}`,
-        content: botResponse,
-        sender: "bot" as const,
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response || "I apologize, but I'm having trouble processing your request right now. Please try again later.",
+        role: "assistant",
         timestamp: new Date(),
       };
 
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1200);
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message. Please try again.");
+      
+      // Add fallback response
+      const fallbackMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I'm sorry, I'm currently experiencing technical difficulties. Please try again later or contact support if the issue persists.",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, fallbackMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSendMessage();
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle>AI Financial Assistant</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-grow flex flex-col p-4 h-full">
-        <div className="flex-grow overflow-auto mb-4 space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "chatbot-message",
-                message.sender === "user" ? "user-message" : "bot-message"
-              )}
-            >
-              <p>{message.content}</p>
-              <div className="text-xs opacity-70 mt-1">
-                {message.timestamp.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="bot-message chatbot-message">
-              <div className="flex space-x-2">
-                <div className="h-2 w-2 bg-primary rounded-full animate-bounce delay-0"></div>
-                <div className="h-2 w-2 bg-primary rounded-full animate-bounce delay-150"></div>
-                <div className="h-2 w-2 bg-primary rounded-full animate-bounce delay-300"></div>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+    <div className="flex flex-col h-full max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-lg">
+        <div className="flex items-center gap-3">
+          <Bot className="w-8 h-8" />
+          <div>
+            <h2 className="text-xl font-semibold">WalletMaster AI Assistant</h2>
+            <p className="text-blue-100 text-sm">Your personal financial advisor</p>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex gap-3 ${
+              message.role === "user" ? "justify-end" : "justify-start"
+            }`}
+          >
+            {message.role === "assistant" && (
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+            )}
+            
+            <Card className={`max-w-[80%] p-3 ${
+              message.role === "user" 
+                ? "bg-blue-600 text-white" 
+                : "bg-white border border-gray-200"
+            }`}>
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <p className={`text-xs mt-2 ${
+                message.role === "user" ? "text-blue-100" : "text-gray-500"
+              }`}>
+                {message.timestamp.toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+              </p>
+            </Card>
+
+            {message.role === "user" && (
+              <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                <User className="w-5 h-5 text-white" />
+              </div>
+            )}
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="flex gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <Card className="bg-white border border-gray-200 p-3">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm text-gray-600">Thinking...</span>
+              </div>
+            </Card>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-gray-200 p-4 bg-white rounded-b-lg">
+        <div className="flex gap-2">
           <Input
-            type="text"
-            placeholder="Ask me anything about your finances..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isTyping}
-            className="flex-grow"
+            onKeyPress={handleKeyPress}
+            placeholder="Ask me anything about your wallet, payments, or finances..."
+            disabled={isLoading}
+            className="flex-1"
           />
-          <Button
+          <Button 
+            onClick={sendMessage} 
+            disabled={!input.trim() || isLoading}
             size="icon"
-            onClick={handleSendMessage}
-            disabled={isTyping || !input.trim()}
+            className="bg-blue-600 hover:bg-blue-700"
           >
-            <Send className="h-4 w-4" />
-            <span className="sr-only">Send</span>
+            <Send className="w-4 h-4" />
           </Button>
         </div>
-      </CardContent>
-    </Card>
+        <p className="text-xs text-gray-500 mt-2">
+          Press Enter to send • Shift+Enter for new line
+        </p>
+      </div>
+    </div>
   );
-};
-
-export default AIChatbot;
+}

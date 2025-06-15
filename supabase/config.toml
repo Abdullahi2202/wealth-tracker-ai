@@ -40,6 +40,9 @@ verify_jwt = false
 [functions.wallet-operations]
 verify_jwt = false
 
+[functions.ai-assistant]
+verify_jwt = false
+
 [storage]
 enabled = true
 port = 54323

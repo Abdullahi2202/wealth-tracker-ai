@@ -6,6 +6,7 @@ import IdentityVerificationUpload from "./IdentityVerificationUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { User, Session } from "@supabase/supabase-js";
+import { Edit, Phone, Mail, CreditCard, Shield, CheckCircle, XCircle, Clock } from "lucide-react";
 
 // Combined profile data from both profiles and registrations tables
 type ProfileData = {
@@ -176,163 +177,172 @@ export default function ProfileView() {
     return verificationRequests.find((r) => r.document_type === type && ["pending", "rejected"].includes(r.status));
   }
 
+  function getVerificationStatus(type: "passport" | "license") {
+    const req = verificationRequests.find((r) => r.document_type === type);
+    if (!req) return null;
+    return req.status;
+  }
+
+  function getStatusIcon(status: string | null) {
+    switch (status) {
+      case "approved":
+        return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case "rejected":
+        return <XCircle className="w-5 h-5 text-red-600" />;
+      case "pending":
+        return <Clock className="w-5 h-5 text-yellow-600" />;
+      default:
+        return <Shield className="w-5 h-5 text-gray-400" />;
+    }
+  }
+
   if (loading) {
-    return <div className="text-center text-muted-foreground p-8">Loading profile...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!profile) {
     return (
-      <div className="text-center text-muted-foreground p-8">
-        <p>Unable to load profile data.</p>
-        {!session && !user && (
-          <p className="mt-2 text-sm">Please log in to view your profile.</p>
-        )}
+      <div className="text-center p-8">
+        <p className="text-muted-foreground mb-4">Unable to load profile data.</p>
+        <Button onClick={() => window.location.reload()}>Retry</Button>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Authentication Status */}
-      <div className="bg-muted/50 p-4 rounded-lg">
-        <h3 className="font-semibold mb-2">Account Status</h3>
-        <div className="text-sm space-y-1">
-          <div>
-            <span className="font-medium">Authentication: </span>
-            <span className={session ? "text-green-600" : "text-orange-600"}>
-              {session ? "Authenticated via Supabase" : "Using localStorage session"}
-            </span>
+      {/* Profile Header */}
+      <div className="flex flex-col items-center text-center mb-6">
+        <div className="relative">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold mb-4 shadow-lg">
+            {profile.full_name ? profile.full_name[0].toUpperCase() : "?"}
           </div>
-          {user && (
-            <div>
-              <span className="font-medium">User ID: </span>
-              <span className="font-mono text-xs">{user.id}</span>
-            </div>
-          )}
-          <div>
-            <span className="font-medium">Email Verified: </span>
-            <span className={user?.email_confirmed_at ? "text-green-600" : "text-orange-600"}>
-              {user?.email_confirmed_at ? "Yes" : "No"}
-            </span>
-          </div>
+          <Button 
+            size="icon" 
+            variant="outline" 
+            className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-white shadow-md"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
         </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">
+          {profile.full_name || "Add your name"}
+        </h1>
+        <p className="text-muted-foreground">{profile.email}</p>
       </div>
 
-      {/* Profile Photo, Name, Email */}
-      <div className="flex justify-center items-center gap-6 flex-col md:flex-row md:items-start">
-        <div className="flex flex-col items-center">
-          <div className="relative h-32 w-32 rounded-full border-2 border-finance-purple bg-muted overflow-hidden mb-2">
-            <div className="h-full w-full flex items-center justify-center text-4xl text-muted-foreground">
-              {profile.full_name ? profile.full_name[0].toUpperCase() : "?"}
+      {/* Profile Information Cards */}
+      <div className="space-y-4">
+        {/* Contact Information */}
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Phone className="w-5 h-5 text-blue-600" />
+            Contact Information
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-600">Email</span>
+              </div>
+              <span className="text-sm font-medium">{profile.email}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Phone className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-600">Phone</span>
+              </div>
+              <span className="text-sm font-medium">
+                {profile.phone || <span className="text-gray-400">Not provided</span>}
+              </span>
             </div>
           </div>
-          <div className="text-lg font-bold">{profile.full_name || "Name not provided"}</div>
-          <div className="text-xs text-muted-foreground">{profile.email}</div>
-          {profile.id && (
-            <div className="text-xs text-muted-foreground font-mono mt-1">
-              ID: {profile.id.slice(0, 8)}...
-            </div>
-          )}
         </div>
-        
-        {/* Main profile details */}
-        <div className="flex flex-col gap-3 min-w-[220px] w-full max-w-[330px]">
-          <div>
-            <span className="font-semibold mr-2">Phone:</span>
-            <span>{profile.phone || <span className="italic text-muted-foreground">Not provided</span>}</span>
-          </div>
-          <div>
-            <span className="font-semibold mr-2">Passport/License Number:</span>
-            <span>{profile.passport_number || <span className="italic text-muted-foreground">Not provided</span>}</span>
-          </div>
-          <div>
-            <span className="font-semibold mr-2">Profile Source:</span>
-            <span className="text-sm text-muted-foreground">
-              {profile.phone ? "Registration + Profile" : "Profile Only"}
-            </span>
-          </div>
-        </div>
-      </div>
 
-      {/* Passport Section */}
-      <div className="mt-6">
-        <div className="font-bold mb-1">Passport Verification</div>
+        {/* Identity Verification */}
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-blue-600" />
+            Identity Verification
+          </h3>
+          <div className="space-y-4">
+            {/* Passport Verification */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-5 h-5 text-gray-400" />
+                <div>
+                  <p className="font-medium text-sm">Passport</p>
+                  <p className="text-xs text-gray-500">Government issued ID</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(getVerificationStatus("passport"))}
+                <span className="text-sm font-medium capitalize">
+                  {getVerificationStatus("passport") || "Not verified"}
+                </span>
+              </div>
+            </div>
+
+            {/* Driver's License */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-5 h-5 text-gray-400" />
+                <div>
+                  <p className="font-medium text-sm">Driver's License</p>
+                  <p className="text-xs text-gray-500">Valid driving license</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(getVerificationStatus("license"))}
+                <span className="text-sm font-medium capitalize">
+                  {getVerificationStatus("license") || "Not verified"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Document Upload Sections */}
         {(() => {
-          const req = findLatestReq("passport");
-          if (req) {
+          const passportReq = findLatestReq("passport");
+          if (!passportReq) {
             return (
-              <div className="my-2">
-                <div>
-                  Status: <span className="capitalize font-semibold">{req.status}</span>
-                  {req.status === "rejected" && req.feedback && (
-                    <span className="ml-2 text-destructive text-xs">({req.feedback})</span>
-                  )}
-                </div>
-                <div>
-                  <a
-                    href={getStorageUrl("identity-docs", req.new_document_url)}
-                    target="_blank"
-                    rel="noopener"
-                    className="text-blue-600 underline"
-                  >
-                    View Uploaded Document
-                  </a>
-                </div>
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <h4 className="font-medium mb-3">Upload Passport</h4>
+                <IdentityVerificationUpload 
+                  email={profile.email} 
+                  documentType="passport" 
+                  onSubmitted={() => fetchProfileData(profile.email)} 
+                />
               </div>
             );
           }
-          return <IdentityVerificationUpload email={profile.email} documentType="passport" onSubmitted={() => fetchProfileData(profile.email)} />;
+          return null;
         })()}
-      </div>
 
-      {/* License Section */}
-      <div>
-        <div className="font-bold mb-1">Driver's License Verification</div>
         {(() => {
-          const req = findLatestReq("license");
-          if (req) {
+          const licenseReq = findLatestReq("license");
+          if (!licenseReq) {
             return (
-              <div className="my-2">
-                <div>
-                  Status: <span className="capitalize font-semibold">{req.status}</span>
-                  {req.status === "rejected" && req.feedback && (
-                    <span className="ml-2 text-destructive text-xs">({req.feedback})</span>
-                  )}
-                </div>
-                <div>
-                  <a
-                    href={getStorageUrl("identity-docs", req.new_document_url)}
-                    target="_blank"
-                    rel="noopener"
-                    className="text-blue-600 underline"
-                  >
-                    View Uploaded Document
-                  </a>
-                </div>
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <h4 className="font-medium mb-3">Upload Driver's License</h4>
+                <IdentityVerificationUpload 
+                  email={profile.email} 
+                  documentType="license" 
+                  onSubmitted={() => fetchProfileData(profile.email)} 
+                />
               </div>
             );
           }
-          return <IdentityVerificationUpload email={profile.email} documentType="license" onSubmitted={() => fetchProfileData(profile.email)} />;
+          return null;
         })()}
-      </div>
-
-      {/* Verification History */}
-      <div>
-        <div className="font-bold mb-1 mt-4">Verification History</div>
-        <div className="space-y-1">
-          {verificationRequests.length === 0 ? (
-            <div className="text-muted-foreground text-sm">No verification actions submitted yet.</div>
-          ) : (
-            verificationRequests.map((r) => (
-              <div key={r.id} className="border px-3 py-1 rounded text-xs flex flex-col md:flex-row md:items-center md:gap-4">
-                <span>{r.document_type === "passport" ? "Passport" : "License"}: {r.status}</span>
-                <span className="text-muted-foreground">Requested: {r.requested_at.slice(0, 10)}</span>
-                {r.status !== "pending" && <span>Reviewed: {r.reviewed_at ? r.reviewed_at.slice(0, 10) : "-"}</span>}
-                {r.feedback && <span className="text-destructive">Feedback: {r.feedback}</span>}
-              </div>
-            ))
-          )}
-        </div>
       </div>
     </div>
   );

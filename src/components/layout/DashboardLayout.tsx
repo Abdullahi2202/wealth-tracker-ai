@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "./DashboardHeader";
@@ -39,15 +40,19 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen flex-col w-full">
+      <div className="flex min-h-screen flex-col w-full bg-gray-50">
         <DashboardHeader />
         <div className="flex flex-1">
           {/* Sidebar on desktop */}
-          <aside className="hidden md:flex w-64 flex-col border-r bg-background">
+          <aside className="hidden md:flex w-64 flex-col border-r bg-white shadow-sm">
             <DashboardSidebar />
           </aside>
-          {/* Page content */}
-          <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
+          {/* Page content with proper mobile spacing */}
+          <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">
+            <div className="max-w-7xl mx-auto">
+              {children}
+            </div>
+          </main>
         </div>
         {/* Mobile bottom nav */}
         <MobileNavigation />

@@ -1,8 +1,9 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import ProfileView from "@/components/profile/ProfileView";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
 
 const Profile = () => {
@@ -42,31 +43,25 @@ const Profile = () => {
 
   if (!isAuthChecked) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-muted px-2">
-        <Card className="max-w-2xl w-full rounded-2xl shadow-lg border border-gray-200 p-0">
-          <CardContent className="p-8 pt-8 flex flex-col gap-6">
-            <div className="text-center text-muted-foreground">
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="text-muted-foreground">
               Checking authentication...
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-muted px-2">
-      <Card className="max-w-2xl w-full rounded-2xl shadow-lg border border-gray-200 p-0">
-        <CardContent className="p-8 pt-8 flex flex-col gap-6">
-          <div className="flex flex-col items-center mb-2">
-            <CardTitle className="text-2xl font-extrabold mb-1 text-center">
-              My Profile
-            </CardTitle>
-          </div>
-          <ProfileView />
-        </CardContent>
-      </Card>
-    </div>
+    <DashboardLayout>
+      <div className="max-w-2xl mx-auto">
+        <ProfileView />
+      </div>
+    </DashboardLayout>
   );
 };
 
