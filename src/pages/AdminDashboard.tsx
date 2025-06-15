@@ -25,11 +25,17 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const checkAdmin = async () => {
+      console.log("Checking admin authentication...");
+      
+      // First check localStorage for admin session
       const storedUser = localStorage.getItem("walletmaster_user");
       if (storedUser) {
         try {
           const userObj = JSON.parse(storedUser);
-          if (userObj.isAdmin && userObj.role === "admin") {
+          console.log("Stored user:", userObj);
+          
+          if (userObj.isAdmin && userObj.role === "admin" && userObj.email === "kingabdalla982@gmail.com") {
+            console.log("Admin found in localStorage");
             setCurrentAdmin(userObj.email);
             setIsAdmin(true);
             setLoading(false);
@@ -40,30 +46,52 @@ const AdminDashboard = () => {
         }
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.user) {
-        toast.error("Please sign in to access admin panel.");
+      // Check Supabase session as fallback
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
+          console.log("No session found, redirecting to login");
+          toast.error("Please sign in to access admin panel.");
+          navigate("/login");
+          return;
+        }
+        
+        const userEmail = session.user.email!;
+        console.log("Supabase user email:", userEmail);
+        setCurrentAdmin(userEmail);
+
+        // Check if user is admin
+        try {
+          const { data } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("email", userEmail)
+            .single();
+
+          console.log("User role data:", data);
+
+          if (!data || data.role !== "admin") {
+            console.log("User is not admin");
+            toast.error("Admin privileges required");
+            navigate("/login");
+            return;
+          }
+
+          setIsAdmin(true);
+        } catch (roleError) {
+          console.error("Error checking user role:", roleError);
+          toast.error("Error checking admin privileges");
+          navigate("/login");
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
+        toast.error("Authentication error");
         navigate("/login");
         return;
       }
-      
-      const userEmail = session.user.email!;
-      setCurrentAdmin(userEmail);
 
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("email", userEmail)
-        .single();
-
-      if (!data || data.role !== "admin") {
-        toast.error("Admin privileges required");
-        navigate("/");
-        return;
-      }
-
-      setIsAdmin(true);
       setLoading(false);
     };
     
@@ -228,6 +256,7 @@ const AdminDashboard = () => {
               </div>
               
               <div className="flex items-center gap-4">
+                <span className="text-sm text-slate-600">Welcome, {currentAdmin}</span>
                 <Button 
                   variant="outline" 
                   onClick={handleLogout} 

@@ -32,17 +32,22 @@ const Login = () => {
           })
         );
 
-        // Ensure admin role exists in user_roles table
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .upsert(
-            { email: ADMIN_EMAIL, role: 'admin' },
-            { onConflict: 'email' }
-          );
+        // Try to ensure admin role exists in user_roles table (but don't fail if it doesn't work)
+        try {
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .upsert(
+              { email: ADMIN_EMAIL, role: 'admin' },
+              { onConflict: 'email' }
+            );
 
-        if (roleError) {
-          console.error("Error setting admin role:", roleError);
-          // Don't fail login if role setting fails - admin is already authenticated
+          if (roleError) {
+            console.error("Error setting admin role:", roleError);
+            // Don't fail login if role setting fails - admin is already authenticated
+          }
+        } catch (roleSetError) {
+          console.error("Role setting failed:", roleSetError);
+          // Continue with login even if role setting fails
         }
 
         toast.success("Admin logged in successfully!");
