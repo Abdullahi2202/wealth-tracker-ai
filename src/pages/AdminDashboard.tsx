@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +20,7 @@ const AdminDashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -74,6 +74,10 @@ const AdminDashboard = () => {
     localStorage.removeItem("walletmaster_user");
     await supabase.auth.signOut();
     navigate("/login");
+  };
+
+  const handleWalletMasterClick = () => {
+    setSidebarOpen(!sidebarOpen);
   };
 
   const renderContent = () => {
@@ -190,7 +194,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
       <div className="flex min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100">
         <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         
@@ -207,8 +211,15 @@ const AdminDashboard = () => {
                     <Shield className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
-                    <p className="text-sm text-slate-600">WalletMaster Administration Panel</p>
+                    <button 
+                      onClick={handleWalletMasterClick}
+                      className="text-left hover:opacity-80 transition-opacity cursor-pointer"
+                    >
+                      <h1 className="text-2xl font-bold text-slate-900">
+                        Wallet<span className="text-blue-600">Master</span>
+                      </h1>
+                      <p className="text-sm text-slate-600">Admin Dashboard</p>
+                    </button>
                   </div>
                 </div>
               </div>
