@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 interface PaymentMethod {
   id: string;
@@ -29,6 +30,31 @@ interface PaymentMethod {
 
 const CardsList = () => {
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+  const [checkingVerification, setCheckingVerification] = useState(true);
+  const navigate = useNavigate();
+
+  // Fetch verification status
+  useEffect(() => {
+    async function fetchVerification() {
+      setCheckingVerification(true);
+      const storedUser = localStorage.getItem("walletmaster_user");
+      const email = storedUser ? JSON.parse(storedUser)?.email : null;
+      if (!email) {
+        setVerificationStatus(null);
+        setCheckingVerification(false);
+        return;
+      }
+      const { data: user } = await supabase
+        .from("registration")
+        .select("verification_status")
+        .eq("email", email)
+        .maybeSingle();
+      setVerificationStatus(user?.verification_status || null);
+      setCheckingVerification(false);
+    }
+    fetchVerification();
+  }, []);
 
   const { data: paymentMethods, isLoading, error, refetch } = useQuery({
     queryKey: ['payment-methods'],
@@ -157,6 +183,51 @@ const CardsList = () => {
         return 'from-gray-500 to-gray-700';
     }
   };
+
+  if (checkingVerification) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Payment Methods</h1>
+        </div>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Checking identity verification status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Restrict adding cards if not verified
+  const canAddCard = verificationStatus === "approved";
+  if (!canAddCard) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Payment Methods</h1>
+          <Button
+            onClick={() => navigate("/verify-identity")}
+            variant="outline"
+            className="border-blue-600 text-blue-700"
+          >
+            Verify Identity
+          </Button>
+        </div>
+        <Card className="text-center py-12 mt-6">
+          <CardContent>
+            <CreditCard className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-medium mb-2">Verification Required</h3>
+            <p className="text-muted-foreground mb-4">
+              You must verify your identity before adding or managing payment methods.
+            </p>
+            <Button onClick={() => navigate("/verify-identity")}>
+              Go to Identity Verification
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

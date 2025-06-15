@@ -1,12 +1,13 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, Phone, Mail, CreditCard, FileText, CheckCircle, Clock, XCircle } from "lucide-react";
+import { User, Phone, Mail, CreditCard, FileText, CheckCircle, Clock, XCircle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import IdentityVerificationUpload from "./IdentityVerificationUpload";
+import { useNavigate } from "react-router-dom";
 
 interface ProfileData {
   email: string;
@@ -20,9 +21,8 @@ interface ProfileData {
 
 export default function ProfileView() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [verificationStatus, setVerificationStatus] = useState<string>("unverified");
   const [loading, setLoading] = useState(true);
-  const [showUpload, setShowUpload] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchProfileData();
@@ -30,66 +30,60 @@ export default function ProfileView() {
 
   const fetchProfileData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error("Please log in to view your profile");
+      // Get current user email from localStorage
+      const storedUser = localStorage.getItem("walletmaster_user");
+      const userEmail = storedUser ? JSON.parse(storedUser)?.email : null;
+      if (!userEmail) {
+        setProfile(null);
+        setLoading(false);
         return;
       }
-
-      // Get user profile from profiles table (by user id)
-      // Use 'as' to satisfy TS about the dynamic fields
+      // Fetch from registration table directly
       const { data: profileData } = await supabase
-        .from("profiles")
+        .from("registration")
         .select("*")
-        .eq("id", user.id)
+        .eq("email", userEmail)
         .maybeSingle();
-
       if (!profileData) {
-        toast.error("Profile not found.");
+        setProfile(null);
         setLoading(false);
         return;
       }
 
-      // Explicitly type the fetched data as ProfileData
-      const pd = profileData as ProfileData;
-
-      const combinedProfile: ProfileData = {
-        email: pd.email || user.email || "",
-        full_name: pd.full_name || user.user_metadata?.full_name || "",
-        phone: pd.phone,
-        passport_number: pd.passport_number,
-        image_url: pd.image_url,
-        document_type: pd.document_type || "passport",
-        verification_status: pd.verification_status || "unverified"
-      };
-
-      setProfile(combinedProfile);
-      setVerificationStatus(combinedProfile.verification_status);
-
+      setProfile(profileData as ProfileData);
     } catch (error) {
-      console.error("Error fetching profile:", error);
       toast.error("Failed to load profile data");
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string | undefined) => {
     switch (status) {
-      case "approved": return "bg-green-100 text-green-800 border-green-200";
-      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "rejected": return "bg-red-100 text-red-800 border-red-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "approved": return <CheckCircle className="h-4 w-4" />;
-      case "pending": return <Clock className="h-4 w-4" />;
-      case "rejected": return <XCircle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+      case "approved":
+        return (
+          <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1">
+            <CheckCircle className="h-4 w-4" /> Verified
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 flex items-center gap-1">
+            <Clock className="h-4 w-4" /> Pending
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1">
+            <XCircle className="h-4 w-4" /> Rejected
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-gray-100 text-gray-800 border-gray-200 flex items-center gap-1">
+            <ShieldCheck className="h-4 w-4" /> Not Verified
+          </Badge>
+        );
     }
   };
 
@@ -131,11 +125,19 @@ export default function ProfileView() {
         <CardContent>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">Verification Status:</span>
-            <Badge className={`${getStatusColor(verificationStatus)} border flex items-center gap-1`}>
-              {getStatusIcon(verificationStatus)}
-              {verificationStatus}
-            </Badge>
+            {getStatusBadge(profile.verification_status)}
           </div>
+          {(profile.verification_status !== "approved") && (
+            <div className="mt-3">
+              <Button
+                variant="outline"
+                className="border-blue-600 text-blue-700"
+                onClick={() => navigate("/verify-identity")}
+              >
+                {profile.verification_status === "rejected" ? "Resubmit Identity" : "Verify Identity"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -168,106 +170,46 @@ export default function ProfileView() {
       </Card>
 
       {/* Identity Document */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {profile.document_type === "passport" ? (
-              <FileText className="h-5 w-5" />
-            ) : (
-              <CreditCard className="h-5 w-5" />
+      {profile.verification_status === "approved" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {profile.document_type === "passport" ? (
+                <FileText className="h-5 w-5" />
+              ) : (
+                <CreditCard className="h-5 w-5" />
+              )}
+              Verified Document
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium">Document Type</p>
+                <p className="text-sm text-muted-foreground capitalize">
+                  {profile.document_type === "passport" ? "Passport" : "Driver's License"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium">
+                  {profile.document_type === "passport" ? "Passport Number" : "License Number"}
+                </p>
+                <p className="text-sm text-muted-foreground">{profile.passport_number}</p>
+              </div>
+            </div>
+            {profile.image_url && (
+              <div className="py-2">
+                <p className="text-sm font-medium mb-1">Document Image</p>
+                <img
+                  src={profile.image_url}
+                  alt="Document"
+                  className="rounded-lg max-w-xs border border-gray-200"
+                />
+              </div>
             )}
-            Identity Document
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium">Document Type</p>
-              <p className="text-sm text-muted-foreground capitalize">
-                {profile.document_type === "passport" ? "Passport" : "Driver's License"}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">
-                {profile.document_type === "passport" ? "Passport Number" : "License Number"}
-              </p>
-              <p className="text-sm text-muted-foreground">{profile.passport_number || "Not provided"}</p>
-            </div>
-          </div>
-          {profile.image_url && (
-            <div className="py-2">
-              <p className="text-sm font-medium mb-1">Document Image</p>
-              <img
-                src={profile.image_url}
-                alt="Document"
-                className="rounded-lg max-w-xs border border-gray-200"
-              />
-            </div>
-          )}
-
-          {verificationStatus === "rejected" && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800 mb-2">
-                Your verification was rejected. You can upload a new document for re-verification.
-              </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setShowUpload(!showUpload)}
-              >
-                Upload New Document
-              </Button>
-              {showUpload && (
-                <div className="mt-4">
-                  <IdentityVerificationUpload
-                    email={profile.email}
-                    documentType={profile.document_type as "passport" | "license"}
-                    onSubmitted={() => {
-                      setShowUpload(false);
-                      fetchProfileData();
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {verificationStatus === "pending" && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-sm text-yellow-800">
-                Your verification is pending review. You'll receive an email notification once it's processed.
-              </p>
-            </div>
-          )}
-
-          {verificationStatus === "unverified" && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 mb-2">
-                Please complete your identity verification to access all features.
-              </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setShowUpload(!showUpload)}
-              >
-                Start Verification
-              </Button>
-              {showUpload && (
-                <div className="mt-4">
-                  <IdentityVerificationUpload
-                    email={profile.email}
-                    documentType={profile.document_type as "passport" | "license"}
-                    onSubmitted={() => {
-                      setShowUpload(false);
-                      fetchProfileData();
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

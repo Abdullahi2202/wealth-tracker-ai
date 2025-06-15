@@ -266,30 +266,42 @@ export type Database = {
       registration: {
         Row: {
           created_at: string | null
+          document_type: string | null
           email: string
           full_name: string
           id: string
+          image_url: string | null
+          passport_number: string | null
           password: string
           phone: string | null
           updated_at: string | null
+          verification_status: string | null
         }
         Insert: {
           created_at?: string | null
+          document_type?: string | null
           email: string
           full_name: string
           id?: string
+          image_url?: string | null
+          passport_number?: string | null
           password: string
           phone?: string | null
           updated_at?: string | null
+          verification_status?: string | null
         }
         Update: {
           created_at?: string | null
+          document_type?: string | null
           email?: string
           full_name?: string
           id?: string
+          image_url?: string | null
+          passport_number?: string | null
           password?: string
           phone?: string | null
           updated_at?: string | null
+          verification_status?: string | null
         }
         Relationships: []
       }

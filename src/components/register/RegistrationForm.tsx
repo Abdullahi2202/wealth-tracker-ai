@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,32 +15,15 @@ const RegistrationForm = () => {
     email: "",
     password: "",
     phone: "",
-    documentType: "passport",
-    documentNumber: "",
-    // Removed isAdmin
+    // Removed all document and admin fields
   });
-  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Upload document to Supabase Storage.
-  const uploadDocument = async (email: string) => {
-    if (!file) return { publicURL: null, error: null };
-    const ext = file.name.split('.').pop();
-    const fileName = `${email}_${Date.now()}.${ext}`;
-    const { data, error } = await supabase.storage
-      .from("documents")
-      .upload(`${email}/${fileName}`, file, { cacheControl: "3600", upsert: true });
-    if (error) return { publicURL: null, error };
-
-    const { data: url } = await supabase.storage.from("documents").getPublicUrl(`${email}/${fileName}`);
-    return { publicURL: url?.publicUrl || null, error: null };
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { fullName, email, password, phone, documentType, documentNumber } = form;
-    if (!fullName || !email || !password || !phone || !documentNumber || !file) {
-      toast.error("Please fill in all required fields and upload your document.");
+    const { fullName, email, password, phone } = form;
+    if (!fullName || !email || !password || !phone) {
+      toast.error("Please fill in all required fields.");
       return;
     }
     setLoading(true);
@@ -60,24 +42,14 @@ const RegistrationForm = () => {
         return;
       }
 
-      // 2. Upload document file
-      const { publicURL, error: uploadError } = await uploadDocument(email);
-      if (uploadError || !publicURL) {
-        toast.error("Failed to upload document, please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // 3. Insert user with document info (NO is_admin property)
+      // 2. Insert user (no document info)
       const { error } = await supabase.from("registration").insert({
         email,
         password,
         full_name: fullName,
         phone,
-        passport_number: documentNumber,
-        image_url: publicURL,
-        document_type: documentType,
-        verification_status: "pending"
+        verification_status: "unverified",
+        // document info will be filled later, after registration
       });
       if (error) throw error;
       toast.success("Registration successful! You can now login.");
@@ -137,26 +109,6 @@ const RegistrationForm = () => {
               required
             />
           </div>
-          <DocumentUpload
-            documentType={form.documentType as "passport" | "license"}
-            onDocumentTypeChange={(type) => setForm(f => ({ ...f, documentType: type }))}
-            onFileSelect={setFile}
-            selectedFile={file}
-          />
-          <div>
-            <Label htmlFor="documentNumber">
-              {form.documentType === "passport" ? "Passport Number" : "Driver's License Number"}
-            </Label>
-            <Input
-              id="documentNumber"
-              type="text"
-              placeholder={`Enter your ${form.documentType === "passport" ? "Passport" : "License"} Number`}
-              value={form.documentNumber}
-              onChange={(e) => setForm((f) => ({ ...f, documentNumber: e.target.value }))}
-              required
-            />
-          </div>
-          {/* Removed Is Admin checkbox */}
           <Button type="submit" disabled={loading} className="mt-4">
             {loading ? "Registering..." : "Register"}
           </Button>
@@ -167,4 +119,3 @@ const RegistrationForm = () => {
 };
 
 export default RegistrationForm;
-

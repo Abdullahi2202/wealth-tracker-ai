@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,40 +22,44 @@ import Settings from "./pages/Settings";
 import Investments from "./pages/Investments";
 import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
+import VerifyIdentity from "@/pages/VerifyIdentity";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/cards" element={<Cards />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/payments/home" element={<PaymentsHome />} />
-          <Route path="/payments/send" element={<SendPayment />} />
-          <Route path="/payments/topup" element={<TopUpWallet />} />
-          <Route path="/payments/received" element={<ReceivedPaymentsMobile />} />
-          <Route path="/assistant" element={<Assistant />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/expenses" element={<Expenses />} />
-          <Route path="/budget" element={<Budget />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/investments" element={<Investments />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin-dashboard" element={<AdminDashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </TooltipProvider>
-    </BrowserRouter>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/cards" element={<Cards />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/payments/home" element={<PaymentsHome />} />
+            <Route path="/payments/send" element={<SendPayment />} />
+            <Route path="/payments/topup" element={<TopUpWallet />} />
+            <Route path="/payments/received" element={<ReceivedPaymentsMobile />} />
+            <Route path="/assistant" element={<Assistant />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/budget" element={<Budget />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/investments" element={<Investments />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin-dashboard" element={<AdminDashboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/verify-identity" element={<VerifyIdentity />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
