@@ -44,31 +44,32 @@ const CardsList = () => {
 
       console.log('Current user:', user.id);
 
-      // First check if user exists in our users table
+      // Check in registration table for existence
       const { data: userData, error: userError } = await supabase
-        .from('users')
+        .from('registration')
         .select('id, email, full_name')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (userError && userError.code !== 'PGRST116') {
-        console.error('Error checking user:', userError);
+        console.error('Error checking registration:', userError);
         throw userError;
       }
 
       if (!userData) {
-        console.log('User not found in users table, creating...');
-        // Create user record if it doesn't exist
+        console.log('User not found in registration table, creating...');
+        // Create registration record if it doesn't exist
         const { error: insertError } = await supabase
-          .from('users')
+          .from('registration')
           .insert({
             id: user.id,
             email: user.email || '',
-            full_name: user.user_metadata?.full_name || user.email || ''
+            full_name: user.user_metadata?.full_name || user.email || '',
+            password: '', // You may skip or set default if not relevant
           });
 
         if (insertError) {
-          console.error('Error creating user:', insertError);
+          console.error('Error creating registration:', insertError);
           throw insertError;
         }
       }

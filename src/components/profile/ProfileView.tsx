@@ -38,25 +38,31 @@ export default function ProfileView() {
         return;
       }
 
-      // Get user data from users table
-      const { data: userData } = await supabase
-        .from("users")
+      // Get user profile from profiles table (by user id)
+      const { data: profileData } = await supabase
+        .from("profiles")
         .select("*")
-        .eq("email", user.email!)
-        .single();
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profileData) {
+        toast.error("Profile not found.");
+        setLoading(false);
+        return;
+      }
 
       const combinedProfile: ProfileData = {
-        email: user.email!,
-        full_name: userData?.full_name || user.user_metadata?.full_name,
-        phone: userData?.phone,
-        passport_number: userData?.passport_number,
-        image_url: userData?.image_url,
-        document_type: userData?.document_type || "passport",
-        verification_status: userData?.verification_status || "unverified"
+        email: profileData.email || user.email || "",
+        full_name: profileData.full_name || user.user_metadata?.full_name || "",
+        phone: (profileData as any).phone,
+        passport_number: (profileData as any).passport_number,
+        image_url: (profileData as any).image_url,
+        document_type: (profileData as any).document_type || "passport",
+        verification_status: (profileData as any).verification_status || "unverified"
       };
 
       setProfile(combinedProfile);
-      setVerificationStatus(userData?.verification_status || "unverified");
+      setVerificationStatus(combinedProfile.verification_status);
 
     } catch (error) {
       console.error("Error fetching profile:", error);
