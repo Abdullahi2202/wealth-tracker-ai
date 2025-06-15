@@ -1,19 +1,9 @@
-
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "./DashboardHeader";
 import DashboardSidebar from "../dashboard/DashboardSidebar";
 import MobileNavigation from "./MobileNavigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
-
-// Define the type for window.Capacitor
-declare global {
-  interface Window {
-    Capacitor?: {
-      isNativePlatform: () => boolean;
-    }
-  }
-}
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
