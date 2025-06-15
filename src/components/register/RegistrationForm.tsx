@@ -52,7 +52,6 @@ const RegistrationForm = () => {
         setLoading(false);
         return;
       }
-
       // 2. Insert user (no document info)
       const { data: inserted, error } = await supabase.from("registration").insert({
         email,
@@ -67,19 +66,17 @@ const RegistrationForm = () => {
       console.log("Insert result", { inserted, error });
 
       if (error || !inserted) {
-        const message = error
-          ? `Registration failed: ${getErrorMessage(error)}`
-          : "Registration failed: Could not insert user.";
+        // Changed this to reveal raw error+code from supabase
+        const message =
+          error
+            ? `Registration failed [${error.code ?? ""}]: ${error.message ?? error}`
+            : "Registration failed: Could not insert user.";
         toast.error(message);
-        setApiError(message); // show on screen
+        setApiError(message);
         setLoading(false);
         return;
       }
 
-      // Log fields of the new user for debugging
-      console.log("Inserted user fields:", inserted);
-
-      // PROFESSIONAL SUCCESS CONFIRMATION
       toast.success(
         "✅ Registration successful! Please check your email for next steps. You can now log in.",
         {
@@ -94,9 +91,9 @@ const RegistrationForm = () => {
       );
       setTimeout(() => navigate("/login"), 1800);
     } catch (err: any) {
-      const msg = "Registration failed: " + getErrorMessage(err);
+      const msg = "Registration failed: " + (err?.message || JSON.stringify(err));
       toast.error(msg);
-      setApiError(msg); // show on screen
+      setApiError(msg);
       console.error("Unexpected registration error:", err);
     } finally {
       setLoading(false);

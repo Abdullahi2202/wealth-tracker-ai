@@ -56,7 +56,6 @@ const Login = () => {
         return;
       }
 
-      // 3. Store user info in localStorage -- everyone is *not* admin
       localStorage.setItem(
         "walletmaster_user",
         JSON.stringify({
@@ -69,11 +68,10 @@ const Login = () => {
 
       toast.success("Logged in successfully!");
 
-      // 4. Redirect
       navigate("/dashboard");
-    } catch (err) {
+    } catch (err: any) {
       toast.error("Login failed, please try again.");
-      setApiError("Login failed due to an unexpected error.");
+      setApiError("Login failed due to an unexpected error: " + (err?.message || JSON.stringify(err)));
       console.error("Unexpected login error:", err);
     } finally {
       setLoading(false);
