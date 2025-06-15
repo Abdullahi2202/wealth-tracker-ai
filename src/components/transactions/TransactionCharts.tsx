@@ -64,7 +64,9 @@ const TransactionCharts = () => {
           .eq('is_active', true);
 
         // Build category colors map
-        const colorsMap = { ...fallbackCategoryColors };
+        const colorsMap: Record<string, string> = {};
+        Object.assign(colorsMap, fallbackCategoryColors);
+        
         if (categoriesData) {
           for (const category of categoriesData) {
             colorsMap[category.name] = category.color;
@@ -80,39 +82,47 @@ const TransactionCharts = () => {
 
         if (!error && transactions) {
           // Process income and expense data
-          const incomeCategories: Record<string, number> = {};
-          const expenseCategories: Record<string, number> = {};
+          const incomeCategories: { [key: string]: number } = {};
+          const expenseCategories: { [key: string]: number } = {};
 
-          for (const tx of transactions) {
-            const categoryName = (tx.category && colorsMap[tx.category]) ? tx.category : "Miscellaneous";
+          for (let i = 0; i < transactions.length; i++) {
+            const tx = transactions[i];
+            const hasValidCategory = tx.category && tx.category in colorsMap;
+            const categoryName = hasValidCategory ? tx.category : "Miscellaneous";
             const amount = Number(tx.amount);
             
             if (tx.type === "income") {
-              incomeCategories[categoryName] = (incomeCategories[categoryName] || 0) + amount;
+              if (categoryName in incomeCategories) {
+                incomeCategories[categoryName] += amount;
+              } else {
+                incomeCategories[categoryName] = amount;
+              }
             } else if (tx.type === "expense") {
-              expenseCategories[categoryName] = (expenseCategories[categoryName] || 0) + amount;
+              if (categoryName in expenseCategories) {
+                expenseCategories[categoryName] += amount;
+              } else {
+                expenseCategories[categoryName] = amount;
+              }
             }
           }
 
           // Convert to chart data
           const incomeChartData: ChartData[] = [];
-          for (const [name, value] of Object.entries(incomeCategories)) {
-            incomeChartData.push({
-              name,
-              value,
-              color: colorsMap[name] || "#6b7280",
-              icon: name,
-            });
+          const incomeKeys = Object.keys(incomeCategories);
+          for (let i = 0; i < incomeKeys.length; i++) {
+            const name = incomeKeys[i];
+            const value = incomeCategories[name];
+            const color = name in colorsMap ? colorsMap[name] : "#6b7280";
+            incomeChartData.push({ name, value, color, icon: name });
           }
 
           const expenseChartData: ChartData[] = [];
-          for (const [name, value] of Object.entries(expenseCategories)) {
-            expenseChartData.push({
-              name,
-              value,
-              color: colorsMap[name] || "#6b7280",
-              icon: name,
-            });
+          const expenseKeys = Object.keys(expenseCategories);
+          for (let i = 0; i < expenseKeys.length; i++) {
+            const name = expenseKeys[i];
+            const value = expenseCategories[name];
+            const color = name in colorsMap ? colorsMap[name] : "#6b7280";
+            expenseChartData.push({ name, value, color, icon: name });
           }
 
           setIncomeData(incomeChartData);
