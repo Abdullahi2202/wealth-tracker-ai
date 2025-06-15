@@ -37,45 +37,33 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching users via edge function...');
+      console.log('Fetching users directly from database...');
       
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'GET',
-      });
+      // Try direct query first since edge function might have issues
+      const { data: directData, error: directError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          email,
+          full_name,
+          phone,
+          passport_number,
+          image_url,
+          verification_status,
+          document_type,
+          created_at,
+          is_active,
+          updated_at
+        `)
+        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching users from edge function:', error);
-        
-        // Fallback: try direct query
-        console.log('Trying direct query as fallback...');
-        const { data: directData, error: directError } = await supabase
-          .from('users')
-          .select(`
-            id,
-            email,
-            full_name,
-            phone,
-            passport_number,
-            image_url,
-            verification_status,
-            document_type,
-            created_at,
-            is_active,
-            updated_at
-          `)
-          .order('created_at', { ascending: false });
-
-        if (directError) {
-          console.error('Direct query also failed:', directError);
-          toast.error('Failed to fetch users: ' + (directError.message || 'Unknown error'));
-          setUsers([]);
-        } else {
-          console.log('Direct query successful:', directData?.length || 0);
-          setUsers(Array.isArray(directData) ? directData : []);
-        }
+      if (directError) {
+        console.error('Direct query failed:', directError);
+        toast.error('Failed to fetch users: ' + (directError.message || 'Unknown error'));
+        setUsers([]);
       } else {
-        console.log('Edge function successful:', data?.length || 0);
-        setUsers(Array.isArray(data) ? data : []);
+        console.log('Direct query successful:', directData?.length || 0);
+        setUsers(Array.isArray(directData) ? directData : []);
       }
     } catch (error: any) {
       console.error('Error:', error);
@@ -92,14 +80,12 @@ const UserManagement = () => {
 
   const handleVerifyUser = async (userId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'PUT',
-        body: {
-          id: userId,
-          action: 'update',
-          verification_status: 'verified'
-        }
-      });
+      const { data, error } = await supabase
+        .from('users')
+        .update({ verification_status: 'verified' })
+        .eq('id', userId)
+        .select()
+        .single();
 
       if (error) {
         console.error('Error verifying user:', error);
@@ -121,14 +107,12 @@ const UserManagement = () => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'DELETE',
-        body: { id: userId }
-      });
-
-      if (error) {
-        console.error('Error deleting user:', error);
-        toast.error('Failed to delete user: ' + (error.message || 'Unknown error'));
+      // Delete from auth users table (will cascade to other tables)
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      
+      if (authError) {
+        console.error('Error deleting user from auth:', authError);
+        toast.error('Failed to delete user: ' + (authError.message || 'Unknown error'));
         return;
       }
 
