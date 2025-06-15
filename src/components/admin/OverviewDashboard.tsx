@@ -38,41 +38,13 @@ const OverviewDashboard = () => {
 
         if (error) {
           console.error('Error fetching stats:', error);
-        } else {
-          setStats(data);
+          return;
         }
 
-        // Generate mock chart data for demonstration
-        const mockUserGrowth = [
-          { month: 'Jan', users: 120 },
-          { month: 'Feb', users: 180 },
-          { month: 'Mar', users: 240 },
-          { month: 'Apr', users: 320 },
-          { month: 'May', users: 420 },
-          { month: 'Jun', users: data?.total_users || 500 }
-        ];
+        setStats(data);
 
-        const mockTransactionTrends = [
-          { day: 'Mon', amount: 2400 },
-          { day: 'Tue', amount: 1398 },
-          { day: 'Wed', amount: 9800 },
-          { day: 'Thu', amount: 3908 },
-          { day: 'Fri', amount: 4800 },
-          { day: 'Sat', amount: 3800 },
-          { day: 'Sun', amount: 4300 }
-        ];
-
-        const mockPaymentMethods = [
-          { name: 'Credit Card', value: 65, color: '#3B82F6' },
-          { name: 'Bank Transfer', value: 25, color: '#10B981' },
-          { name: 'Digital Wallet', value: 10, color: '#F59E0B' }
-        ];
-
-        setChartData({
-          userGrowth: mockUserGrowth,
-          transactionTrends: mockTransactionTrends,
-          paymentMethods: mockPaymentMethods
-        });
+        // Fetch real chart data
+        await fetchChartData();
 
       } catch (error) {
         console.error('Error calling admin function:', error);
@@ -82,6 +54,82 @@ const OverviewDashboard = () => {
 
     fetchStats();
   }, []);
+
+  const fetchChartData = async () => {
+    try {
+      // Fetch user growth data
+      const { data: userGrowthData } = await supabase
+        .from('users')
+        .select('created_at')
+        .order('created_at', { ascending: true });
+
+      // Process user growth data by month
+      const monthlyGrowth = userGrowthData?.reduce((acc: any[], user) => {
+        const month = new Date(user.created_at).toLocaleDateString('en-US', { month: 'short' });
+        const existingMonth = acc.find(item => item.month === month);
+        if (existingMonth) {
+          existingMonth.users += 1;
+        } else {
+          acc.push({ month, users: 1 });
+        }
+        return acc;
+      }, []) || [];
+
+      // Fetch transaction trends data
+      const { data: transactionData } = await supabase
+        .from('payment_transactions')
+        .select('amount, created_at')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+      // Process transaction data by day
+      const dailyTransactions = transactionData?.reduce((acc: any[], transaction) => {
+        const day = new Date(transaction.created_at).toLocaleDateString('en-US', { weekday: 'short' });
+        const existingDay = acc.find(item => item.day === day);
+        if (existingDay) {
+          existingDay.amount += transaction.amount / 100;
+        } else {
+          acc.push({ day, amount: transaction.amount / 100 });
+        }
+        return acc;
+      }, []) || [];
+
+      // Fetch payment methods data
+      const { data: paymentMethodsData } = await supabase
+        .from('stored_payment_methods')
+        .select('card_brand');
+
+      const methodDistribution = paymentMethodsData?.reduce((acc: any[], method) => {
+        const brand = method.card_brand || 'Unknown';
+        const existing = acc.find(item => item.name === brand);
+        if (existing) {
+          existing.value += 1;
+        } else {
+          acc.push({ name: brand, value: 1, color: getColorForBrand(brand) });
+        }
+        return acc;
+      }, []) || [];
+
+      setChartData({
+        userGrowth: monthlyGrowth.slice(-6), // Last 6 months
+        transactionTrends: dailyTransactions,
+        paymentMethods: methodDistribution
+      });
+
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+    }
+  };
+
+  const getColorForBrand = (brand: string) => {
+    const colors: Record<string, string> = {
+      'visa': '#1A1F71',
+      'mastercard': '#EB001B',
+      'amex': '#006FCF',
+      'discover': '#FF6000',
+      'Unknown': '#6B7280'
+    };
+    return colors[brand.toLowerCase()] || '#6B7280';
+  };
 
   if (loading) {
     return (
@@ -190,7 +238,7 @@ const OverviewDashboard = () => {
         {/* Transaction Trends */}
         <Card>
           <CardHeader>
-            <CardTitle>Transaction Trends</CardTitle>
+            <CardTitle>Transaction Trends (Last 7 Days)</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -214,37 +262,45 @@ const OverviewDashboard = () => {
             <CardTitle>Payment Methods</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={chartData.paymentMethods}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={80}
-                  dataKey="value"
-                >
-                  {chartData.paymentMethods.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+            {chartData.paymentMethods.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={chartData.paymentMethods}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={80}
+                      dataKey="value"
+                    >
+                      {chartData.paymentMethods.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-2 mt-4">
+                  {chartData.paymentMethods.map((method, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: method.color }}
+                        />
+                        <span className="text-sm">{method.name}</span>
+                      </div>
+                      <span className="text-sm font-medium">{method.value}</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="space-y-2 mt-4">
-              {chartData.paymentMethods.map((method, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: method.color }}
-                    />
-                    <span className="text-sm">{method.name}</span>
-                  </div>
-                  <span className="text-sm font-medium">{method.value}%</span>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No payment methods found</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
