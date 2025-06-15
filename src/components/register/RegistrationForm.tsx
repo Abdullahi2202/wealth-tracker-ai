@@ -39,11 +39,13 @@ const RegistrationForm = () => {
     setLoading(true);
     try {
       // 1. Check for duplicates
-      const { data: exist } = await supabase
+      const { data: exist, error: checkError } = await supabase
         .from("registration")
         .select("*")
         .eq("email", email)
         .maybeSingle();
+
+      console.log("Exist check", { exist, checkError });
 
       if (exist) {
         toast.error("This email is already registered. Please log in instead.");
@@ -53,13 +55,17 @@ const RegistrationForm = () => {
       }
 
       // 2. Insert user (no document info)
-      const { error } = await supabase.from("registration").insert({
+      const { data: inserted, error } = await supabase.from("registration").insert({
         email,
         password,
         full_name: fullName,
         phone,
         verification_status: "unverified",
-      });
+      })
+      .select("*")
+      .single();
+
+      console.log("Insert result", { inserted, error });
 
       if (error) {
         // Check for RLS error
@@ -76,6 +82,15 @@ const RegistrationForm = () => {
         setLoading(false);
         return;
       }
+
+      if (!inserted) {
+        toast.error("Registration failed: Could not insert user. Please contact support.");
+        setLoading(false);
+        return;
+      }
+
+      // Log fields of the new user for debugging
+      console.log("Inserted user fields:", inserted);
 
       // PROFESSIONAL SUCCESS CONFIRMATION
       toast.success(
@@ -94,6 +109,7 @@ const RegistrationForm = () => {
     } catch (err: any) {
       // Unexpected, likely network or supabase client bug
       toast.error("Registration failed: " + getErrorMessage(err));
+      console.error("Unexpected registration error:", err);
     } finally {
       setLoading(false);
     }
@@ -157,3 +173,4 @@ const RegistrationForm = () => {
 };
 
 export default RegistrationForm;
+
