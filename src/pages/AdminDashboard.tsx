@@ -34,7 +34,8 @@ const AdminDashboard = () => {
           const userObj = JSON.parse(storedUser);
           console.log("Stored user:", userObj);
           
-          if (userObj.isAdmin && userObj.role === "admin" && userObj.email === "kingabdalla982@gmail.com") {
+          // Check if user has admin role or is the hardcoded admin
+          if (userObj.isAdmin || userObj.role === "admin" || userObj.email === "kingabdalla982@gmail.com") {
             console.log("Admin found in localStorage");
             setCurrentAdmin(userObj.email);
             setIsAdmin(true);
@@ -61,29 +62,54 @@ const AdminDashboard = () => {
         console.log("Supabase user email:", userEmail);
         setCurrentAdmin(userEmail);
 
-        // Check if user is admin
+        // Check if user is admin in database
         try {
           const { data } = await supabase
             .from("user_roles")
             .select("role")
             .eq("email", userEmail)
-            .single();
+            .maybeSingle();
 
           console.log("User role data:", data);
 
-          if (!data || data.role !== "admin") {
+          // Allow access if user has admin role OR is the hardcoded admin email
+          if (data?.role === "admin" || userEmail === "kingabdalla982@gmail.com") {
+            setIsAdmin(true);
+            
+            // Update localStorage with admin status
+            localStorage.setItem(
+              "walletmaster_user",
+              JSON.stringify({
+                email: userEmail,
+                role: "admin",
+                isAdmin: true,
+              })
+            );
+          } else {
             console.log("User is not admin");
             toast.error("Admin privileges required");
             navigate("/login");
             return;
           }
-
-          setIsAdmin(true);
         } catch (roleError) {
           console.error("Error checking user role:", roleError);
-          toast.error("Error checking admin privileges");
-          navigate("/login");
-          return;
+          
+          // If it's the hardcoded admin email, allow access even if role check fails
+          if (userEmail === "kingabdalla982@gmail.com") {
+            setIsAdmin(true);
+            localStorage.setItem(
+              "walletmaster_user",
+              JSON.stringify({
+                email: userEmail,
+                role: "admin",
+                isAdmin: true,
+              })
+            );
+          } else {
+            toast.error("Error checking admin privileges");
+            navigate("/login");
+            return;
+          }
         }
       } catch (error) {
         console.error("Error checking session:", error);

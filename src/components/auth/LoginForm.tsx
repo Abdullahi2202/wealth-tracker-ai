@@ -18,6 +18,26 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const checkUserRole = async (userEmail: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('email', userEmail)
+        .single();
+
+      if (error) {
+        console.error("Error checking user role:", error);
+        return null;
+      }
+
+      return data?.role || null;
+    } catch (error) {
+      console.error("Error checking user role:", error);
+      return null;
+    }
+  };
+
   const handleAdminLogin = async () => {
     try {
       // For admin, create a session without going through Supabase auth
@@ -93,17 +113,27 @@ const Login = () => {
 
       if (error) throw error;
 
-      // Store user data
+      // Check user role after successful login
+      const userRole = await checkUserRole(data.user.email!);
+      
+      // Store user data with role information
       localStorage.setItem(
         "walletmaster_user",
         JSON.stringify({
           email: data.user.email,
-          role: "user",
+          role: userRole || "user",
+          isAdmin: userRole === "admin",
         })
       );
 
       toast.success("Logged in successfully!");
-      navigate("/dashboard");
+      
+      // Redirect based on user role
+      if (userRole === "admin") {
+        navigate("/admin-dashboard");
+      } else {
+        navigate("/dashboard");
+      }
 
     } catch (error) {
       console.error("Login error:", error);
