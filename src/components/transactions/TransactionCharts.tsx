@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ShoppingCart, Home, Car, Gamepad2, Utensils, Heart, GraduationCap, 
          Lightbulb, Smartphone, Gift, TrendingUp, Briefcase, CreditCard, Plane } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 
 interface Transaction {
   id: string;
@@ -28,7 +29,8 @@ interface Category {
   icon: string;
 }
 
-const iconMap = {
+// Explicitly type the iconMap to prevent excessive type instantiation
+const iconMap: Record<string, LucideIcon> = {
   'Food & Dining': Utensils,
   'Shopping': ShoppingCart,
   'ShoppingCart': ShoppingCart,
@@ -57,7 +59,7 @@ const iconMap = {
   'Miscellaneous': CreditCard,
   'CreditCard': CreditCard,
   'Utensils': Utensils,
-};
+} as const;
 
 // Fallback colors for legacy categories
 const fallbackCategoryColors: Record<string, string> = {
@@ -162,7 +164,7 @@ const TransactionCharts = () => {
   }, []);
 
   const renderIcon = (iconName: string) => {
-    const IconComponent = iconMap[iconName as keyof typeof iconMap] || CreditCard;
+    const IconComponent = iconMap[iconName] || CreditCard;
     return <IconComponent className="h-4 w-4" />;
   };
 
