@@ -1,28 +1,31 @@
-
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in with Supabase Auth and log session for debugging
+    let redirecting = false;
+
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       console.log("[Index] Supabase session on mount:", session);
-      if (session) {
-        navigate("/dashboard");
+      if (session && !redirecting) {
+        redirecting = true;
+        navigate("/dashboard", { replace: true });
       }
+      setChecking(false);
     };
     checkSession();
 
-    // Listen for auth state changes so redirect happens after login/logout immediately
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("[Index] Supabase session changed:", session);
-      if (session) {
-        navigate("/dashboard");
+      if (session && !redirecting) {
+        redirecting = true;
+        navigate("/dashboard", { replace: true });
       }
     });
 
@@ -30,6 +33,18 @@ const Index = () => {
       subscription.unsubscribe();
     };
   }, [navigate]);
+
+  // Show loading while checking session
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-3" />
+          <p className="text-center text-muted-foreground">Checking session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
