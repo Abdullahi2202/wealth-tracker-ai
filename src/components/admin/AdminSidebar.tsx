@@ -1,8 +1,7 @@
 
 import { cn } from "@/lib/utils";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Users, BarChart3, Shield, CreditCard, Settings, Activity, FolderOpen, Menu } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Users, BarChart3, Shield, CreditCard, Settings, Activity, FolderOpen, ChevronRight } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 
 interface AdminSidebarProps {
@@ -13,39 +12,63 @@ interface AdminSidebarProps {
 const menuItems = [
   {
     id: "overview",
-    label: "Overview Dashboard",
+    label: "Overview",
     icon: BarChart3,
-    description: "Stats and analytics",
+    description: "Dashboard & Analytics",
+    color: "from-blue-500 to-blue-600",
+    bgColor: "bg-blue-50",
+    textColor: "text-blue-700",
+    borderColor: "border-blue-200",
   },
   {
     id: "users",
-    label: "User Management",
+    label: "Users",
     icon: Users,
-    description: "Manage users & verification",
+    description: "User Management",
+    color: "from-emerald-500 to-emerald-600", 
+    bgColor: "bg-emerald-50",
+    textColor: "text-emerald-700",
+    borderColor: "border-emerald-200",
   },
   {
-    id: "transactions",
-    label: "Transaction Management",
+    id: "transactions", 
+    label: "Transactions",
     icon: CreditCard,
-    description: "View & manage transactions",
+    description: "Payment Management",
+    color: "from-purple-500 to-purple-600",
+    bgColor: "bg-purple-50", 
+    textColor: "text-purple-700",
+    borderColor: "border-purple-200",
   },
   {
     id: "content",
-    label: "Content Management",
+    label: "Content",
     icon: FolderOpen,
-    description: "Categories & content",
+    description: "Content Management", 
+    color: "from-orange-500 to-orange-600",
+    bgColor: "bg-orange-50",
+    textColor: "text-orange-700", 
+    borderColor: "border-orange-200",
   },
   {
     id: "settings",
-    label: "App Settings",
+    label: "Settings",
     icon: Settings,
-    description: "System configuration",
+    description: "System Configuration",
+    color: "from-slate-500 to-slate-600",
+    bgColor: "bg-slate-50",
+    textColor: "text-slate-700",
+    borderColor: "border-slate-200",
   },
   {
     id: "activity",
-    label: "Activity Tracking",
+    label: "Activity",
     icon: Activity,
-    description: "User activity logs",
+    description: "Activity Tracking",
+    color: "from-rose-500 to-rose-600",
+    bgColor: "bg-rose-50", 
+    textColor: "text-rose-700",
+    borderColor: "border-rose-200",
   },
 ];
 
@@ -56,32 +79,38 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
   return (
     <Sidebar 
       collapsible="icon" 
-      className="border-r border-slate-200 bg-white shadow-sm"
+      className="border-r-0 bg-white shadow-xl"
     >
-      <SidebarContent>
-        {/* Logo/Brand */}
+      <SidebarContent className="bg-gradient-to-b from-slate-50 to-white">
+        {/* Brand Header */}
         <div className={cn(
-          "p-6 border-b border-slate-200 transition-all duration-200",
+          "p-6 border-b border-slate-100 bg-white shadow-sm transition-all duration-300",
           isCollapsed && "p-4"
         )}>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-sm">
-              <Shield className="h-6 w-6 text-white" />
+            <div className="relative">
+              <div className="p-2.5 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl shadow-lg">
+                <Shield className="h-7 w-7 text-white" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
             </div>
             {!isCollapsed && (
-              <div>
-                <h2 className="font-bold text-lg text-slate-900">
+              <div className="flex-1">
+                <h1 className="font-bold text-xl text-slate-900">
                   Wallet<span className="text-blue-600">Master</span>
-                </h2>
-                <p className="text-xs text-slate-500 font-medium">Admin Panel</p>
+                </h1>
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">
+                  Control Center
+                </p>
               </div>
             )}
           </div>
         </div>
 
-        <SidebarGroup className="p-6">
+        {/* Navigation Menu */}
+        <SidebarGroup className="p-6 flex-1">
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-3">
+            <SidebarMenu className="space-y-2">
               {menuItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (
@@ -90,36 +119,56 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
                       onClick={() => onTabChange(item.id)}
                       tooltip={isCollapsed ? item.label : undefined}
                       className={cn(
-                        "w-full p-4 rounded-xl transition-all duration-200 group hover:shadow-sm min-h-[60px]",
+                        "w-full p-0 rounded-2xl transition-all duration-300 group hover:shadow-lg min-h-[70px] border-2 relative overflow-hidden",
                         isActive
-                          ? "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-                          : "hover:bg-slate-50 text-slate-700 hover:text-slate-900"
+                          ? `${item.bgColor} ${item.textColor} ${item.borderColor} shadow-lg scale-[1.02]`
+                          : "hover:bg-white hover:shadow-md border-transparent hover:border-slate-200 bg-slate-50/50"
                       )}
                     >
-                      <div className="flex items-center gap-4 w-full">
-                        <item.icon
-                          className={cn(
-                            "h-6 w-6 transition-colors flex-shrink-0",
-                            isActive ? "text-blue-600" : "text-slate-500 group-hover:text-slate-700"
-                          )}
-                        />
+                      <div className="flex items-center gap-4 w-full p-4 relative z-10">
+                        <div className={cn(
+                          "p-2.5 rounded-xl transition-all duration-300",
+                          isActive 
+                            ? `bg-gradient-to-br ${item.color} text-white shadow-lg` 
+                            : "bg-white text-slate-500 group-hover:text-slate-700 shadow-sm"
+                        )}>
+                          <item.icon className="h-5 w-5" />
+                        </div>
+                        
                         {!isCollapsed && (
                           <div className="flex-1 text-left min-w-0">
                             <div className={cn(
-                              "font-semibold text-sm truncate mb-1",
-                              isActive ? "text-blue-900" : "text-slate-900"
+                              "font-bold text-sm truncate mb-0.5",
+                              isActive ? item.textColor : "text-slate-900"
                             )}>
                               {item.label}
                             </div>
                             <div className={cn(
-                              "text-xs truncate leading-relaxed",
-                              isActive ? "text-blue-600" : "text-slate-500"
+                              "text-xs truncate font-medium",
+                              isActive ? `${item.textColor} opacity-80` : "text-slate-500"
                             )}>
                               {item.description}
                             </div>
                           </div>
                         )}
+
+                        {!isCollapsed && (
+                          <ChevronRight className={cn(
+                            "h-4 w-4 transition-all duration-300",
+                            isActive 
+                              ? `${item.textColor} rotate-90` 
+                              : "text-slate-400 group-hover:text-slate-600 group-hover:translate-x-1"
+                          )} />
+                        )}
                       </div>
+
+                      {/* Active indicator line */}
+                      {isActive && (
+                        <div className={cn(
+                          "absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full",
+                          `bg-gradient-to-b ${item.color}`
+                        )} />
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -128,16 +177,20 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Footer */}
+        {/* Pro Footer */}
         {!isCollapsed && (
-          <div className="mt-auto p-6 border-t border-slate-200">
-            <div className="text-center">
-              <p className="text-xs text-slate-500">
-                © 2024 WalletMaster
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Admin Dashboard v1.0
-              </p>
+          <div className="p-6 border-t border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-4 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-10 translate-x-10"></div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-4 w-4" />
+                  <span className="font-bold text-sm">Enterprise</span>
+                </div>
+                <p className="text-xs opacity-90 leading-relaxed">
+                  Advanced admin controls & analytics
+                </p>
+              </div>
             </div>
           </div>
         )}
