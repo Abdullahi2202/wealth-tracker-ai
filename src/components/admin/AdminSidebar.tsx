@@ -79,9 +79,9 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
           </div>
         </div>
 
-        <SidebarGroup className="p-4">
+        <SidebarGroup className="p-6">
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
+            <SidebarMenu className="space-y-3">
               {menuItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (
@@ -90,29 +90,29 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
                       onClick={() => onTabChange(item.id)}
                       tooltip={isCollapsed ? item.label : undefined}
                       className={cn(
-                        "w-full p-3 rounded-xl transition-all duration-200 group hover:shadow-sm",
+                        "w-full p-4 rounded-xl transition-all duration-200 group hover:shadow-sm min-h-[60px]",
                         isActive
                           ? "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200 shadow-sm"
                           : "hover:bg-slate-50 text-slate-700 hover:text-slate-900"
                       )}
                     >
-                      <div className="flex items-center gap-3 w-full">
+                      <div className="flex items-center gap-4 w-full">
                         <item.icon
                           className={cn(
-                            "h-5 w-5 transition-colors flex-shrink-0",
+                            "h-6 w-6 transition-colors flex-shrink-0",
                             isActive ? "text-blue-600" : "text-slate-500 group-hover:text-slate-700"
                           )}
                         />
                         {!isCollapsed && (
                           <div className="flex-1 text-left min-w-0">
                             <div className={cn(
-                              "font-medium text-sm truncate",
+                              "font-semibold text-sm truncate mb-1",
                               isActive ? "text-blue-900" : "text-slate-900"
                             )}>
                               {item.label}
                             </div>
                             <div className={cn(
-                              "text-xs mt-0.5 truncate",
+                              "text-xs truncate leading-relaxed",
                               isActive ? "text-blue-600" : "text-slate-500"
                             )}>
                               {item.description}
@@ -130,7 +130,7 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
 
         {/* Footer */}
         {!isCollapsed && (
-          <div className="mt-auto p-4 border-t border-slate-200">
+          <div className="mt-auto p-6 border-t border-slate-200">
             <div className="text-center">
               <p className="text-xs text-slate-500">
                 © 2024 WalletMaster
