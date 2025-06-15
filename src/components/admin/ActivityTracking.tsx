@@ -10,7 +10,8 @@ import { format } from "date-fns";
 
 interface ActivityLog {
   id: string;
-  admin_email: string;
+  admin_user_id: string;
+  admin_email?: string;
   action: string;
   target_table?: string;
   target_id?: string;
@@ -35,7 +36,10 @@ const ActivityTracking = () => {
     try {
       const { data, error } = await supabase
         .from('admin_activity_logs')
-        .select('*')
+        .select(`
+          *,
+          admin_user:users!admin_activity_logs_admin_user_id_fkey(email)
+        `)
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -47,6 +51,7 @@ const ActivityTracking = () => {
       // Transform the data to match our interface
       const transformedData = (data || []).map(item => ({
         ...item,
+        admin_email: item.admin_user?.email || 'Unknown',
         ip_address: item.ip_address?.toString() || null,
       }));
 

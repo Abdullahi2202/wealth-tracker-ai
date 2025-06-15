@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -458,12 +457,6 @@ const ContentManagement = () => {
               ))}
             </TableBody>
           </Table>
-          
-          {settings.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No settings found</p>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

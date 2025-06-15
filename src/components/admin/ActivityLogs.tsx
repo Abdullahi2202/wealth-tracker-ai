@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +8,8 @@ import { Activity, Eye, Edit, Trash2, Plus } from "lucide-react";
 
 type AdminActivityLog = {
   id: string;
-  admin_email: string;
+  admin_user_id: string;
+  admin_email?: string;
   action: string;
   target_table: string | null;
   target_id: string | null;
@@ -33,14 +33,21 @@ const ActivityLogs = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("admin_activity_logs")
-      .select("*")
+      .select(`
+        *,
+        admin_user:users!admin_activity_logs_admin_user_id_fkey(email)
+      `)
       .order("created_at", { ascending: false })
       .limit(100);
 
     if (error) {
       console.error("Error fetching admin activity logs:", error);
     } else {
-      setLogs(data || []);
+      const transformedLogs = (data || []).map(log => ({
+        ...log,
+        admin_email: log.admin_user?.email || 'Unknown'
+      }));
+      setLogs(transformedLogs);
     }
     setLoading(false);
   };

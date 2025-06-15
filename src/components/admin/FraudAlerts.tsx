@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 type FraudAlert = {
   id: string;
-  user_email: string;
+  user_id: string;
+  user_email?: string;
   alert_type: string;
   risk_score: number;
   description: string | null;
@@ -63,14 +63,21 @@ const FraudAlerts = () => {
     try {
       const { data, error } = await supabase
         .from("fraud_alerts")
-        .select("*")
+        .select(`
+          *,
+          user:users!fraud_alerts_user_id_fkey(email)
+        `)
         .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching fraud alerts:", error);
         toast.error("Failed to fetch fraud alerts");
       } else {
-        setAlerts(data || []);
+        const transformedData = (data || []).map(item => ({
+          ...item,
+          user_email: item.user?.email || 'Unknown'
+        }));
+        setAlerts(transformedData);
       }
     } catch (error) {
       console.error("Error fetching fraud alerts:", error);
@@ -86,7 +93,7 @@ const FraudAlerts = () => {
         .update({ 
           status,
           reviewed_at: new Date().toISOString(),
-          reviewed_by: (await supabase.auth.getUser()).data.user?.email 
+          reviewed_by: (await supabase.auth.getUser()).data.user?.id 
         })
         .eq("id", alertId);
 
@@ -104,7 +111,7 @@ const FraudAlerts = () => {
   };
 
   const filteredAlerts = alerts.filter(alert => {
-    const matchesSearch = alert.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = alert.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          alert.alert_type.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || alert.status === statusFilter;
     return matchesSearch && matchesStatus;

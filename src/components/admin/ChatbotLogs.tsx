@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 type ChatbotConversation = {
   id: string;
-  user_email: string;
+  user_id: string;
+  user_email?: string;
   session_id: string;
   message: string;
   response: string | null;
@@ -58,7 +58,10 @@ const ChatbotLogs = () => {
     try {
       const { data, error } = await supabase
         .from("chatbot_conversations")
-        .select("*")
+        .select(`
+          *,
+          user:users!chatbot_conversations_user_id_fkey(email)
+        `)
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -66,7 +69,11 @@ const ChatbotLogs = () => {
         console.error("Error fetching chatbot conversations:", error);
         toast.error("Failed to fetch chatbot conversations");
       } else {
-        setConversations(data || []);
+        const transformedData = (data || []).map(item => ({
+          ...item,
+          user_email: item.user?.email || 'Unknown'
+        }));
+        setConversations(transformedData);
       }
     } catch (error) {
       console.error("Error fetching chatbot conversations:", error);
@@ -77,9 +84,22 @@ const ChatbotLogs = () => {
 
   const generateSampleConversations = async () => {
     try {
+      // Get a sample user to assign conversations to
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, email')
+        .limit(1);
+
+      if (!users || users.length === 0) {
+        toast.error("No users found. Please create a user first.");
+        return;
+      }
+
+      const sampleUser = users[0];
+
       const sampleConversations = [
         {
-          user_email: "user1@example.com",
+          user_id: sampleUser.id,
           session_id: `sess_${Date.now()}_1`,
           message: "How do I reset my password?",
           response: "You can reset your password by clicking the 'Forgot Password' link on the login page.",
@@ -88,7 +108,7 @@ const ChatbotLogs = () => {
           response_time_ms: 180
         },
         {
-          user_email: "user2@example.com",
+          user_id: sampleUser.id,
           session_id: `sess_${Date.now()}_2`,
           message: "What are my transaction limits?",
           response: "Your daily transaction limit is $5,000 for verified accounts and $1,000 for unverified accounts.",
@@ -97,7 +117,7 @@ const ChatbotLogs = () => {
           response_time_ms: 220
         },
         {
-          user_email: "user3@example.com",
+          user_id: sampleUser.id,
           session_id: `sess_${Date.now()}_3`,
           message: "I need help with identity verification",
           response: "To verify your identity, please upload a clear photo of your government-issued ID and proof of address.",
@@ -120,7 +140,7 @@ const ChatbotLogs = () => {
   };
 
   const filteredConversations = conversations.filter(conversation => {
-    const matchesSearch = conversation.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = conversation.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          conversation.message.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesIntent = intentFilter === "all" || conversation.intent_detected === intentFilter;
     return matchesSearch && matchesIntent;
