@@ -1,4 +1,3 @@
-
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -29,8 +28,8 @@ interface Category {
   icon: string;
 }
 
-// Explicitly type the iconMap to prevent excessive type instantiation
-const iconMap: Record<string, LucideIcon> = {
+// Simplified iconMap to prevent excessive type instantiation
+const iconMap: { [key: string]: LucideIcon } = {
   'Food & Dining': Utensils,
   'Shopping': ShoppingCart,
   'ShoppingCart': ShoppingCart,
@@ -59,7 +58,7 @@ const iconMap: Record<string, LucideIcon> = {
   'Miscellaneous': CreditCard,
   'CreditCard': CreditCard,
   'Utensils': Utensils,
-} as const;
+};
 
 // Fallback colors for legacy categories
 const fallbackCategoryColors: Record<string, string> = {
