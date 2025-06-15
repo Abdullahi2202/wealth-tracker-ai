@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +19,15 @@ const RegistrationForm = () => {
     // Removed all document and admin fields
   });
   const [loading, setLoading] = useState(false);
+
+  // Helper for detailed error display
+  const getErrorMessage = (err: any) => {
+    if (!err) return "Unknown registration error. Please contact support.";
+    if (typeof err === "string") return err;
+    if (err?.message) return err.message;
+    if (err?.error_description) return err.error_description;
+    return JSON.stringify(err);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,13 +59,41 @@ const RegistrationForm = () => {
         full_name: fullName,
         phone,
         verification_status: "unverified",
-        // document info will be filled later, after registration
       });
-      if (error) throw error;
-      toast.success("Registration successful! You can now login.");
-      navigate("/login");
-    } catch (err) {
-      toast.error("Registration failed, please try again.");
+
+      if (error) {
+        // Check for RLS error
+        if (
+          error.message &&
+          error.message.includes("violates row-level security policy")
+        ) {
+          toast.error("Registration is currently unavailable. Please contact support: registration is blocked due to security policy (RLS).");
+          setLoading(false);
+          return;
+        }
+        // Display detailed error for all other issues
+        toast.error("Registration failed: " + getErrorMessage(error));
+        setLoading(false);
+        return;
+      }
+
+      // PROFESSIONAL SUCCESS CONFIRMATION
+      toast.success(
+        "✅ Registration successful! Please check your email for next steps. You can now log in.",
+        {
+          description: (
+            <div>
+              <div className="text-muted-foreground">Thank you, {fullName}!</div>
+              <div className="text-xs">You’ll be redirected shortly.</div>
+            </div>
+          ),
+          duration: 4200,
+        }
+      );
+      setTimeout(() => navigate("/login"), 1800);
+    } catch (err: any) {
+      // Unexpected, likely network or supabase client bug
+      toast.error("Registration failed: " + getErrorMessage(err));
     } finally {
       setLoading(false);
     }
