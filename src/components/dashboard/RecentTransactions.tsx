@@ -39,25 +39,37 @@ const RecentTransactions = () => {
       }
       
       try {
-        // Use a more direct approach to avoid type inference issues
-        const query = supabase
+        // First get the user_id from the users table
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("email", email)
+          .single();
+
+        if (userError || !userData) {
+          setTransactionList([]);
+          setLoading(false);
+          return;
+        }
+
+        // Then get transactions using user_id
+        const { data: transactionData, error: transactionError } = await supabase
           .from("transactions")
           .select("id, name, category, amount, date, type")
+          .eq("user_id", userData.id)
           .order("date", { ascending: false })
           .limit(10);
         
-        const { data, error } = await query.eq("email", email);
-        
-        if (!error && data) {
+        if (!transactionError && transactionData) {
           // Map the data with explicit typing
-          const mappedData = data.map((item: any) => ({
+          const mappedData: TransactionItem[] = transactionData.map((item) => ({
             id: String(item.id),
             name: String(item.name),
             category: item.category ? String(item.category) : null,
             amount: Number(item.amount),
             date: item.date ? String(item.date) : null,
             type: String(item.type)
-          })) as TransactionItem[];
+          }));
           
           setTransactionList(mappedData);
         } else {
