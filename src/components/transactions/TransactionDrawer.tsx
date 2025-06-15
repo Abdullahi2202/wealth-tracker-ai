@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ShoppingCart, Home, Car, Gamepad2, Utensils, Heart, GraduationCap, 
+         Lightbulb, Smartphone, Gift, TrendingUp, Briefcase, CreditCard, Plane } from "lucide-react";
 
 interface TransactionDrawerProps {
   open: boolean;
@@ -20,13 +22,38 @@ interface TransactionDrawerProps {
   onSaved?: () => void;
 }
 
+const iconMap = {
+  'Food & Dining': Utensils,
+  'Shopping': ShoppingCart,
+  'Housing': Home,
+  'Transportation': Car,
+  'Entertainment': Gamepad2,
+  'Healthcare': Heart,
+  'Education': GraduationCap,
+  'Utilities': Lightbulb,
+  'Technology': Smartphone,
+  'Travel': Plane,
+  'Business': Briefcase,
+  'Gifts & Donations': Gift,
+  'Investment': TrendingUp,
+  'Miscellaneous': CreditCard,
+};
+
 const CATEGORY_OPTIONS = [
-  "Food",
-  "Housing",
-  "Transport",
-  "Entertainment",
-  "Shopping",
-  "Misc"
+  { value: "Food & Dining", label: "Food & Dining", color: "#F59E0B", icon: "Food & Dining" },
+  { value: "Shopping", label: "Shopping", color: "#EC4899", icon: "Shopping" },
+  { value: "Housing", label: "Housing", color: "#06B6D4", icon: "Housing" },
+  { value: "Transportation", label: "Transportation", color: "#8B5CF6", icon: "Transportation" },
+  { value: "Entertainment", label: "Entertainment", color: "#10B981", icon: "Entertainment" },
+  { value: "Healthcare", label: "Healthcare", color: "#EF4444", icon: "Healthcare" },
+  { value: "Education", label: "Education", color: "#6366F1", icon: "Education" },
+  { value: "Utilities", label: "Utilities", color: "#84CC16", icon: "Utilities" },
+  { value: "Technology", label: "Technology", color: "#3B82F6", icon: "Technology" },
+  { value: "Travel", label: "Travel", color: "#F97316", icon: "Travel" },
+  { value: "Business", label: "Business", color: "#1F2937", icon: "Business" },
+  { value: "Gifts & Donations", label: "Gifts & Donations", color: "#DB2777", icon: "Gifts & Donations" },
+  { value: "Investment", label: "Investment", color: "#059669", icon: "Investment" },
+  { value: "Miscellaneous", label: "Miscellaneous", color: "#6B7280", icon: "Miscellaneous" },
 ];
 
 const TYPE_OPTIONS = [
@@ -43,7 +70,7 @@ export default function TransactionDrawer({
   const [form, setForm] = useState(() =>
     transaction
       ? { ...transaction }
-      : { name: "", amount: 0, type: "expense", category: "Food", date: new Date().toISOString().slice(0, 10) }
+      : { name: "", amount: 0, type: "expense", category: "Food & Dining", date: new Date().toISOString().slice(0, 10) }
   );
   const [loading, setLoading] = useState(false);
 
@@ -94,6 +121,13 @@ export default function TransactionDrawer({
     setLoading(false);
   };
 
+  const renderIcon = (iconName: string) => {
+    const IconComponent = iconMap[iconName as keyof typeof iconMap] || CreditCard;
+    return <IconComponent className="h-4 w-4" />;
+  };
+
+  const selectedCategory = CATEGORY_OPTIONS.find(cat => cat.value === form.category);
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
@@ -130,17 +164,36 @@ export default function TransactionDrawer({
                 <option value={opt.value} key={opt.value}>{opt.label}</option>
               ))}
             </select>
-            <select
-              name="category"
-              className="rounded-md border px-3 py-2 text-base bg-background"
-              value={form.category}
-              onChange={handleChange}
-              required
-            >
-              {CATEGORY_OPTIONS.map((cat) => (
-                <option value={cat} key={cat}>{cat}</option>
-              ))}
-            </select>
+            
+            {/* Enhanced Category Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category</label>
+              <select
+                name="category"
+                className="rounded-md border px-3 py-2 text-base bg-background w-full"
+                value={form.category}
+                onChange={handleChange}
+                required
+              >
+                {CATEGORY_OPTIONS.map((cat) => (
+                  <option value={cat.value} key={cat.value}>{cat.label}</option>
+                ))}
+              </select>
+              
+              {/* Category Preview */}
+              {selectedCategory && (
+                <div className="flex items-center gap-2 p-2 rounded-lg border bg-muted/50">
+                  <div 
+                    className="p-2 rounded-lg"
+                    style={{ backgroundColor: selectedCategory.color + '20', border: `1px solid ${selectedCategory.color}` }}
+                  >
+                    {renderIcon(selectedCategory.icon)}
+                  </div>
+                  <span className="text-sm font-medium">{selectedCategory.label}</span>
+                </div>
+              )}
+            </div>
+            
             <Input
               name="date"
               type="date"
