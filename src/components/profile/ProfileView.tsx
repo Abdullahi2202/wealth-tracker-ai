@@ -19,6 +19,18 @@ interface ProfileData {
   verification_status?: string;
 }
 
+interface RegistrationData {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  passport_number: string;
+  image_url: string;
+  document_type: string;
+  verification_status: string;
+  created_at: string;
+}
+
 export default function ProfileView() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<string>("unverified");
@@ -45,7 +57,7 @@ export default function ProfileView() {
         .eq("email", user.email!)
         .single();
 
-      // Get registration data
+      // Get registration data with new columns
       const { data: registrationData } = await supabase
         .from("registrations")
         .select("*")
@@ -66,8 +78,8 @@ export default function ProfileView() {
         phone: registrationData?.phone,
         passport_number: registrationData?.passport_number,
         image_url: registrationData?.image_url,
-        document_type: registrationData?.document_type,
-        verification_status: registrationData?.verification_status
+        document_type: registrationData?.document_type || "passport",
+        verification_status: registrationData?.verification_status || "unverified"
       };
 
       setProfile(combinedProfile);

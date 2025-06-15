@@ -359,30 +359,36 @@ export type Database = {
       registrations: {
         Row: {
           created_at: string | null
+          document_type: string | null
           email: string
           full_name: string
           id: string
           image_url: string
           passport_number: string
           phone: string
+          verification_status: string | null
         }
         Insert: {
           created_at?: string | null
+          document_type?: string | null
           email: string
           full_name: string
           id?: string
           image_url: string
           passport_number: string
           phone: string
+          verification_status?: string | null
         }
         Update: {
           created_at?: string | null
+          document_type?: string | null
           email?: string
           full_name?: string
           id?: string
           image_url?: string
           passport_number?: string
           phone?: string
+          verification_status?: string | null
         }
         Relationships: []
       }
