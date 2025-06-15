@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,11 +9,11 @@ import { toast } from "sonner";
 import { MessageSquare, Eye, CheckCircle, Clock, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 
 type SupportTicket = {
   id: string;
-  user_email: string;
+  user_id: string;
+  user_email?: string;
   subject: string;
   description: string;
   priority: string;
@@ -65,14 +64,22 @@ const SupportTickets = () => {
     try {
       const { data, error } = await supabase
         .from("support_tickets")
-        .select("*")
+        .select(`
+          *,
+          user:users!support_tickets_user_id_fkey(email)
+        `)
         .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching support tickets:", error);
         toast.error("Failed to fetch support tickets");
       } else {
-        setTickets(data || []);
+        // Transform the data to include user_email
+        const transformedTickets = (data || []).map(ticket => ({
+          ...ticket,
+          user_email: ticket.user?.email || 'Unknown'
+        }));
+        setTickets(transformedTickets);
       }
     } catch (error) {
       console.error("Error fetching support tickets:", error);
@@ -135,7 +142,7 @@ const SupportTickets = () => {
   };
 
   const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = ticket.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          ticket.subject.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;

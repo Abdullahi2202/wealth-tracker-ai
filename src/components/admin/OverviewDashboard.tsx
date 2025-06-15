@@ -75,9 +75,9 @@ const OverviewDashboard = () => {
         return acc;
       }, []) || [];
 
-      // Fetch transaction trends data
+      // Fetch transaction trends data - using transactions table instead of payment_transactions
       const { data: transactionData } = await supabase
-        .from('payment_transactions')
+        .from('transactions')
         .select('amount, created_at')
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
@@ -86,20 +86,20 @@ const OverviewDashboard = () => {
         const day = new Date(transaction.created_at).toLocaleDateString('en-US', { weekday: 'short' });
         const existingDay = acc.find(item => item.day === day);
         if (existingDay) {
-          existingDay.amount += transaction.amount / 100;
+          existingDay.amount += transaction.amount;
         } else {
-          acc.push({ day, amount: transaction.amount / 100 });
+          acc.push({ day, amount: transaction.amount });
         }
         return acc;
       }, []) || [];
 
-      // Fetch payment methods data
+      // Fetch payment methods data - using payment_methods table instead of stored_payment_methods
       const { data: paymentMethodsData } = await supabase
-        .from('stored_payment_methods')
-        .select('card_brand');
+        .from('payment_methods')
+        .select('brand');
 
       const methodDistribution = paymentMethodsData?.reduce((acc: any[], method) => {
-        const brand = method.card_brand || 'Unknown';
+        const brand = method.brand || 'Unknown';
         const existing = acc.find(item => item.name === brand);
         if (existing) {
           existing.value += 1;
