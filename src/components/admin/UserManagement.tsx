@@ -16,8 +16,8 @@ interface User {
   phone?: string;
   passport_number?: string;
   image_url?: string;
-  verification_status?: string;
   document_type?: string;
+  verification_status?: string;
   created_at: string;
   is_active?: boolean;
   updated_at?: string;
@@ -264,8 +264,15 @@ const UserManagement = () => {
                   <TableCell>
                     <div className="text-sm">
                       <div className="capitalize">{user.document_type || 'passport'}</div>
+                      {user.passport_number && <div className="text-muted-foreground">ID: {user.passport_number}</div>}
                       {user.image_url && (
-                        <div className="text-muted-foreground">Document uploaded</div>
+                        <div className="pt-1">
+                          <img
+                            src={user.image_url}
+                            alt="Document"
+                            className="max-h-14 max-w-28 rounded border border-gray-200"
+                          />
+                        </div>
                       )}
                     </div>
                   </TableCell>

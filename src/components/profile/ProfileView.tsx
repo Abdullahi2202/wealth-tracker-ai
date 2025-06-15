@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,11 +53,11 @@ export default function ProfileView() {
       const combinedProfile: ProfileData = {
         email: profileData.email || user.email || "",
         full_name: profileData.full_name || user.user_metadata?.full_name || "",
-        phone: (profileData as any).phone,
-        passport_number: (profileData as any).passport_number,
-        image_url: (profileData as any).image_url,
-        document_type: (profileData as any).document_type || "passport",
-        verification_status: (profileData as any).verification_status || "unverified"
+        phone: profileData.phone,
+        passport_number: profileData.passport_number,
+        image_url: profileData.image_url,
+        document_type: profileData.document_type || "passport",
+        verification_status: profileData.verification_status || "unverified"
       };
 
       setProfile(combinedProfile);
@@ -126,7 +125,7 @@ export default function ProfileView() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">Verification Status:</span>
             <Badge className={`${getStatusColor(verificationStatus)} border flex items-center gap-1`}>
               {getStatusIcon(verificationStatus)}
@@ -153,7 +152,6 @@ export default function ProfileView() {
                 <p className="text-sm text-muted-foreground">{profile.email}</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-3">
               <Phone className="h-4 w-4 text-muted-foreground" />
               <div>
@@ -185,12 +183,23 @@ export default function ProfileView() {
                 {profile.document_type === "passport" ? "Passport" : "Driver's License"}
               </p>
             </div>
-            
             <div>
-              <p className="text-sm font-medium">Document Number</p>
+              <p className="text-sm font-medium">
+                {profile.document_type === "passport" ? "Passport Number" : "License Number"}
+              </p>
               <p className="text-sm text-muted-foreground">{profile.passport_number || "Not provided"}</p>
             </div>
           </div>
+          {profile.image_url && (
+            <div className="py-2">
+              <p className="text-sm font-medium mb-1">Document Image</p>
+              <img
+                src={profile.image_url}
+                alt="Document"
+                className="rounded-lg max-w-xs border border-gray-200"
+              />
+            </div>
+          )}
 
           {verificationStatus === "rejected" && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
