@@ -38,6 +38,7 @@ export default function ProfileView() {
       }
 
       // Get user profile from profiles table (by user id)
+      // Use 'as' to satisfy TS about the dynamic fields
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
@@ -50,14 +51,17 @@ export default function ProfileView() {
         return;
       }
 
+      // Explicitly type the fetched data as ProfileData
+      const pd = profileData as ProfileData;
+
       const combinedProfile: ProfileData = {
-        email: profileData.email || user.email || "",
-        full_name: profileData.full_name || user.user_metadata?.full_name || "",
-        phone: profileData.phone,
-        passport_number: profileData.passport_number,
-        image_url: profileData.image_url,
-        document_type: profileData.document_type || "passport",
-        verification_status: profileData.verification_status || "unverified"
+        email: pd.email || user.email || "",
+        full_name: pd.full_name || user.user_metadata?.full_name || "",
+        phone: pd.phone,
+        passport_number: pd.passport_number,
+        image_url: pd.image_url,
+        document_type: pd.document_type || "passport",
+        verification_status: pd.verification_status || "unverified"
       };
 
       setProfile(combinedProfile);
