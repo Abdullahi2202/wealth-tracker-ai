@@ -2,38 +2,26 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Payment method type
 export interface PaymentMethod {
   id: string;
-  user_email: string;
-  type: "wallet" | "bank" | "card" | "apple_pay" | "google_pay";
-  details: any;
+  type: string;
   label: string;
+  brand?: string;
+  exp_month?: number;
+  exp_year?: number;
+  details?: any;
   is_active: boolean;
-  created_at: string;
+  default_card?: boolean;
 }
 
-// Helper: Type guard for allowed payment method strings
-function isPaymentMethodType(
-  value: string
-): value is PaymentMethod["type"] {
-  return [
-    "wallet",
-    "bank",
-    "card",
-    "apple_pay",
-    "google_pay",
-  ].includes(value);
-}
-
-// Return array of methods, loading, and addMethod function
 export function usePaymentMethods() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchMethods = async () => {
-      setLoading(true);
+  const fetchMethods = async () => {
+    setLoading(true);
+    try {
+      // Get current user email
       const storedUser = localStorage.getItem("walletmaster_user");
       let email = "";
       if (storedUser) {
@@ -42,36 +30,37 @@ export function usePaymentMethods() {
           email = userObj.email || "";
         } catch {}
       }
+
       if (!email) {
         setMethods([]);
         setLoading(false);
         return;
       }
+
       const { data, error } = await supabase
         .from("payment_methods")
         .select("*")
         .eq("user_email", email)
         .eq("is_active", true)
-        .order("created_at", { ascending: true });
-      if (error || !data) {
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching payment methods:", error);
         setMethods([]);
       } else {
-        // Type-safe mapping to PaymentMethod[]
-        const validMethods: PaymentMethod[] = data
-          .filter((item) => isPaymentMethodType(item.type))
-          .map((item) => ({
-            ...item,
-            type: item.type as PaymentMethod["type"],
-          }));
-        setMethods(validMethods);
+        setMethods(data || []);
       }
-      setLoading(false);
-    };
-    fetchMethods();
-  }, []);
+    } catch (error) {
+      console.error("Error in fetchMethods:", error);
+      setMethods([]);
+    }
+    setLoading(false);
+  };
 
-  // Add new payment method
-  async function addNewMethod(newMethod: Omit<PaymentMethod, "id" | "created_at" | "user_email" | "is_active">) {
+  useEffect(() => {
+    fetchMethods();
+
+    // Set up real-time subscription for payment methods
     const storedUser = localStorage.getItem("walletmaster_user");
     let email = "";
     if (storedUser) {
@@ -80,23 +69,33 @@ export function usePaymentMethods() {
         email = userObj.email || "";
       } catch {}
     }
-    if (!email) {
-      throw new Error("No user found!");
-    }
-    const { data, error } = await supabase.from("payment_methods").insert({
-      ...newMethod,
-      user_email: email,
-      is_active: true,
-    });
-    if (error) {
-      throw error;
-    }
-    // Refetch after adding
-    setTimeout(() => {
-      // Wait a moment for DB write
-      window.location.reload();
-    }, 600);
-  }
 
-  return { methods, loading, addNewMethod };
+    if (!email) return;
+
+    const channel = supabase
+      .channel("payment-methods-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "payment_methods",
+          filter: `user_email=eq.${email}`,
+        },
+        () => {
+          fetchMethods();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  return {
+    methods,
+    loading,
+    refetch: fetchMethods,
+  };
 }

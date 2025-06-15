@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,56 +20,51 @@ export function useWallet() {
 
   const fetchWallet = useCallback(async () => {
     setLoading(true);
-    const storedUser = localStorage.getItem("walletmaster_user");
-    let email = "";
-    if (storedUser) {
-      try {
-        const userObj = JSON.parse(storedUser);
-        email = userObj.email || "";
-      } catch {}
-    }
-    if (!email) {
-      setWallet(null);
-      setLoading(false);
-      return;
-    }
-    // Fetch wallet for user, or create if doesn't exist
-    let { data, error } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("user_email", email)
-      .maybeSingle();
-    if (error) {
-      setWallet(null);
-      setLoading(false);
-      return;
-    }
-    // If wallet doesn't exist, create one
-    if (!data) {
-      const { data: created, error: err } = await supabase
-        .from("wallets")
-        .insert({
-          user_email: email,
-          balance: 0,
-        })
-        .select()
-        .maybeSingle();
-      if (err) {
+    try {
+      const storedUser = localStorage.getItem("walletmaster_user");
+      let email = "";
+      if (storedUser) {
+        try {
+          const userObj = JSON.parse(storedUser);
+          email = userObj.email || "";
+        } catch {}
+      }
+      
+      if (!email) {
+        setWallet(null);
+        setLoading(false);
+        return;
+      }
+
+      // Use the wallet-operations edge function to get balance
+      const { data, error } = await supabase.functions.invoke('wallet-operations', {
+        method: 'GET',
+        body: null,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }, {
+        method: 'GET',
+        params: { action: 'get-balance' }
+      });
+
+      if (error) {
+        console.error("Error fetching wallet:", error);
         setWallet(null);
       } else {
-        setWallet(created);
+        setWallet(data);
       }
-      setLoading(false);
-      return;
+    } catch (error) {
+      console.error("Error in fetchWallet:", error);
+      setWallet(null);
     }
-    setWallet(data);
     setLoading(false);
   }, []);
 
   // Subscribe to real-time wallet balance changes
   useEffect(() => {
     fetchWallet(); // initial load
-    // Listen to SUPABASE real-time wallet updates
+    
     const storedUser = localStorage.getItem("walletmaster_user");
     let email = "";
     if (storedUser) {
@@ -77,9 +73,11 @@ export function useWallet() {
         email = userObj.email || "";
       } catch {}
     }
+    
     if (!email) return;
+    
     const channel = supabase
-      .channel("schema-db-changes")
+      .channel("wallet-changes")
       .on(
         "postgres_changes",
         {
@@ -93,31 +91,58 @@ export function useWallet() {
         }
       )
       .subscribe();
+      
     return () => {
       supabase.removeChannel(channel);
     };
   }, [fetchWallet]);
 
-  // Refetch utility and balanceUpdater
-  const updateWalletBalance = useCallback(
-    async (amountDelta: number) => {
-      if (!wallet) return false;
-      const { data, error } = await supabase
-        .from("wallets")
-        .update({
-          balance: (Number(wallet.balance) + Number(amountDelta)),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", wallet.id)
-        .select()
-        .maybeSingle();
-      if (!error && data) {
+  // Add funds to wallet using edge function
+  const addFunds = useCallback(
+    async (amount: number, source?: string, description?: string) => {
+      try {
+        const { data, error } = await supabase.functions.invoke('wallet-operations', {
+          body: { amount, source, description },
+          headers: { 'Content-Type': 'application/json' },
+        }, {
+          method: 'POST',
+          params: { action: 'add-funds' }
+        });
+
+        if (error) throw error;
+        
         setWallet(data);
         return true;
+      } catch (error) {
+        console.error("Error adding funds:", error);
+        return false;
       }
-      return false;
     },
-    [wallet]
+    []
+  );
+
+  // Send payment using edge function
+  const sendPayment = useCallback(
+    async (recipient: string, amount: number, note?: string) => {
+      try {
+        const { data, error } = await supabase.functions.invoke('wallet-operations', {
+          body: { recipient, sendAmount: amount, note },
+          headers: { 'Content-Type': 'application/json' },
+        }, {
+          method: 'POST',
+          params: { action: 'send-payment' }
+        });
+
+        if (error) throw error;
+        
+        await fetchWallet(); // Refresh wallet data
+        return true;
+      } catch (error) {
+        console.error("Error sending payment:", error);
+        return false;
+      }
+    },
+    [fetchWallet]
   );
 
   return {
@@ -125,6 +150,7 @@ export function useWallet() {
     balance: wallet?.balance ?? 0,
     loading,
     refetch: fetchWallet,
-    updateWalletBalance,
+    addFunds,
+    sendPayment,
   };
 }

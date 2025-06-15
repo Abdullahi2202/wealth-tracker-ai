@@ -1,15 +1,14 @@
+
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import { useWallet } from "@/hooks/useWallet";
 
 const CATEGORY_OPTIONS = [
   "Transfer", "Food", "Bills", "Shopping", "Transport", "Misc"
@@ -29,57 +28,53 @@ const SendPayment = () => {
   const [loading, setLoading] = useState(false);
 
   const { methods } = usePaymentMethods();
+  const { sendPayment, wallet, balance } = useWallet();
   const navigate = useNavigate();
 
   // Set default method when available
   useEffect(() => {
     if (!fromMethod && methods.length > 0) setFromMethod(methods[0].id);
-  }, [methods]);
+  }, [methods, fromMethod]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountValue = parseFloat(amount);
+    
     if (!amountValue || amountValue <= 0) {
       toast.error("Please enter a valid amount.");
       return;
     }
+    
     if (!recipient) {
-      toast.error("Enter recipient card number or ID.");
+      toast.error("Enter recipient email or ID.");
       return;
     }
-    if (!fromMethod) {
-      toast.error("Choose a payment method.");
+
+    if (balance < amountValue) {
+      toast.error("Insufficient wallet balance.");
       return;
     }
+    
     setLoading(true);
-    const storedUser = localStorage.getItem("walletmaster_user");
-    let email = "";
-    if (storedUser) {
-      try {
-        const userObj = JSON.parse(storedUser);
-        email = userObj.email || "";
-      } catch { email = ""; }
+
+    try {
+      const success = await sendPayment(recipient, amountValue, note);
+      
+      if (success) {
+        toast.success(`Payment of $${amountValue.toFixed(2)} sent to ${recipient}!`);
+        setAmount("");
+        setRecipient("");
+        setNote("");
+        setTag("");
+      } else {
+        toast.error("Failed to send payment. Please try again.");
+      }
+    } catch (error) {
+      console.error("Send payment error:", error);
+      toast.error("Failed to send payment. Please try again.");
     }
-    await supabase.from("transactions").insert({
-      amount: amountValue,
-      type: "expense",
-      name: "Manual Send",
-      category,
-      tag: tag || null,
-      note: note || null,
-      date: new Date().toISOString().split("T")[0],
-      email,
-      source_method_id: fromMethod || null,
-      recipient_email: recipient,
-    });
-    setTimeout(() => {
-      toast.success(`Payment of $${amountValue.toFixed(2)} sent!`);
-      setLoading(false);
-      setAmount("");
-      setRecipient("");
-      setNote("");
-      setTag("");
-    }, 1000);
+    
+    setLoading(false);
   };
 
   return (
@@ -93,31 +88,45 @@ const SendPayment = () => {
       <Card className="max-w-md mx-auto shadow-lg rounded-2xl animate-scale-in">
         <CardHeader>
           <CardTitle>Send Money</CardTitle>
-          <CardDescription>Transfer money to another card instantly.</CardDescription>
+          <CardDescription>
+            Transfer money from your wallet. Available balance: ${balance.toFixed(2)}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSend} className="space-y-5">
-            <PaymentMethodPicker value={fromMethod} onChange={setFromMethod} />
             <div>
-              <label className="block text-sm mb-1">Recipient (Card/email/ID)</label>
+              <label className="block text-sm mb-1">From Wallet</label>
+              <div className="p-3 border rounded-md bg-gray-50">
+                <div className="text-sm text-gray-600">Current Balance</div>
+                <div className="text-lg font-semibold">${balance.toFixed(2)}</div>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm mb-1">Recipient Email</label>
               <Input
-                type="text"
-                placeholder="Enter recipient"
+                type="email"
+                placeholder="Enter recipient email"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                autoFocus
+                required
               />
             </div>
+            
             <div>
               <label className="block text-sm mb-1">Amount</label>
               <Input
                 type="number"
                 min={0}
+                step="0.01"
+                max={balance}
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                required
               />
             </div>
+            
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="block text-xs">Category</label>
@@ -141,6 +150,7 @@ const SendPayment = () => {
                 </select>
               </div>
             </div>
+            
             <div>
               <label className="block text-xs">Note</label>
               <Input
@@ -151,12 +161,14 @@ const SendPayment = () => {
               />
             </div>
 
-            <Button type="submit" className="w-full mt-4" disabled={loading}> {loading ? "Sending..." : "Send Payment"} </Button>
+            <Button 
+              type="submit" 
+              className="w-full mt-4" 
+              disabled={loading || balance < parseFloat(amount || "0")}
+            >
+              {loading ? "Sending..." : "Send Payment"}
+            </Button>
           </form>
-          {/* Recurring/Scheduled/FaceID Placeholder */}
-          <div className="mt-4 text-center text-xs text-muted-foreground">
-            <strong>Coming soon:</strong> <span>Schedule/Recurring Payments • FaceID Auth</span>
-          </div>
         </CardContent>
       </Card>
     </div>

@@ -8,31 +8,19 @@ schemas = ["public", "storage", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
-[db]
-port = 54322
-major_version = 15
-
-[studio]
-enabled = true
-port = 54323
-
-[inbucket]
-enabled = true
-port = 54324
-smtp_port = 54325
-pop3_port = 54326
-
-[storage]
-enabled = true
-file_size_limit = "50MiB"
-
 [auth]
 enabled = true
+port = 54324
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
 enable_signup = true
-enable_confirmations = false
+enable_anonymous_sign_ins = false
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
 
 [functions.user-management]
 verify_jwt = false
@@ -40,11 +28,19 @@ verify_jwt = false
 [functions.payment-processing]
 verify_jwt = false
 
-[functions.admin-operations]
-verify_jwt = true
-
 [functions.webhook-handler]
+verify_jwt = false
+
+[functions.admin-operations]
 verify_jwt = false
 
 [functions.add-stripe-card]
 verify_jwt = false
+
+[functions.wallet-operations]
+verify_jwt = false
+
+[storage]
+enabled = true
+port = 54323
+file_size_limit = "50MiB"
