@@ -69,8 +69,8 @@ const VerifyIdentity = () => {
           cacheControl: "3600",
           upsert: true,
         });
+
       if (error) {
-        // More detailed error for mobile debug
         console.error("Supabase storage upload error:", error);
         toast.error(`Upload failed: ${error.message || "Unknown storage error."}`);
         setUploading(false);
@@ -82,20 +82,22 @@ const VerifyIdentity = () => {
         setUploading(false);
         return;
       }
-      const { data: url, error: urlError } = await supabase.storage
+
+      // getPublicUrl does not return error, only data
+      const urlResult = supabase.storage
         .from("identity-documents")
         .getPublicUrl(`${userEmail}/${fileName}`);
 
-      if (urlError) {
-        console.error("Error getting public URL:", urlError);
+      const publicUrl = urlResult?.data?.publicUrl || null;
+
+      if (!publicUrl) {
+        console.error("Could not get public URL for uploaded file.");
         toast.error("Error getting file URL. Please contact support.");
         setUploading(false);
         return;
       }
-      const publicUrl = url?.publicUrl || null;
 
       // Update registration table
-      // Confirm your table is called "registration" and not "registrations"
       const { error: updateError } = await supabase
         .from("registration")
         .update({
