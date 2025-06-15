@@ -40,9 +40,10 @@ const Login = () => {
 
   const checkUserVerification = async (userEmail: string) => {
     try {
+      // Check verification status in registrations table
       const { data, error } = await supabase
-        .from('users')
-        .select('is_verified')
+        .from('registrations')
+        .select('verification_status')
         .eq('email', userEmail)
         .single();
 
@@ -51,7 +52,7 @@ const Login = () => {
         return false;
       }
 
-      return data?.is_verified || false;
+      return data?.verification_status === 'verified';
     } catch (error) {
       console.error("Error checking user verification:", error);
       return false;

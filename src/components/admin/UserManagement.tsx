@@ -17,9 +17,9 @@ interface User {
   phone?: string;
   passport_number?: string;
   image_url?: string;
-  is_verified?: boolean;
+  verification_status?: string;
+  document_type?: string;
   created_at: string;
-  updated_at: string;
 }
 
 const UserManagement = () => {
@@ -34,9 +34,9 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      // Fetch from the users table directly
+      // Fetch from the registrations table where users are actually stored
       const { data, error } = await supabase
-        .from('users')
+        .from('registrations')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -46,7 +46,7 @@ const UserManagement = () => {
         return;
       }
 
-      console.log('Fetched users:', data);
+      console.log('Fetched users from registrations:', data);
       setUsers(data || []);
     } catch (error) {
       console.error('Error:', error);
@@ -59,8 +59,8 @@ const UserManagement = () => {
   const handleVerifyUser = async (userId: string) => {
     try {
       const { error } = await supabase
-        .from('users')
-        .update({ is_verified: true })
+        .from('registrations')
+        .update({ verification_status: 'verified' })
         .eq('id', userId);
 
       if (error) {
@@ -84,7 +84,7 @@ const UserManagement = () => {
 
     try {
       const { error } = await supabase
-        .from('users')
+        .from('registrations')
         .delete()
         .eq('id', userId);
 
@@ -103,7 +103,7 @@ const UserManagement = () => {
   };
 
   const getStatusBadge = (user: User) => {
-    if (user.is_verified) {
+    if (user.verification_status === 'verified') {
       return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Verified</Badge>;
     }
     return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
@@ -115,8 +115,8 @@ const UserManagement = () => {
                          user.phone?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || 
-                         (statusFilter === "verified" && user.is_verified) ||
-                         (statusFilter === "pending" && !user.is_verified);
+                         (statusFilter === "verified" && user.verification_status === 'verified') ||
+                         (statusFilter === "pending" && user.verification_status !== 'verified');
     
     return matchesSearch && matchesStatus;
   });
@@ -187,7 +187,7 @@ const UserManagement = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-green-600">
-              {users.filter(u => u.is_verified).length}
+              {users.filter(u => u.verification_status === 'verified').length}
             </div>
             <p className="text-sm text-muted-foreground">Verified</p>
           </CardContent>
@@ -195,7 +195,7 @@ const UserManagement = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-yellow-600">
-              {users.filter(u => !u.is_verified).length}
+              {users.filter(u => u.verification_status !== 'verified').length}
             </div>
             <p className="text-sm text-muted-foreground">Pending</p>
           </CardContent>
@@ -213,6 +213,7 @@ const UserManagement = () => {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Contact</TableHead>
+                <TableHead>Document</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Actions</TableHead>
@@ -244,6 +245,14 @@ const UserManagement = () => {
                       )}
                     </div>
                   </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div className="capitalize">{user.document_type || 'passport'}</div>
+                      {user.image_url && (
+                        <div className="text-muted-foreground">Document uploaded</div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{getStatusBadge(user)}</TableCell>
                   <TableCell>
                     {format(new Date(user.created_at), 'MMM dd, yyyy')}
@@ -253,7 +262,7 @@ const UserManagement = () => {
                       <Button variant="outline" size="sm">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {!user.is_verified && (
+                      {user.verification_status !== 'verified' && (
                         <Button 
                           variant="outline" 
                           size="sm"
