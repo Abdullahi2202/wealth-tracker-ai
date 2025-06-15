@@ -1,13 +1,14 @@
 
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  Home, CreditCard, BarChart3, User
+  Home, CreditCard, BarChart3, User, Bot
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { name: "Home", icon: Home, path: "/dashboard" },
   { name: "Payments", icon: CreditCard, path: "/payments/home" },
   { name: "Analytics", icon: BarChart3, path: "/transactions" },
+  { name: "Assistant", icon: Bot, path: "/assistant" },
   { name: "Profile", icon: User, path: "/profile" }
 ];
 
@@ -24,7 +25,7 @@ const MobileNavigation = () => {
         return (
           <button
             key={item.name}
-            className="flex flex-col items-center justify-center w-1/4 p-1 group focus:outline-none transition-all duration-200"
+            className="flex flex-col items-center justify-center flex-1 p-1 group focus:outline-none transition-all duration-200"
             onClick={() => navigate(item.path)}
             aria-current={isActive ? "page" : undefined}
           >
@@ -35,11 +36,11 @@ const MobileNavigation = () => {
                   : "text-gray-500 group-hover:text-blue-600 group-hover:bg-blue-50"
               }`}
               style={{
-                width: isActive ? 42 : 36,
-                height: isActive ? 42 : 36,
+                width: isActive ? 36 : 32,
+                height: isActive ? 36 : 32,
               }}
             >
-              <item.icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+              <item.icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
             </div>
             <span className={`mt-1 text-xs font-medium transition-colors ${
               isActive ? "text-blue-600" : "text-gray-500 group-hover:text-blue-600"
