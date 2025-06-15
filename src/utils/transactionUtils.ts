@@ -29,41 +29,51 @@ export async function createAndLogTransaction({
   scheduledFor?: string;
   tag?: string;
 }) {
-  // Insert transaction
-  const { data, error } = await supabase.from("transactions").insert([{
-    email: userEmail,
+  // Insert transaction with explicit typing
+  const { data: transactionData, error: transactionError } = await supabase.from("transactions").insert([{
+    user_id: userEmail,
     amount,
     type: transactionType,
     name,
     category,
     date: date ? date : new Date().toISOString().slice(0,10),
-    source_method_id: sourceMethodId,
-    recipient_email: recipientEmail,
-    sender_email: senderEmail,
+    payment_method_id: sourceMethodId,
+    recipient_user_id: recipientEmail,
     note,
     scheduled_for: scheduledFor,
-    tag,
   }]);
 
   // Update wallet if relevant
-  if (!error) {
+  if (!transactionError) {
     // Only update wallet for wallet-based transactions
     if (sourceMethodId) {
-      // Fetch payment method to see if this is wallet
-      const pmRes = await supabase.from("payment_methods").select("*").eq("id", sourceMethodId).maybeSingle();
-      const paymentMethod = pmRes.data;
+      // Fetch payment method to see if this is wallet with explicit typing
+      const { data: paymentMethodData } = await supabase
+        .from("payment_methods")
+        .select("*")
+        .eq("id", sourceMethodId)
+        .maybeSingle();
+      
+      const paymentMethod = paymentMethodData;
       if (paymentMethod && paymentMethod.type === "wallet") {
-        // Find user's wallet
-        let walletEmail = transactionType === "income"
+        // Find user's wallet with explicit typing
+        let walletUserId = transactionType === "income"
           ? (recipientEmail || userEmail)
           : userEmail;
-        const walRes = await supabase.from("wallets").select("*").eq("user_email", walletEmail).maybeSingle();
-        const wallet = walRes.data;
+        
+        const { data: walletData } = await supabase
+          .from("wallets")
+          .select("*")
+          .eq("user_id", walletUserId)
+          .maybeSingle();
+        
+        const wallet = walletData;
         if (wallet) {
           const newBalance =
             transactionType === "income"
               ? Number(wallet.balance) + Number(amount)
               : Number(wallet.balance) - Number(amount);
+              
           await supabase
             .from("wallets")
             .update({
@@ -76,5 +86,5 @@ export async function createAndLogTransaction({
     }
     return { success: true, error: null };
   }
-  return { success: false, error };
+  return { success: false, error: transactionError };
 }

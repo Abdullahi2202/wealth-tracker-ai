@@ -14,6 +14,7 @@ import ActivityTracking from "@/components/admin/ActivityTracking";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Shield, LogOut, Menu } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 
 const AdminDashboard = () => {
   const [currentAdmin, setCurrentAdmin] = useState<string | null>(null);
@@ -49,16 +50,17 @@ const AdminDashboard = () => {
 
       // Check Supabase session as fallback
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         
-        if (!session?.user) {
+        if (sessionError || !sessionData?.session?.user) {
           console.log("No session found, redirecting to login");
           toast.error("Please sign in to access admin panel.");
           navigate("/login");
           return;
         }
         
-        const userEmail = session.user.email!;
+        const session: Session = sessionData.session;
+        const userEmail: string = session.user.email!;
         console.log("Supabase user email:", userEmail);
         setCurrentAdmin(userEmail);
 
@@ -67,7 +69,7 @@ const AdminDashboard = () => {
           const { data } = await supabase
             .from("user_roles")
             .select("role")
-            .eq("email", userEmail)
+            .eq("user_id", session.user.id)
             .maybeSingle();
 
           console.log("User role data:", data);

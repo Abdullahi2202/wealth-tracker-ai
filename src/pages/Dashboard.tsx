@@ -46,15 +46,22 @@ const Dashboard = () => {
 
     const fetchTransactions = async () => {
       setLoading(true);
-      // Fetch all user's transactions from Supabase
-      const { data, error } = await supabase
+      // Fetch all user's transactions from Supabase with explicit typing
+      const { data: transactionData, error } = await supabase
         .from("transactions")
         .select("id, amount, type, date")
-        .eq("email", userEmail)
+        .eq("user_id", userEmail)
         .order("date", { ascending: false });
 
-      if (!error && Array.isArray(data)) {
-        setTransactions(data);
+      if (!error && Array.isArray(transactionData)) {
+        const typedTransactions: Transaction[] = transactionData.map(item => ({
+          id: item.id,
+          amount: Number(item.amount),
+          type: String(item.type),
+          date: String(item.date)
+        }));
+        
+        setTransactions(typedTransactions);
 
         // Calculate current month
         const now = new Date();
@@ -65,7 +72,7 @@ const Dashboard = () => {
         let monthlyIncome = 0;
         let monthlyExpenses = 0;
 
-        data.forEach((txn) => {
+        typedTransactions.forEach((txn) => {
           const txnDate = new Date(txn.date);
           if (txn.type === "income") {
             balance += Number(txn.amount);
