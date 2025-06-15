@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -50,19 +49,20 @@ export function VerifyIdentityForm() {
           upsert: true,
         });
 
-      if (storageError) {
-        if (storageError.message.includes("violates row-level security")) {
+      // Add better logging here
+      if (storageError || !data) {
+        console.error("Supabase storage upload error:", storageError);
+        console.error("Supabase storage upload result:", data);
+
+        if (storageError?.message?.includes("violates row-level security")) {
           toast.error("Storage upload failed due to security policy. Please contact support.");
-        } else if (storageError.message.includes("bucket")) {
+        } else if (storageError && storageError?.message?.includes("bucket")) {
           toast.error("Storage bucket not found. Please contact support.");
-        } else {
+        } else if (storageError) {
           toast.error(`Upload failed: ${storageError.message || "Unknown storage error."}`);
+        } else {
+          toast.error("Upload failed, please try again.");
         }
-        setUploading(false);
-        return;
-      }
-      if (!data) {
-        toast.error("Upload failed, please try again.");
         setUploading(false);
         return;
       }
@@ -100,6 +100,7 @@ export function VerifyIdentityForm() {
       toast.success("Your document was submitted for verification!");
       setTimeout(() => navigate("/profile"), 1200);
     } catch (error: any) {
+      console.error("Generic upload catch error:", error);
       toast.error("Upload failed: " + (error?.message || "Unknown error."));
     } finally {
       setUploading(false);
