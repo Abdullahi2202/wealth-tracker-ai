@@ -69,43 +69,45 @@ const TransactionCharts = () => {
           .select('name, color, icon')
           .eq('is_active', true);
 
-        // Build category colors map
+        // Build category colors map with explicit typing
         const colorsMap: Record<string, string> = { ...fallbackCategoryColors };
-        categoriesData?.forEach((category: Category) => {
-          colorsMap[category.name] = category.color;
-        });
+        if (categoriesData) {
+          categoriesData.forEach((category) => {
+            colorsMap[category.name] = category.color;
+          });
+        }
         setCategoryColors(colorsMap);
 
-        // Fetch transactions
+        // Fetch transactions with explicit typing
         const { data: transactions, error } = await supabase
           .from("transactions")
           .select("id, amount, category, type")
           .eq("email", email);
 
-        if (!error && Array.isArray(transactions)) {
-          // Process income and expense data
-          const incomeMap: Record<string, number> = {};
-          const expenseMap: Record<string, number> = {};
+        if (!error && transactions) {
+          // Process income and expense data with explicit typing
+          const incomeMap = new Map<string, number>();
+          const expenseMap = new Map<string, number>();
 
-          transactions.forEach((tx: Transaction) => {
-            const category = tx.category && colorsMap[tx.category] ? tx.category : "Miscellaneous";
+          transactions.forEach((tx) => {
+            const category = (tx.category && colorsMap[tx.category]) ? tx.category : "Miscellaneous";
             const amount = Number(tx.amount);
             
             if (tx.type === "income") {
-              incomeMap[category] = (incomeMap[category] || 0) + amount;
+              incomeMap.set(category, (incomeMap.get(category) || 0) + amount);
             } else if (tx.type === "expense") {
-              expenseMap[category] = (expenseMap[category] || 0) + amount;
+              expenseMap.set(category, (expenseMap.get(category) || 0) + amount);
             }
           });
 
-          const incomeChartData = Object.entries(incomeMap).map(([name, value]) => ({
+          const incomeChartData: ChartData[] = Array.from(incomeMap.entries()).map(([name, value]) => ({
             name,
             value,
             color: colorsMap[name] || "#6b7280",
             icon: name,
           }));
 
-          const expenseChartData = Object.entries(expenseMap).map(([name, value]) => ({
+          const expenseChartData: ChartData[] = Array.from(expenseMap.entries()).map(([name, value]) => ({
             name,
             value,
             color: colorsMap[name] || "#6b7280",
