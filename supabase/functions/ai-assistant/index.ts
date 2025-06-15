@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, context } = await req.json();
+    const { prompt, context, userInfo } = await req.json();
 
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
@@ -31,9 +31,16 @@ serve(async (req) => {
 - Security and verification concerns
 - General financial literacy
 
-Be concise, helpful, and professional. Always prioritize user security and provide accurate financial guidance. If you don't know something specific about the WalletMaster app, say so and suggest contacting support.
+User Context:
+${userInfo ? `
+- User Name: ${userInfo.name || 'Not provided'}
+- User Email: ${userInfo.email || 'Not provided'}
+- Account Type: ${userInfo.isAdmin ? 'Administrator' : 'Regular User'}
+` : 'No user information available'}
 
-Current context: ${context || 'general assistance'}`;
+Be concise, helpful, and professional. Always prioritize user security and provide accurate financial guidance. You can reference the user by name when appropriate to make the conversation more personal. If you don't know something specific about the WalletMaster app, say so and suggest contacting support.
+
+${context || 'General assistance context'}`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

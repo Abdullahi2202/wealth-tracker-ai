@@ -14,6 +14,13 @@ interface Message {
   timestamp: Date;
 }
 
+interface UserContext {
+  email?: string;
+  full_name?: string;
+  id?: string;
+  isAdmin?: boolean;
+}
+
 export default function AIChatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -25,6 +32,7 @@ export default function AIChatbot() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [userContext, setUserContext] = useState<UserContext>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -34,6 +42,24 @@ export default function AIChatbot() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Get user context from localStorage
+    const storedUser = localStorage.getItem("walletmaster_user");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        setUserContext({
+          email: user.email,
+          full_name: user.full_name,
+          id: user.id,
+          isAdmin: user.isAdmin
+        });
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
+    }
+  }, []);
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -50,10 +76,25 @@ export default function AIChatbot() {
     setIsLoading(true);
 
     try {
+      // Create enhanced context with user information
+      const enhancedContext = `
+        User Information:
+        - Name: ${userContext.full_name || 'Unknown'}
+        - Email: ${userContext.email || 'Unknown'}
+        - User Type: ${userContext.isAdmin ? 'Admin' : 'Regular User'}
+        
+        Context: Financial assistant for WalletMaster app - User is asking for help with their wallet and financial management.
+      `;
+
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: { 
           prompt: input.trim(),
-          context: "financial assistant for WalletMaster app"
+          context: enhancedContext,
+          userInfo: {
+            name: userContext.full_name,
+            email: userContext.email,
+            isAdmin: userContext.isAdmin
+          }
         },
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +143,9 @@ export default function AIChatbot() {
           <Bot className="w-8 h-8" />
           <div>
             <h2 className="text-xl font-semibold">WalletMaster AI Assistant</h2>
-            <p className="text-blue-100 text-sm">Your personal financial advisor</p>
+            <p className="text-blue-100 text-sm">
+              {userContext.full_name ? `Hello ${userContext.full_name}! ` : ''}Your personal financial advisor
+            </p>
           </div>
         </div>
       </div>
