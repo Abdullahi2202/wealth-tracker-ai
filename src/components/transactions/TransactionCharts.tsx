@@ -1,3 +1,4 @@
+
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -80,42 +81,50 @@ const TransactionCharts = () => {
           .eq("email", email);
 
         if (!error && rawTransactions) {
-          // Convert raw data to our Transaction type
-          const transactions: Array<{ amount: number; category: string | null; type: string }> = rawTransactions.map(tx => ({
-            amount: Number(tx.amount),
-            category: tx.category,
-            type: tx.type
-          }));
+          // Convert raw data to simple transaction objects
+          const transactions = rawTransactions.map(tx => {
+            return {
+              amount: Number(tx.amount),
+              category: tx.category,
+              type: tx.type
+            };
+          });
 
-          // Process income and expense data
-          const incomeMap = new Map<string, number>();
-          const expenseMap = new Map<string, number>();
+          // Process income and expense data using simple objects
+          const incomeCategories: Record<string, number> = {};
+          const expenseCategories: Record<string, number> = {};
 
           transactions.forEach(tx => {
             const categoryName = (tx.category && colorsMap[tx.category]) ? tx.category : "Miscellaneous";
             const amount = tx.amount;
             
             if (tx.type === "income") {
-              incomeMap.set(categoryName, (incomeMap.get(categoryName) || 0) + amount);
+              incomeCategories[categoryName] = (incomeCategories[categoryName] || 0) + amount;
             } else if (tx.type === "expense") {
-              expenseMap.set(categoryName, (expenseMap.get(categoryName) || 0) + amount);
+              expenseCategories[categoryName] = (expenseCategories[categoryName] || 0) + amount;
             }
           });
 
-          // Convert to chart data
-          const incomeChartData: ChartData[] = Array.from(incomeMap.entries()).map(([name, value]) => ({
-            name,
-            value,
-            color: colorsMap[name] || "#6b7280",
-            icon: name,
-          }));
+          // Convert to chart data with explicit typing
+          const incomeChartData: ChartData[] = [];
+          for (const categoryName in incomeCategories) {
+            incomeChartData.push({
+              name: categoryName,
+              value: incomeCategories[categoryName],
+              color: colorsMap[categoryName] || "#6b7280",
+              icon: categoryName,
+            });
+          }
 
-          const expenseChartData: ChartData[] = Array.from(expenseMap.entries()).map(([name, value]) => ({
-            name,
-            value,
-            color: colorsMap[name] || "#6b7280",
-            icon: name,
-          }));
+          const expenseChartData: ChartData[] = [];
+          for (const categoryName in expenseCategories) {
+            expenseChartData.push({
+              name: categoryName,
+              value: expenseCategories[categoryName],
+              color: colorsMap[categoryName] || "#6b7280",
+              icon: categoryName,
+            });
+          }
 
           setIncomeData(incomeChartData);
           setExpenseData(expenseChartData);
