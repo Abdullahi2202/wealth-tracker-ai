@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { ArrowLeft } from "lucide-react";
 
 const VerifyIdentity = () => {
   const [documentType, setDocumentType] = useState<"passport" | "license">("passport");
@@ -68,7 +69,19 @@ const VerifyIdentity = () => {
           cacheControl: "3600",
           upsert: true,
         });
-      if (error) throw error;
+      if (error) {
+        // Provide full detail for easy debugging
+        console.error("Supabase storage upload error:", error);
+        toast.error("Upload failed, please try again. Ensure your file is JPEG, JPG, or PNG and less than 5MB.");
+        setUploading(false);
+        return;
+      }
+      if (!data) {
+        console.error("No data returned from storage upload.");
+        toast.error("Upload failed, please try again.");
+        setUploading(false);
+        return;
+      }
       const { data: url } = await supabase.storage
         .from("identity-documents")
         .getPublicUrl(`${userEmail}/${fileName}`);
@@ -84,11 +97,17 @@ const VerifyIdentity = () => {
           verification_status: "pending",
         })
         .eq("email", userEmail);
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Supabase registration update error:", updateError);
+        toast.error("Failed to update registration, please contact support.");
+        setUploading(false);
+        return;
+      }
 
       toast.success("Document submitted for verification!");
       navigate("/profile");
     } catch (error) {
+      console.error("Unexpected upload error:", error);
       toast.error("Upload failed, please try again.");
     } finally {
       setUploading(false);
@@ -98,9 +117,19 @@ const VerifyIdentity = () => {
   return (
     <div className="min-h-screen flex justify-center items-center bg-muted">
       <Card className="max-w-md w-full shadow-lg">
-        <CardHeader>
-          <CardTitle>Identity Verification</CardTitle>
-          <CardDescription>
+        <CardHeader className="relative pb-3">
+          <button
+            className="absolute left-2 top-2 flex items-center text-muted-foreground hover:text-primary transition-colors"
+            type="button"
+            onClick={() => navigate(-1)}
+            aria-label="Go back"
+            style={{ background: "none", border: "none", padding: 0 }}
+          >
+            <ArrowLeft className="h-5 w-5 mr-1" aria-hidden="true" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
+          <CardTitle className="pl-8">Identity Verification</CardTitle>
+          <CardDescription className="pl-8">
             Upload your identity document to verify your account.
           </CardDescription>
         </CardHeader>
