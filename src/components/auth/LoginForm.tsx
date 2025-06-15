@@ -51,7 +51,7 @@ const Login = () => {
         }
 
         toast.success("Admin logged in successfully!");
-        navigate("/admin");
+        navigate("/admin-dashboard");
         return true;
       }
       return false;
