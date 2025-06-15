@@ -16,39 +16,43 @@ export function useUserRole() {
       }
       
       try {
-        // First get user ID from users table
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("id")
-          .eq("email", session.user.email)
-          .single();
+        // Use the new get_user_role function to avoid recursion
+        const { data: roleData, error } = await supabase
+          .rpc('get_user_role', { user_uuid: session.user.id });
 
-        if (userError || !userData) {
-          console.error("Error finding user:", userError);
-          setRole(null);
+        if (error) {
+          console.error("Error fetching role:", error);
+          // Fallback: check if user is hardcoded admin
+          if (session.user.email === "kingabdalla982@gmail.com") {
+            setRole("admin");
+          } else {
+            setRole("user");
+          }
           return;
         }
 
-        // Then get role from user_roles table
-        const { data: roleData, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userData.id)
-          .single();
-
-        if (roleError) {
-          console.error("Error fetching role:", roleError);
-          setRole(null);
-          return;
+        const userRole = roleData;
+        if (userRole === "admin") {
+          setRole("admin");
+        } else if (userRole === "user") {
+          setRole("user");
+        } else {
+          // Default to user if no role found, or admin for hardcoded email
+          if (session.user.email === "kingabdalla982@gmail.com") {
+            setRole("admin");
+          } else {
+            setRole("user");
+          }
         }
-
-        const userRole = roleData?.role;
-        if (userRole === "admin") setRole("admin");
-        else if (userRole === "user") setRole("user");
-        else setRole(null);
       } catch (error) {
         console.error("Error in fetchRole:", error);
-        setRole(null);
+        // Fallback: check if user is hardcoded admin
+        const session_data = await supabase.auth.getSession();
+        if (session_data.data.session?.user?.email === "kingabdalla982@gmail.com") {
+          setRole("admin");
+        } else {
+          setRole("user");
+        }
       }
     }
     fetchRole();
