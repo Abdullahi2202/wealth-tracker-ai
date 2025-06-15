@@ -1,3 +1,4 @@
+
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -12,50 +13,6 @@ interface Transaction {
   date: string;
   type: "income" | "expense";
 }
-
-// Sample data
-const transactions: Transaction[] = [
-  {
-    id: "t1",
-    name: "Grocery Store",
-    category: "Food",
-    amount: 85.25,
-    date: "2025-05-10",
-    type: "expense",
-  },
-  {
-    id: "t2",
-    name: "Salary Deposit",
-    category: "Income",
-    amount: 3200,
-    date: "2025-05-08",
-    type: "income",
-  },
-  {
-    id: "t3",
-    name: "Restaurant",
-    category: "Food",
-    amount: 32.50,
-    date: "2025-05-07",
-    type: "expense",
-  },
-  {
-    id: "t4",
-    name: "Taxi",
-    category: "Transport",
-    amount: 12.80,
-    date: "2025-05-06",
-    type: "expense",
-  },
-  {
-    id: "t5",
-    name: "Freelance Payment",
-    category: "Income",
-    amount: 380,
-    date: "2025-05-05",
-    type: "income",
-  },
-];
 
 const RecentTransactions = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
