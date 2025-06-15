@@ -12,101 +12,47 @@ Deno.serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { method, url } = req
-    const urlObj = new URL(url)
-    const action = urlObj.searchParams.get('action')
+    const { method } = req
 
-    // Verify admin access
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('Authorization required')
-    }
+    console.log('Admin operations request method:', method)
 
     switch (method) {
       case 'GET':
-        if (action === 'dashboard-stats') {
-          // Get comprehensive dashboard statistics
-          const [usersResult, walletsResult, transactionsResult, paymentsResult] = await Promise.all([
-            supabase.from('users').select('id, created_at, is_verified'),
-            supabase.from('user_wallets').select('balance'),
-            supabase.from('transaction_logs').select('amount, transaction_type, created_at'),
-            supabase.from('payment_transactions').select('amount, status, created_at')
-          ])
+        // Default to returning dashboard stats
+        console.log('Fetching dashboard statistics...')
+        
+        // Get comprehensive dashboard statistics
+        const [usersResult, walletsResult, transactionsResult, paymentsResult] = await Promise.all([
+          supabase.from('users').select('id, created_at, is_verified'),
+          supabase.from('user_wallets').select('balance'),
+          supabase.from('transaction_logs').select('amount, transaction_type, created_at'),
+          supabase.from('payment_transactions').select('amount, status, created_at')
+        ])
 
-          const stats = {
-            total_users: usersResult.data?.length || 0,
-            verified_users: usersResult.data?.filter(u => u.is_verified).length || 0,
-            total_wallet_balance: walletsResult.data?.reduce((sum, w) => sum + w.balance, 0) || 0,
-            total_transactions: transactionsResult.data?.length || 0,
-            total_payments: paymentsResult.data?.length || 0,
-            successful_payments: paymentsResult.data?.filter(p => p.status === 'succeeded').length || 0,
-            recent_signups: usersResult.data?.filter(u => 
-              new Date(u.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-            ).length || 0
-          }
-
-          return new Response(JSON.stringify(stats), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
+        const stats = {
+          total_users: usersResult.data?.length || 0,
+          verified_users: usersResult.data?.filter(u => u.is_verified).length || 0,
+          total_wallet_balance: walletsResult.data?.reduce((sum, w) => sum + w.balance, 0) || 0,
+          total_transactions: transactionsResult.data?.length || 0,
+          total_payments: paymentsResult.data?.length || 0,
+          successful_payments: paymentsResult.data?.filter(p => p.status === 'succeeded' || p.status === 'completed').length || 0,
+          recent_signups: usersResult.data?.filter(u => 
+            new Date(u.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          ).length || 0
         }
 
-        if (action === 'all-users') {
-          const { data: users, error } = await supabase
-            .from('users')
-            .select(`
-              *,
-              user_wallets(balance, currency, is_frozen),
-              stored_payment_methods(count),
-              payment_transactions(count),
-              transaction_logs(count)
-            `)
-            .order('created_at', { ascending: false })
-
-          if (error) throw error
-
-          return new Response(JSON.stringify(users), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
-
-        if (action === 'all-transactions') {
-          const { data: transactions, error } = await supabase
-            .from('transaction_logs')
-            .select(`
-              *,
-              users(email, full_name)
-            `)
-            .order('created_at', { ascending: false })
-            .limit(100)
-
-          if (error) throw error
-
-          return new Response(JSON.stringify(transactions), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
-
-        if (action === 'all-payments') {
-          const { data: payments, error } = await supabase
-            .from('payment_transactions')
-            .select(`
-              *,
-              users(email, full_name)
-            `)
-            .order('created_at', { ascending: false })
-            .limit(100)
-
-          if (error) throw error
-
-          return new Response(JSON.stringify(payments), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
-        break
+        console.log('Dashboard stats:', stats)
+        return new Response(JSON.stringify(stats), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
 
       case 'POST':
+        const body = await req.json()
+        console.log('POST request body:', body)
+        const { action } = body
+
         if (action === 'freeze-user') {
-          const { user_id, reason } = await req.json()
+          const { user_id, reason } = body
           
           // Freeze user wallet
           const { error: freezeError } = await supabase
@@ -127,7 +73,7 @@ Deno.serve(async (req) => {
               new_values: { is_frozen: true, reason }
             })
 
-          if (logError) throw logError
+          if (logError) console.error('Failed to log admin action:', logError)
 
           return new Response(JSON.stringify({ success: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -135,7 +81,7 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'verify-user') {
-          const { user_id } = await req.json()
+          const { user_id } = body
           
           const { error } = await supabase
             .from('users')
@@ -150,7 +96,7 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'adjust-balance') {
-          const { user_id, amount, reason } = await req.json()
+          const { user_id, amount, reason } = body
           
           // Get current balance
           const { data: wallet, error: walletError } = await supabase
@@ -183,7 +129,7 @@ Deno.serve(async (req) => {
               description: `Admin adjustment: ${reason}`
             })
 
-          if (logError) throw logError
+          if (logError) console.error('Failed to log transaction:', logError)
 
           return new Response(JSON.stringify({ success: true, new_balance: newBalance }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -192,7 +138,7 @@ Deno.serve(async (req) => {
         break
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+    return new Response(JSON.stringify({ error: 'Invalid action or method' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
