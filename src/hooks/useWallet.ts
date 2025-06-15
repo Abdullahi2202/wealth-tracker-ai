@@ -38,14 +38,10 @@ export function useWallet() {
 
       // Use the wallet-operations edge function to get balance
       const { data, error } = await supabase.functions.invoke('wallet-operations', {
-        method: 'GET',
-        body: null,
+        body: { action: 'get-balance' },
         headers: {
           'Content-Type': 'application/json',
         },
-      }, {
-        method: 'GET',
-        params: { action: 'get-balance' }
       });
 
       if (error) {
@@ -102,11 +98,8 @@ export function useWallet() {
     async (amount: number, source?: string, description?: string) => {
       try {
         const { data, error } = await supabase.functions.invoke('wallet-operations', {
-          body: { amount, source, description },
+          body: { action: 'add-funds', amount, source, description },
           headers: { 'Content-Type': 'application/json' },
-        }, {
-          method: 'POST',
-          params: { action: 'add-funds' }
         });
 
         if (error) throw error;
@@ -126,11 +119,8 @@ export function useWallet() {
     async (recipient: string, amount: number, note?: string) => {
       try {
         const { data, error } = await supabase.functions.invoke('wallet-operations', {
-          body: { recipient, sendAmount: amount, note },
+          body: { action: 'send-payment', recipient, sendAmount: amount, note },
           headers: { 'Content-Type': 'application/json' },
-        }, {
-          method: 'POST',
-          params: { action: 'send-payment' }
         });
 
         if (error) throw error;
