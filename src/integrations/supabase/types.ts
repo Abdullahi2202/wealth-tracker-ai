@@ -12,8 +12,8 @@ export type Database = {
       admin_activity_logs: {
         Row: {
           action: string
-          admin_email: string
-          created_at: string
+          admin_user_id: string | null
+          created_at: string | null
           id: string
           ip_address: unknown | null
           new_values: Json | null
@@ -24,8 +24,8 @@ export type Database = {
         }
         Insert: {
           action: string
-          admin_email: string
-          created_at?: string
+          admin_user_id?: string | null
+          created_at?: string | null
           id?: string
           ip_address?: unknown | null
           new_values?: Json | null
@@ -36,8 +36,8 @@ export type Database = {
         }
         Update: {
           action?: string
-          admin_email?: string
-          created_at?: string
+          admin_user_id?: string | null
+          created_at?: string | null
           id?: string
           ip_address?: unknown | null
           new_values?: Json | null
@@ -46,31 +46,10 @@ export type Database = {
           target_table?: string | null
           user_agent?: string | null
         }
-        Relationships: []
-      }
-      admin_users: {
-        Row: {
-          created_at: string
-          id: string
-          permissions: Json | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          permissions?: Json | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          permissions?: Json | null
-          user_id?: string | null
-        }
         Relationships: [
           {
-            foreignKeyName: "admin_users_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "admin_activity_logs_admin_user_id_fkey"
+            columns: ["admin_user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -79,30 +58,30 @@ export type Database = {
       }
       categories: {
         Row: {
-          color: string
+          color: string | null
           created_at: string | null
           description: string | null
-          icon: string
+          icon: string | null
           id: string
           is_active: boolean | null
           name: string
           updated_at: string | null
         }
         Insert: {
-          color?: string
+          color?: string | null
           created_at?: string | null
           description?: string | null
-          icon?: string
+          icon?: string | null
           id?: string
           is_active?: boolean | null
           name: string
           updated_at?: string | null
         }
         Update: {
-          color?: string
+          color?: string | null
           created_at?: string | null
           description?: string | null
-          icon?: string
+          icon?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
@@ -112,7 +91,7 @@ export type Database = {
       }
       chatbot_conversations: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           intent_detected: string | null
           message: string
@@ -120,10 +99,10 @@ export type Database = {
           response_time_ms: number | null
           satisfaction_score: number | null
           session_id: string
-          user_email: string
+          user_id: string | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           intent_detected?: string | null
           message: string
@@ -131,10 +110,10 @@ export type Database = {
           response_time_ms?: number | null
           satisfaction_score?: number | null
           session_id: string
-          user_email: string
+          user_id?: string | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           intent_detected?: string | null
           message?: string
@@ -142,222 +121,11 @@ export type Database = {
           response_time_ms?: number | null
           satisfaction_score?: number | null
           session_id?: string
-          user_email?: string
-        }
-        Relationships: []
-      }
-      fraud_alerts: {
-        Row: {
-          alert_type: string
-          created_at: string
-          description: string | null
-          id: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          risk_score: number
-          status: string
-          transaction_id: string | null
-          user_email: string
-        }
-        Insert: {
-          alert_type: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          risk_score?: number
-          status?: string
-          transaction_id?: string | null
-          user_email: string
-        }
-        Update: {
-          alert_type?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          risk_score?: number
-          status?: string
-          transaction_id?: string | null
-          user_email?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fraud_alerts_transaction_id_fkey"
-            columns: ["transaction_id"]
-            isOneToOne: false
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      identity_verification_requests: {
-        Row: {
-          document_type: string
-          email: string
-          feedback: string | null
-          id: string
-          new_document_url: string
-          new_number: string | null
-          old_document_url: string | null
-          requested_at: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-        }
-        Insert: {
-          document_type: string
-          email: string
-          feedback?: string | null
-          id?: string
-          new_document_url: string
-          new_number?: string | null
-          old_document_url?: string | null
-          requested_at?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-        }
-        Update: {
-          document_type?: string
-          email?: string
-          feedback?: string | null
-          id?: string
-          new_document_url?: string
-          new_number?: string | null
-          old_document_url?: string | null
-          requested_at?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "identity_verification_requests_email_fkey"
-            columns: ["email"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["email"]
-          },
-        ]
-      }
-      investments: {
-        Row: {
-          change_pct: number | null
-          created_at: string | null
-          email: string
-          id: string
-          is_positive: boolean | null
-          name: string
-          value: number
-        }
-        Insert: {
-          change_pct?: number | null
-          created_at?: string | null
-          email: string
-          id?: string
-          is_positive?: boolean | null
-          name: string
-          value: number
-        }
-        Update: {
-          change_pct?: number | null
-          created_at?: string | null
-          email?: string
-          id?: string
-          is_positive?: boolean | null
-          name?: string
-          value?: number
-        }
-        Relationships: []
-      }
-      payment_methods: {
-        Row: {
-          brand: string | null
-          created_at: string
-          default_card: boolean | null
-          details: Json | null
-          exp_month: number | null
-          exp_year: number | null
-          id: string
-          is_active: boolean
-          label: string | null
-          stripe_payment_method_id: string | null
-          type: string
-          user_email: string
-        }
-        Insert: {
-          brand?: string | null
-          created_at?: string
-          default_card?: boolean | null
-          details?: Json | null
-          exp_month?: number | null
-          exp_year?: number | null
-          id?: string
-          is_active?: boolean
-          label?: string | null
-          stripe_payment_method_id?: string | null
-          type: string
-          user_email: string
-        }
-        Update: {
-          brand?: string | null
-          created_at?: string
-          default_card?: boolean | null
-          details?: Json | null
-          exp_month?: number | null
-          exp_year?: number | null
-          id?: string
-          is_active?: boolean
-          label?: string | null
-          stripe_payment_method_id?: string | null
-          type?: string
-          user_email?: string
-        }
-        Relationships: []
-      }
-      payment_transactions: {
-        Row: {
-          amount: number
-          created_at: string
-          currency: string | null
-          description: string | null
-          id: string
-          metadata: Json | null
-          processed_at: string | null
-          status: string
-          stripe_payment_intent_id: string | null
-          user_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string | null
-          description?: string | null
-          id?: string
-          metadata?: Json | null
-          processed_at?: string | null
-          status?: string
-          stripe_payment_intent_id?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string | null
-          description?: string | null
-          id?: string
-          metadata?: Json | null
-          processed_at?: string | null
-          status?: string
-          stripe_payment_intent_id?: string | null
           user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "payment_transactions_user_id_fkey"
+            foreignKeyName: "chatbot_conversations_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -365,130 +133,116 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      fraud_alerts: {
         Row: {
+          alert_type: string
           created_at: string | null
-          email: string
-          full_name: string | null
-          id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email: string
-          full_name?: string | null
-          id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string
-          full_name?: string | null
-          id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      registrations: {
-        Row: {
-          created_at: string | null
-          document_type: string | null
-          email: string
-          full_name: string
-          id: string
-          image_url: string
-          passport_number: string
-          phone: string
-          verification_status: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          document_type?: string | null
-          email: string
-          full_name: string
-          id?: string
-          image_url: string
-          passport_number: string
-          phone: string
-          verification_status?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          document_type?: string | null
-          email?: string
-          full_name?: string
-          id?: string
-          image_url?: string
-          passport_number?: string
-          phone?: string
-          verification_status?: string | null
-        }
-        Relationships: []
-      }
-      settings: {
-        Row: {
           description: string | null
           id: string
-          key: string
-          updated_at: string | null
-          value: Json
-        }
-        Insert: {
-          description?: string | null
-          id?: string
-          key: string
-          updated_at?: string | null
-          value: Json
-        }
-        Update: {
-          description?: string | null
-          id?: string
-          key?: string
-          updated_at?: string | null
-          value?: Json
-        }
-        Relationships: []
-      }
-      stored_payment_methods: {
-        Row: {
-          card_brand: string | null
-          card_exp_month: number | null
-          card_exp_year: number | null
-          card_last4: string | null
-          created_at: string
-          id: string
-          is_active: boolean | null
-          is_default: boolean | null
-          stripe_payment_method_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          risk_score: number | null
+          status: string | null
+          transaction_id: string | null
           user_id: string | null
         }
         Insert: {
-          card_brand?: string | null
-          card_exp_month?: number | null
-          card_exp_year?: number | null
-          card_last4?: string | null
-          created_at?: string
+          alert_type: string
+          created_at?: string | null
+          description?: string | null
           id?: string
-          is_active?: boolean | null
-          is_default?: boolean | null
-          stripe_payment_method_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risk_score?: number | null
+          status?: string | null
+          transaction_id?: string | null
           user_id?: string | null
         }
         Update: {
-          card_brand?: string | null
-          card_exp_month?: number | null
-          card_exp_year?: number | null
-          card_last4?: string | null
-          created_at?: string
+          alert_type?: string
+          created_at?: string | null
+          description?: string | null
           id?: string
-          is_active?: boolean | null
-          is_default?: boolean | null
-          stripe_payment_method_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risk_score?: number | null
+          status?: string | null
+          transaction_id?: string | null
           user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "stored_payment_methods_user_id_fkey"
+            foreignKeyName: "fraud_alerts_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fraud_alerts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fraud_alerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_methods: {
+        Row: {
+          brand: string | null
+          created_at: string | null
+          details: Json | null
+          exp_month: number | null
+          exp_year: number | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          label: string | null
+          last4: string | null
+          stripe_payment_method_id: string | null
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string | null
+          details?: Json | null
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          label?: string | null
+          last4?: string | null
+          stripe_payment_method_id?: string | null
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string | null
+          details?: Json | null
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          label?: string | null
+          last4?: string | null
+          stripe_payment_method_id?: string | null
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -499,41 +253,56 @@ export type Database = {
       support_tickets: {
         Row: {
           assigned_to: string | null
-          created_at: string
+          created_at: string | null
           description: string
           id: string
-          priority: string
+          priority: string | null
           resolved_at: string | null
-          status: string
+          status: string | null
           subject: string
-          updated_at: string
-          user_email: string
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           assigned_to?: string | null
-          created_at?: string
+          created_at?: string | null
           description: string
           id?: string
-          priority?: string
+          priority?: string | null
           resolved_at?: string | null
-          status?: string
+          status?: string | null
           subject: string
-          updated_at?: string
-          user_email: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           assigned_to?: string | null
-          created_at?: string
+          created_at?: string | null
           description?: string
           id?: string
-          priority?: string
+          priority?: string | null
           resolved_at?: string | null
-          status?: string
+          status?: string | null
           subject?: string
-          updated_at?: string
-          user_email?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       system_metrics: {
         Row: {
@@ -541,21 +310,21 @@ export type Database = {
           metric_name: string
           metric_type: string
           metric_value: number
-          recorded_at: string
+          recorded_at: string | null
         }
         Insert: {
           id?: string
           metric_name: string
           metric_type: string
           metric_value: number
-          recorded_at?: string
+          recorded_at?: string | null
         }
         Update: {
           id?: string
           metric_name?: string
           metric_type?: string
           metric_value?: number
-          recorded_at?: string
+          recorded_at?: string | null
         }
         Relationships: []
       }
@@ -564,11 +333,11 @@ export type Database = {
           amount: number
           balance_after: number
           balance_before: number
-          created_at: string
+          created_at: string | null
           description: string | null
           id: string
-          metadata: Json | null
           reference_id: string | null
+          transaction_id: string | null
           transaction_type: string
           user_id: string | null
         }
@@ -576,11 +345,11 @@ export type Database = {
           amount: number
           balance_after: number
           balance_before: number
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
-          metadata?: Json | null
           reference_id?: string | null
+          transaction_id?: string | null
           transaction_type: string
           user_id?: string | null
         }
@@ -588,15 +357,22 @@ export type Database = {
           amount?: number
           balance_after?: number
           balance_before?: number
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
-          metadata?: Json | null
           reference_id?: string | null
+          transaction_id?: string | null
           transaction_type?: string
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "transaction_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transaction_logs_user_id_fkey"
             columns: ["user_id"]
@@ -611,56 +387,67 @@ export type Database = {
           amount: number
           category: string | null
           created_at: string | null
-          date: string
-          email: string
+          date: string | null
           id: string
           name: string
           note: string | null
-          recipient_email: string | null
+          payment_method_id: string | null
+          recipient_user_id: string | null
           scheduled_for: string | null
-          sender_email: string | null
-          source_method_id: string | null
-          tag: string | null
+          status: string | null
           type: string
+          user_id: string | null
         }
         Insert: {
           amount: number
           category?: string | null
           created_at?: string | null
-          date?: string
-          email: string
+          date?: string | null
           id?: string
           name: string
           note?: string | null
-          recipient_email?: string | null
+          payment_method_id?: string | null
+          recipient_user_id?: string | null
           scheduled_for?: string | null
-          sender_email?: string | null
-          source_method_id?: string | null
-          tag?: string | null
+          status?: string | null
           type: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
           category?: string | null
           created_at?: string | null
-          date?: string
-          email?: string
+          date?: string | null
           id?: string
           name?: string
           note?: string | null
-          recipient_email?: string | null
+          payment_method_id?: string | null
+          recipient_user_id?: string | null
           scheduled_for?: string | null
-          sender_email?: string | null
-          source_method_id?: string | null
-          tag?: string | null
+          status?: string | null
           type?: string
+          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "transactions_source_method_id_fkey"
-            columns: ["source_method_id"]
+            foreignKeyName: "transactions_payment_method_id_fkey"
+            columns: ["payment_method_id"]
             isOneToOne: false
             referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -668,52 +455,25 @@ export type Database = {
       user_roles: {
         Row: {
           created_at: string | null
-          email: string
           id: string
-          role: Database["public"]["Enums"]["app_role"]
-        }
-        Insert: {
-          created_at?: string | null
-          email: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-        }
-        Update: {
-          created_at?: string | null
-          email?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-        }
-        Relationships: []
-      }
-      user_wallets: {
-        Row: {
-          balance: number
-          currency: string | null
-          id: string
-          is_frozen: boolean | null
-          updated_at: string
+          role: string
           user_id: string | null
         }
         Insert: {
-          balance?: number
-          currency?: string | null
+          created_at?: string | null
           id?: string
-          is_frozen?: boolean | null
-          updated_at?: string
+          role?: string
           user_id?: string | null
         }
         Update: {
-          balance?: number
-          currency?: string | null
+          created_at?: string | null
           id?: string
-          is_frozen?: boolean | null
-          updated_at?: string
+          role?: string
           user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "user_wallets_user_id_fkey"
+            foreignKeyName: "user_roles_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "users"
@@ -723,60 +483,83 @@ export type Database = {
       }
       users: {
         Row: {
-          created_at: string
+          created_at: string | null
+          document_type: string | null
           email: string
           full_name: string
           id: string
           image_url: string | null
-          is_verified: boolean | null
+          is_active: boolean | null
           passport_number: string | null
           phone: string | null
-          updated_at: string
+          updated_at: string | null
+          verification_status: string | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
+          document_type?: string | null
           email: string
           full_name: string
           id?: string
           image_url?: string | null
-          is_verified?: boolean | null
+          is_active?: boolean | null
           passport_number?: string | null
           phone?: string | null
-          updated_at?: string
+          updated_at?: string | null
+          verification_status?: string | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
+          document_type?: string | null
           email?: string
           full_name?: string
           id?: string
           image_url?: string | null
-          is_verified?: boolean | null
+          is_active?: boolean | null
           passport_number?: string | null
           phone?: string | null
-          updated_at?: string
+          updated_at?: string | null
+          verification_status?: string | null
         }
         Relationships: []
       }
       wallets: {
         Row: {
-          balance: number
+          balance: number | null
+          created_at: string | null
+          currency: string | null
           id: string
-          updated_at: string
-          user_email: string
+          is_frozen: boolean | null
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          balance?: number
+          balance?: number | null
+          created_at?: string | null
+          currency?: string | null
           id?: string
-          updated_at?: string
-          user_email: string
+          is_frozen?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          balance?: number
+          balance?: number | null
+          created_at?: string | null
+          currency?: string | null
           id?: string
-          updated_at?: string
-          user_email?: string
+          is_frozen?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "wallets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

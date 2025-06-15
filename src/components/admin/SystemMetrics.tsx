@@ -10,8 +10,6 @@ interface DashboardStats {
   verified_users: number;
   total_wallet_balance: number;
   total_transactions: number;
-  total_payments: number;
-  successful_payments: number;
   recent_signups: number;
 }
 
@@ -31,19 +29,51 @@ const SystemMetrics = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch dashboard stats
-        const { data, error } = await supabase.functions.invoke('admin-operations', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        // Fetch users data
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('id, verification_status, created_at');
 
-        if (error) {
-          console.error('Error fetching stats:', error);
-        } else {
-          setStats(data);
+        if (usersError) {
+          console.error('Error fetching users:', usersError);
         }
+
+        // Fetch wallets data
+        const { data: walletsData, error: walletsError } = await supabase
+          .from('wallets')
+          .select('balance');
+
+        if (walletsError) {
+          console.error('Error fetching wallets:', walletsError);
+        }
+
+        // Fetch transactions data
+        const { data: transactionsData, error: transactionsError } = await supabase
+          .from('transactions')
+          .select('id');
+
+        if (transactionsError) {
+          console.error('Error fetching transactions:', transactionsError);
+        }
+
+        // Calculate stats
+        const totalUsers = usersData?.length || 0;
+        const verifiedUsers = usersData?.filter(u => u.verification_status === 'verified').length || 0;
+        const totalWalletBalance = walletsData?.reduce((sum, w) => sum + Number(w.balance), 0) || 0;
+        const totalTransactions = transactionsData?.length || 0;
+        
+        // Calculate recent signups (last 7 days)
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const recentSignups = usersData?.filter(u => new Date(u.created_at) > weekAgo).length || 0;
+
+        setStats({
+          total_users: totalUsers,
+          verified_users: verifiedUsers,
+          total_wallet_balance: totalWalletBalance * 100, // Convert to cents for consistency
+          total_transactions: totalTransactions,
+          recent_signups: recentSignups
+        });
 
         // Fetch system metrics data
         const { data: metricsData } = await supabase
@@ -53,28 +83,28 @@ const SystemMetrics = () => {
           .limit(10);
 
         // Calculate system metrics from real data
-        const activeUsersToday = await supabase
+        const { data: adminLogsData } = await supabase
           .from('admin_activity_logs')
-          .select('admin_email')
+          .select('admin_user_id')
           .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-        const chatbotMetrics = await supabase
+        const { data: chatbotData } = await supabase
           .from('chatbot_conversations')
           .select('response_time_ms')
           .not('response_time_ms', 'is', null)
           .limit(100);
 
-        const avgResponseTime = chatbotMetrics.data?.reduce((sum, conv) => sum + (conv.response_time_ms || 0), 0) / (chatbotMetrics.data?.length || 1) || 0;
+        const avgResponseTime = chatbotData?.reduce((sum, conv) => sum + (conv.response_time_ms || 0), 0) / (chatbotData?.length || 1) || 0;
 
         setMetrics({
-          activeUsers: new Set(activeUsersToday.data?.map(log => log.admin_email)).size,
+          activeUsers: new Set(adminLogsData?.map(log => log.admin_user_id)).size,
           avgResponseTime: Math.round(avgResponseTime),
           errorRate: 0.2, // This would come from error monitoring
           uptime: 99.9
         });
 
       } catch (error) {
-        console.error('Error calling admin function:', error);
+        console.error('Error fetching data:', error);
       }
       setLoading(false);
     };
@@ -101,10 +131,6 @@ const SystemMetrics = () => {
 
   const verificationRate = stats.total_users > 0 
     ? ((stats.verified_users / stats.total_users) * 100).toFixed(1)
-    : "0";
-
-  const successRate = stats.total_payments > 0 
-    ? ((stats.successful_payments / stats.total_payments) * 100).toFixed(1)
     : "0";
 
   return (
@@ -223,27 +249,27 @@ const SystemMetrics = () => {
         </div>
       )}
 
-      {/* Payment Metrics */}
+      {/* User Growth and System Health */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Payment Overview</CardTitle>
+            <CardTitle className="text-lg">User Overview</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Total Payments</span>
-              <Badge variant="secondary">{stats.total_payments}</Badge>
+              <span className="text-sm font-medium">Total Users</span>
+              <Badge variant="secondary">{stats.total_users}</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Successful</span>
+              <span className="text-sm font-medium">Verified</span>
               <Badge className="bg-green-100 text-green-800">
                 <CheckCircle className="h-3 w-3 mr-1" />
-                {stats.successful_payments}
+                {stats.verified_users}
               </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Success Rate</span>
-              <Badge variant="outline">{successRate}%</Badge>
+              <span className="text-sm font-medium">Verification Rate</span>
+              <Badge variant="outline">{verificationRate}%</Badge>
             </div>
           </CardContent>
         </Card>
@@ -309,7 +335,6 @@ const SystemMetrics = () => {
               <ul className="text-sm space-y-1 text-muted-foreground">
                 <li>• ${(stats.total_wallet_balance / 100).toFixed(2)} total wallet funds</li>
                 <li>• {stats.total_transactions} transaction records</li>
-                <li>• {stats.successful_payments} successful payments</li>
               </ul>
             </div>
           </div>

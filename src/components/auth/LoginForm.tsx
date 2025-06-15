@@ -20,18 +20,31 @@ const Login = () => {
 
   const checkUserRole = async (userEmail: string) => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
+      // Get user ID from users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
         .eq('email', userEmail)
         .single();
 
-      if (error) {
-        console.error("Error checking user role:", error);
+      if (userError || !userData) {
+        console.error("Error finding user:", userError);
         return null;
       }
 
-      return data?.role || null;
+      // Get role from user_roles table
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userData.id)
+        .single();
+
+      if (roleError) {
+        console.error("Error checking user role:", roleError);
+        return null;
+      }
+
+      return roleData?.role || null;
     } catch (error) {
       console.error("Error checking user role:", error);
       return null;
@@ -40,9 +53,9 @@ const Login = () => {
 
   const checkUserVerification = async (userEmail: string) => {
     try {
-      // Check verification status in registrations table
+      // Check verification status in users table
       const { data, error } = await supabase
-        .from('registrations')
+        .from('users')
         .select('verification_status')
         .eq('email', userEmail)
         .single();
@@ -75,16 +88,25 @@ const Login = () => {
 
         // Try to ensure admin role exists in user_roles table (but don't fail if it doesn't work)
         try {
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .upsert(
-              { email: ADMIN_EMAIL, role: 'admin' },
-              { onConflict: 'email' }
-            );
+          // First get the admin user ID
+          const { data: adminUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', ADMIN_EMAIL)
+            .single();
 
-          if (roleError) {
-            console.error("Error setting admin role:", roleError);
-            // Don't fail login if role setting fails - admin is already authenticated
+          if (adminUser) {
+            const { error: roleError } = await supabase
+              .from('user_roles')
+              .upsert(
+                { user_id: adminUser.id, role: 'admin' },
+                { onConflict: 'user_id' }
+              );
+
+            if (roleError) {
+              console.error("Error setting admin role:", roleError);
+              // Don't fail login if role setting fails - admin is already authenticated
+            }
           }
         } catch (roleSetError) {
           console.error("Role setting failed:", roleSetError);

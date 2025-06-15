@@ -34,9 +34,8 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      // Fetch from the registrations table where users are actually stored
       const { data, error } = await supabase
-        .from('registrations')
+        .from('users')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -46,7 +45,7 @@ const UserManagement = () => {
         return;
       }
 
-      console.log('Fetched users from registrations:', data);
+      console.log('Fetched users:', data);
       setUsers(data || []);
     } catch (error) {
       console.error('Error:', error);
@@ -59,7 +58,7 @@ const UserManagement = () => {
   const handleVerifyUser = async (userId: string) => {
     try {
       const { error } = await supabase
-        .from('registrations')
+        .from('users')
         .update({ verification_status: 'verified' })
         .eq('id', userId);
 
@@ -70,7 +69,7 @@ const UserManagement = () => {
       }
 
       toast.success('User verified successfully');
-      fetchUsers(); // Refresh the list
+      fetchUsers();
     } catch (error) {
       console.error('Error verifying user:', error);
       toast.error('Failed to verify user');
@@ -84,7 +83,7 @@ const UserManagement = () => {
 
     try {
       const { error } = await supabase
-        .from('registrations')
+        .from('users')
         .delete()
         .eq('id', userId);
 
@@ -95,7 +94,7 @@ const UserManagement = () => {
       }
 
       toast.success('User deleted successfully');
-      fetchUsers(); // Refresh the list
+      fetchUsers();
     } catch (error) {
       console.error('Error deleting user:', error);
       toast.error('Failed to delete user');

@@ -11,15 +11,18 @@ import { format } from "date-fns";
 
 interface Transaction {
   id: string;
-  user_email?: string;
+  user_id: string;
   amount: number;
   type: string;
   status: string;
   created_at: string;
-  description?: string;
-  recipient_email?: string;
-  user_id?: string;
-  metadata?: any;
+  name: string;
+  category?: string;
+  note?: string;
+  user: {
+    email: string;
+    full_name: string;
+  };
 }
 
 const TransactionManagement = () => {
@@ -35,15 +38,18 @@ const TransactionManagement = () => {
   const fetchTransactions = async () => {
     try {
       const { data, error } = await supabase
-        .from('payment_transactions')
+        .from('transactions')
         .select(`
           id,
+          user_id,
           amount,
+          type,
           status,
-          description,
+          name,
+          category,
+          note,
           created_at,
-          metadata,
-          user_id
+          user:users(email, full_name)
         `)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -53,22 +59,7 @@ const TransactionManagement = () => {
         return;
       }
 
-      // Transform and enrich transaction data
-      const enrichedTransactions = data?.map(transaction => {
-        const metadata = transaction.metadata || {};
-        return {
-          ...transaction,
-          user_email: `user${transaction.user_id?.slice(0, 8) || 'unknown'}@example.com`,
-          type: (typeof metadata === 'object' && metadata !== null && 'type' in metadata) 
-            ? String(metadata.type) 
-            : 'payment',
-          recipient_email: (typeof metadata === 'object' && metadata !== null && 'recipient' in metadata) 
-            ? String(metadata.recipient) 
-            : null
-        };
-      }) || [];
-
-      setTransactions(enrichedTransactions);
+      setTransactions(data || []);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -93,18 +84,19 @@ const TransactionManagement = () => {
     switch (type) {
       case 'transfer':
         return <Badge variant="outline">Transfer</Badge>;
-      case 'payment':
-        return <Badge variant="outline">Payment</Badge>;
-      case 'topup':
-        return <Badge variant="outline">Top Up</Badge>;
+      case 'income':
+        return <Badge variant="outline" className="bg-green-50 text-green-700">Income</Badge>;
+      case 'expense':
+        return <Badge variant="outline" className="bg-red-50 text-red-700">Expense</Badge>;
       default:
         return <Badge variant="outline">{type}</Badge>;
     }
   };
 
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = transaction.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.user?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          transaction.id.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
@@ -226,9 +218,14 @@ const TransactionManagement = () => {
                   <TableCell className="font-mono text-sm">
                     {transaction.id.slice(0, 8)}...
                   </TableCell>
-                  <TableCell>{transaction.user_email}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{transaction.user?.full_name}</div>
+                      <div className="text-sm text-muted-foreground">{transaction.user?.email}</div>
+                    </div>
+                  </TableCell>
                   <TableCell className="font-medium">
-                    ${(transaction.amount / 100).toFixed(2)}
+                    ${Number(transaction.amount).toFixed(2)}
                   </TableCell>
                   <TableCell>{getTypeBadge(transaction.type)}</TableCell>
                   <TableCell>{getStatusBadge(transaction.status)}</TableCell>

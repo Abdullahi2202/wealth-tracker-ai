@@ -12,16 +12,17 @@ import { toast } from "sonner";
 
 type Transaction = {
   id: string;
-  email: string;
-  name: string;
+  user_id: string;
   amount: number;
   type: string;
-  date: string;
-  created_at: string;
+  name: string;
   category?: string;
-  recipient_email?: string;
-  sender_email?: string;
   note?: string;
+  created_at: string;
+  user: {
+    email: string;
+    full_name: string;
+  };
 };
 
 const TransactionMonitoring = () => {
@@ -42,12 +43,10 @@ const TransactionMonitoring = () => {
         (payload) => {
           console.log('Transaction change:', payload);
           if (payload.eventType === 'INSERT') {
-            setTransactions(prev => [payload.new as Transaction, ...prev]);
+            fetchTransactions(); // Refetch to get user data
             toast.success("New transaction detected");
           } else if (payload.eventType === 'UPDATE') {
-            setTransactions(prev => prev.map(t => 
-              t.id === payload.new.id ? payload.new as Transaction : t
-            ));
+            fetchTransactions();
           } else if (payload.eventType === 'DELETE') {
             setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
           }
@@ -65,7 +64,17 @@ const TransactionMonitoring = () => {
     try {
       const { data, error } = await supabase
         .from("transactions")
-        .select("*")
+        .select(`
+          id,
+          user_id,
+          amount,
+          type,
+          name,
+          category,
+          note,
+          created_at,
+          user:users(email, full_name)
+        `)
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -91,9 +100,9 @@ const TransactionMonitoring = () => {
   };
 
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.recipient_email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = transaction.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.user?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === "all" || transaction.type === typeFilter;
     return matchesSearch && matchesType;
   });
@@ -108,11 +117,11 @@ const TransactionMonitoring = () => {
   };
 
   const calculateMetrics = () => {
-    const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
+    const totalAmount = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
     const incomeTransactions = transactions.filter(t => t.type === "income");
     const expenseTransactions = transactions.filter(t => t.type === "expense");
-    const totalIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const totalExpense = expenseTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const totalIncome = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalExpense = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
     
     return {
       totalTransactions: transactions.length,
@@ -177,7 +186,7 @@ const TransactionMonitoring = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Search transactions by email, name, or recipient..."
+            placeholder="Search transactions by email, name, or description..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -214,7 +223,6 @@ const TransactionMonitoring = () => {
               <TableHead>Description</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Amount</TableHead>
-              <TableHead>Recipient</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Note</TableHead>
             </TableRow>
@@ -226,7 +234,12 @@ const TransactionMonitoring = () => {
                   {new Date(transaction.created_at).toLocaleDateString()} {' '}
                   {new Date(transaction.created_at).toLocaleTimeString()}
                 </TableCell>
-                <TableCell className="font-medium">{transaction.email}</TableCell>
+                <TableCell>
+                  <div>
+                    <div className="font-medium">{transaction.user?.full_name}</div>
+                    <div className="text-sm text-muted-foreground">{transaction.user?.email}</div>
+                  </div>
+                </TableCell>
                 <TableCell>{transaction.name}</TableCell>
                 <TableCell>
                   <Badge className={getTypeColor(transaction.type)}>
@@ -235,10 +248,9 @@ const TransactionMonitoring = () => {
                 </TableCell>
                 <TableCell className="font-mono">
                   <span className={transaction.type === 'income' ? 'text-green-600' : transaction.type === 'expense' ? 'text-red-600' : 'text-blue-600'}>
-                    ${transaction.amount.toFixed(2)}
+                    ${Number(transaction.amount).toFixed(2)}
                   </span>
                 </TableCell>
-                <TableCell>{transaction.recipient_email || "-"}</TableCell>
                 <TableCell>{transaction.category || "-"}</TableCell>
                 <TableCell>{transaction.note || "-"}</TableCell>
               </TableRow>
