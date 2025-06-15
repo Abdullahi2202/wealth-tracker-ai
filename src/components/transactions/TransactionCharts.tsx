@@ -1,4 +1,3 @@
-
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -57,17 +56,9 @@ const categoryColors: Record<string, string> = {
   
   // Legacy categories for backward compatibility
   'Food': '#F59E0B',
-  'Housing': '#06B6D4',
   'Transport': '#8B5CF6',
-  'Entertainment': '#10B981',
-  'Shopping': '#EC4899',
-  'Healthcare': '#EF4444',
-  'Education': '#6366F1',
-  'Utilities': '#84CC16',
   'Salary': '#22c55e',
   'Freelance': '#3b82f6',
-  'Investment': '#8b5cf6',
-  'Business': '#f59e0b',
   'Misc': '#6b7280',
 };
 
