@@ -1,7 +1,9 @@
 
 import { cn } from "@/lib/utils";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Users, BarChart3, Shield, CreditCard, Settings, Activity, FolderOpen } from "lucide-react";
+import { Users, BarChart3, Shield, CreditCard, Settings, Activity, FolderOpen, Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/ui/sidebar";
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -48,61 +50,75 @@ const menuItems = [
 ];
 
 export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
   return (
-    <Sidebar className="border-r border-slate-200 bg-white">
+    <Sidebar 
+      collapsible="icon" 
+      className="border-r border-slate-200 bg-white shadow-sm"
+    >
       <SidebarContent>
         {/* Logo/Brand */}
-        <div className="p-6 border-b border-slate-200">
+        <div className={cn(
+          "p-6 border-b border-slate-200 transition-all duration-200",
+          isCollapsed && "p-4"
+        )}>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
+            <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-sm">
               <Shield className="h-6 w-6 text-white" />
             </div>
-            <div>
-              <h2 className="font-bold text-lg text-slate-900">
-                Wallet<span className="text-blue-600">Master</span>
-              </h2>
-              <p className="text-xs text-slate-500">Admin Panel</p>
-            </div>
+            {!isCollapsed && (
+              <div>
+                <h2 className="font-bold text-lg text-slate-900">
+                  Wallet<span className="text-blue-600">Master</span>
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">Admin Panel</p>
+              </div>
+            )}
           </div>
         </div>
 
         <SidebarGroup className="p-4">
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-2">
+            <SidebarMenu className="space-y-1">
               {menuItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
                       onClick={() => onTabChange(item.id)}
+                      tooltip={isCollapsed ? item.label : undefined}
                       className={cn(
-                        "w-full p-4 rounded-lg transition-all duration-200 group",
+                        "w-full p-3 rounded-xl transition-all duration-200 group hover:shadow-sm",
                         isActive
-                          ? "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
+                          ? "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200 shadow-sm"
                           : "hover:bg-slate-50 text-slate-700 hover:text-slate-900"
                       )}
                     >
                       <div className="flex items-center gap-3 w-full">
                         <item.icon
                           className={cn(
-                            "h-5 w-5 transition-colors",
+                            "h-5 w-5 transition-colors flex-shrink-0",
                             isActive ? "text-blue-600" : "text-slate-500 group-hover:text-slate-700"
                           )}
                         />
-                        <div className="flex-1 text-left">
-                          <div className={cn(
-                            "font-medium text-sm",
-                            isActive ? "text-blue-900" : "text-slate-900"
-                          )}>
-                            {item.label}
+                        {!isCollapsed && (
+                          <div className="flex-1 text-left min-w-0">
+                            <div className={cn(
+                              "font-medium text-sm truncate",
+                              isActive ? "text-blue-900" : "text-slate-900"
+                            )}>
+                              {item.label}
+                            </div>
+                            <div className={cn(
+                              "text-xs mt-0.5 truncate",
+                              isActive ? "text-blue-600" : "text-slate-500"
+                            )}>
+                              {item.description}
+                            </div>
                           </div>
-                          <div className={cn(
-                            "text-xs mt-0.5",
-                            isActive ? "text-blue-600" : "text-slate-500"
-                          )}>
-                            {item.description}
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -113,16 +129,18 @@ export default function AdminSidebar({ activeTab, onTabChange }: AdminSidebarPro
         </SidebarGroup>
 
         {/* Footer */}
-        <div className="mt-auto p-4 border-t border-slate-200">
-          <div className="text-center">
-            <p className="text-xs text-slate-500">
-              © 2024 WalletMaster
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              Admin Dashboard v1.0
-            </p>
+        {!isCollapsed && (
+          <div className="mt-auto p-4 border-t border-slate-200">
+            <div className="text-center">
+              <p className="text-xs text-slate-500">
+                © 2024 WalletMaster
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Admin Dashboard v1.0
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </SidebarContent>
     </Sidebar>
   );

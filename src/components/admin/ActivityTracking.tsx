@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,7 +44,13 @@ const ActivityTracking = () => {
         return;
       }
 
-      setActivities(data || []);
+      // Transform the data to match our interface
+      const transformedData = (data || []).map(item => ({
+        ...item,
+        ip_address: item.ip_address?.toString() || null,
+      }));
+
+      setActivities(transformedData);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -101,42 +106,6 @@ const ActivityTracking = () => {
     
     return matchesSearch && matchesAction;
   });
-
-  // Mock data for demonstration if no real data exists
-  const mockActivities = [
-    {
-      id: '1',
-      admin_email: 'admin@walletmaster.com',
-      action: 'login',
-      target_table: null,
-      target_id: null,
-      ip_address: '192.168.1.1',
-      user_agent: 'Mozilla/5.0...',
-      created_at: new Date().toISOString()
-    },
-    {
-      id: '2',
-      admin_email: 'admin@walletmaster.com',
-      action: 'update',
-      target_table: 'users',
-      target_id: 'user-123',
-      ip_address: '192.168.1.1',
-      user_agent: 'Mozilla/5.0...',
-      created_at: new Date(Date.now() - 3600000).toISOString()
-    },
-    {
-      id: '3',
-      admin_email: 'admin@walletmaster.com',
-      action: 'create',
-      target_table: 'payment_methods',
-      target_id: 'pm-456',
-      ip_address: '192.168.1.1',
-      user_agent: 'Mozilla/5.0...',
-      created_at: new Date(Date.now() - 7200000).toISOString()
-    }
-  ];
-
-  const displayActivities = activities.length > 0 ? filteredActivities : mockActivities;
 
   if (loading) {
     return (
@@ -203,7 +172,7 @@ const ActivityTracking = () => {
             <div className="flex items-center gap-3">
               <Activity className="h-8 w-8 text-blue-600" />
               <div>
-                <div className="text-2xl font-bold">{displayActivities.length}</div>
+                <div className="text-2xl font-bold">{filteredActivities.length}</div>
                 <p className="text-sm text-muted-foreground">Total Activities</p>
               </div>
             </div>
@@ -215,7 +184,7 @@ const ActivityTracking = () => {
               <User className="h-8 w-8 text-green-600" />
               <div>
                 <div className="text-2xl font-bold">
-                  {displayActivities.filter(a => a.action?.toLowerCase() === 'login').length}
+                  {filteredActivities.filter(a => a.action?.toLowerCase() === 'login').length}
                 </div>
                 <p className="text-sm text-muted-foreground">Logins Today</p>
               </div>
@@ -228,7 +197,7 @@ const ActivityTracking = () => {
               <Settings className="h-8 w-8 text-yellow-600" />
               <div>
                 <div className="text-2xl font-bold">
-                  {displayActivities.filter(a => ['create', 'update', 'delete'].includes(a.action?.toLowerCase() || '')).length}
+                  {filteredActivities.filter(a => ['create', 'update', 'delete'].includes(a.action?.toLowerCase() || '')).length}
                 </div>
                 <p className="text-sm text-muted-foreground">Admin Actions</p>
               </div>
@@ -266,7 +235,7 @@ const ActivityTracking = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {displayActivities.map((activity) => (
+              {filteredActivities.map((activity) => (
                 <TableRow key={activity.id}>
                   <TableCell className="font-medium">
                     {activity.admin_email}
@@ -307,7 +276,7 @@ const ActivityTracking = () => {
             </TableBody>
           </Table>
           
-          {displayActivities.length === 0 && (
+          {filteredActivities.length === 0 && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No activities found</p>
             </div>

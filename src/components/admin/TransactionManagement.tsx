@@ -11,13 +11,15 @@ import { format } from "date-fns";
 
 interface Transaction {
   id: string;
-  user_email: string;
+  user_email?: string;
   amount: number;
   type: string;
   status: string;
   created_at: string;
   description?: string;
   recipient_email?: string;
+  user_id?: string;
+  metadata?: any;
 }
 
 const TransactionManagement = () => {
@@ -51,13 +53,20 @@ const TransactionManagement = () => {
         return;
       }
 
-      // Mock additional data for demonstration
-      const enrichedTransactions = data?.map(transaction => ({
-        ...transaction,
-        user_email: `user${transaction.user_id?.slice(0, 8)}@example.com`,
-        type: transaction.metadata?.type || 'payment',
-        recipient_email: transaction.metadata?.recipient || null
-      })) || [];
+      // Transform and enrich transaction data
+      const enrichedTransactions = data?.map(transaction => {
+        const metadata = transaction.metadata || {};
+        return {
+          ...transaction,
+          user_email: `user${transaction.user_id?.slice(0, 8) || 'unknown'}@example.com`,
+          type: (typeof metadata === 'object' && metadata !== null && 'type' in metadata) 
+            ? String(metadata.type) 
+            : 'payment',
+          recipient_email: (typeof metadata === 'object' && metadata !== null && 'recipient' in metadata) 
+            ? String(metadata.recipient) 
+            : null
+        };
+      }) || [];
 
       setTransactions(enrichedTransactions);
     } catch (error) {

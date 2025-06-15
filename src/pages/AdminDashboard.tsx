@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,8 +13,8 @@ import ContentManagement from "@/components/admin/ContentManagement";
 import AppSettings from "@/components/admin/AppSettings";
 import ActivityTracking from "@/components/admin/ActivityTracking";
 import AdminSidebar from "@/components/admin/AdminSidebar";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { Shield, LogOut } from "lucide-react";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Shield, LogOut, Menu } from "lucide-react";
 
 const AdminDashboard = () => {
   const [currentAdmin, setCurrentAdmin] = useState<string | null>(null);
@@ -79,10 +80,10 @@ const AdminDashboard = () => {
     switch (activeTab) {
       case "overview":
         return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">Overview Dashboard</CardTitle>
-              <CardDescription>Platform statistics and analytics</CardDescription>
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white">
+              <CardTitle className="text-xl font-semibold text-slate-900">Overview Dashboard</CardTitle>
+              <CardDescription className="text-slate-600">Platform statistics and analytics</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <OverviewDashboard />
@@ -91,10 +92,10 @@ const AdminDashboard = () => {
         );
       case "users":
         return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">User Management</CardTitle>
-              <CardDescription>Manage users, verification, and account status</CardDescription>
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white">
+              <CardTitle className="text-xl font-semibold text-slate-900">User Management</CardTitle>
+              <CardDescription className="text-slate-600">Manage users, verification, and account status</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <UserManagement />
@@ -103,10 +104,10 @@ const AdminDashboard = () => {
         );
       case "transactions":
         return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">Transaction Management</CardTitle>
-              <CardDescription>Monitor and manage all platform transactions</CardDescription>
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white">
+              <CardTitle className="text-xl font-semibold text-slate-900">Transaction Management</CardTitle>
+              <CardDescription className="text-slate-600">Monitor and manage all platform transactions</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <TransactionManagement />
@@ -115,10 +116,10 @@ const AdminDashboard = () => {
         );
       case "content":
         return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">Content Management</CardTitle>
-              <CardDescription>Manage categories and app content</CardDescription>
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white">
+              <CardTitle className="text-xl font-semibold text-slate-900">Content Management</CardTitle>
+              <CardDescription className="text-slate-600">Manage categories and app content</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <ContentManagement />
@@ -127,10 +128,10 @@ const AdminDashboard = () => {
         );
       case "settings":
         return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">App Settings</CardTitle>
-              <CardDescription>Configure system settings and preferences</CardDescription>
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white">
+              <CardTitle className="text-xl font-semibold text-slate-900">App Settings</CardTitle>
+              <CardDescription className="text-slate-600">Configure system settings and preferences</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <AppSettings />
@@ -139,10 +140,10 @@ const AdminDashboard = () => {
         );
       case "activity":
         return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">Activity Tracking</CardTitle>
-              <CardDescription>Monitor user and admin activities</CardDescription>
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white">
+              <CardTitle className="text-xl font-semibold text-slate-900">Activity Tracking</CardTitle>
+              <CardDescription className="text-slate-600">Monitor user and admin activities</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <ActivityTracking />
@@ -151,10 +152,10 @@ const AdminDashboard = () => {
         );
       case "metrics":
         return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="border-b bg-slate-50/50">
-              <CardTitle className="text-xl font-semibold">System Overview</CardTitle>
-              <CardDescription>Platform analytics and key metrics</CardDescription>
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white">
+              <CardTitle className="text-xl font-semibold text-slate-900">System Overview</CardTitle>
+              <CardDescription className="text-slate-600">Platform analytics and key metrics</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <SystemMetrics />
@@ -168,10 +169,10 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading admin dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">Loading admin dashboard...</p>
         </div>
       </div>
     );
@@ -179,29 +180,36 @@ const AdminDashboard = () => {
 
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Checking admin privileges...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">Checking admin privileges...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-slate-50">
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100">
         <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <header className="bg-white border-b border-slate-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Shield className="h-8 w-8 text-blue-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
-                  <p className="text-sm text-slate-600">Wallet Master Administration Panel</p>
+          <header className="bg-white border-b border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between px-6 py-4">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </SidebarTrigger>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-sm">
+                    <Shield className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+                    <p className="text-sm text-slate-600">WalletMaster Administration Panel</p>
+                  </div>
                 </div>
               </div>
               
@@ -210,7 +218,11 @@ const AdminDashboard = () => {
                   <p className="text-sm font-medium text-slate-900">{currentAdmin}</p>
                   <p className="text-xs text-slate-500">Administrator</p>
                 </div>
-                <Button variant="outline" onClick={handleLogout} className="gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleLogout} 
+                  className="gap-2 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+                >
                   <LogOut className="h-4 w-4" />
                   Logout
                 </Button>
@@ -219,8 +231,10 @@ const AdminDashboard = () => {
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 p-6">
-            {renderContent()}
+          <main className="flex-1 p-6 overflow-auto">
+            <div className="max-w-7xl mx-auto">
+              {renderContent()}
+            </div>
           </main>
         </div>
       </div>
