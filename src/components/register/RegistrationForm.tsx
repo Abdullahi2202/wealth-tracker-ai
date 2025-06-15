@@ -7,9 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import DocumentUpload from "./DocumentUpload";
-
-type DocumentType = "passport" | "license";
 
 const RegistrationForm = () => {
   const navigate = useNavigate();
@@ -18,117 +15,46 @@ const RegistrationForm = () => {
     email: "",
     password: "",
     phone: "",
-    passportNumber: "",
+    isAdmin: false,
   });
-  const [documentType, setDocumentType] = useState<DocumentType>("passport");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const { fullName, email, password, phone, passportNumber } = form;
-
-    if (!fullName || !email || !password || !phone || !passportNumber) {
-      toast.error("Please fill in all fields.");
+    const { fullName, email, password, phone, isAdmin } = form;
+    if (!fullName || !email || !password) {
+      toast.error("Please fill in all required fields.");
       return;
     }
-
-    if (!selectedFile) {
-      toast.error("Please upload your identity document.");
-      return;
-    }
-
     setLoading(true);
-
     try {
-      console.log("Starting registration process for:", email);
+      // 1. Check for duplicates
+      const { data: exist } = await supabase
+        .from("registration")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
 
-      // Step 1: Create user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      if (exist) {
+        toast.error("This email is already registered. Please log in instead.");
+        navigate("/login");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Insert user
+      const { error } = await supabase.from("registration").insert({
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName,
-            phone: phone,
-            passport_number: passportNumber,
-            document_type: documentType
-          }
-        }
-      });
-
-      if (authError) {
-        console.error("Registration error:", authError);
-        if (authError.message.includes("already registered")) {
-          toast.error("This email is already registered. Please try logging in instead.");
-          navigate("/login");
-        } else {
-          toast.error("Registration failed: " + authError.message);
-        }
-        setLoading(false);
-        return;
-      }
-
-      if (!authData.user) {
-        toast.error("Registration failed. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      console.log("Auth user created successfully:", authData.user.id);
-
-      // Step 2: Insert user data directly into users table
-      const { error: userError } = await supabase.from("users").insert({
-        id: authData.user.id,
-        email: email,
         full_name: fullName,
-        phone: phone,
-        passport_number: passportNumber,
-        document_type: documentType,
-        verification_status: "pending",
-        is_active: true
+        phone,
+        is_admin: isAdmin,
       });
-
-      if (userError) {
-        console.error("Error creating user record:", userError);
-        // Continue since auth user was created
-      } else {
-        console.log("User record created successfully");
-      }
-
-      // Step 3: Create wallet for the user
-      const { error: walletError } = await supabase.from("wallets").insert({
-        user_id: authData.user.id,
-        balance: 0,
-        currency: "USD"
-      });
-
-      if (walletError) {
-        console.error("Error creating wallet:", walletError);
-      } else {
-        console.log("Wallet created successfully");
-      }
-
-      // Step 4: Set admin role if needed
-      if (email === "kingabdalla982@gmail.com") {
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({ user_id: authData.user.id, role: "admin" });
-
-        if (roleError) {
-          console.error("Error setting admin role:", roleError);
-        } else {
-          console.log("Admin role set successfully");
-        }
-      }
-
-      toast.success("Registration successful! Your identity is being verified.");
+      if (error) throw error;
+      toast.success("Registration successful! You can now login.");
       navigate("/login");
-
-    } catch (error) {
-      console.error("Unexpected registration error:", error);
-      toast.error("An unexpected error occurred. Please try again.");
+    } catch (err) {
+      toast.error("Registration failed, please try again.");
     } finally {
       setLoading(false);
     }
@@ -149,7 +75,6 @@ const RegistrationForm = () => {
               required
             />
           </div>
-
           <div>
             <Label htmlFor="email">Email Address</Label>
             <Input
@@ -161,7 +86,6 @@ const RegistrationForm = () => {
               required
             />
           </div>
-
           <div>
             <Label htmlFor="password">Password</Label>
             <Input
@@ -173,7 +97,6 @@ const RegistrationForm = () => {
               required
             />
           </div>
-
           <div>
             <Label htmlFor="phone">Phone Number</Label>
             <Input
@@ -182,52 +105,21 @@ const RegistrationForm = () => {
               placeholder="Enter your phone number"
               value={form.phone}
               onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              required
             />
           </div>
-
           <div>
-            <Label htmlFor="passportNumber">
-              {documentType === "passport" ? "Passport" : "Driver's License"} Number
-            </Label>
+            <Label htmlFor="isAdmin">Is Admin?</Label>
             <Input
-              id="passportNumber"
-              placeholder={`Enter your ${documentType === "passport" ? "passport" : "driver's license"} number`}
-              value={form.passportNumber}
-              onChange={(e) => setForm((f) => ({ ...f, passportNumber: e.target.value }))}
-              required
+              id="isAdmin"
+              type="checkbox"
+              checked={form.isAdmin}
+              onChange={(e) => setForm((f) => ({ ...f, isAdmin: e.target.checked }))}
             />
           </div>
-
-          <DocumentUpload
-            documentType={documentType}
-            onDocumentTypeChange={setDocumentType}
-            onFileSelect={setSelectedFile}
-            selectedFile={selectedFile}
-          />
-
           <Button type="submit" disabled={loading} className="mt-4">
-            {loading ? "Registering..." : "Register & Submit for Verification"}
+            {loading ? "Registering..." : "Register"}
           </Button>
         </form>
-
-        {/* Admin user guidance */}
-        {form.email === "kingabdalla982@gmail.com" && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm text-green-800">
-              <strong>Admin Account:</strong> You're registering as an admin user. 
-              Your account will automatically receive admin privileges.
-            </p>
-          </div>
-        )}
-
-        {/* Verification Notice */}
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Identity Verification:</strong> After registration, your identity will be verified by our admin team. 
-            You'll receive an email notification once verification is complete.
-          </p>
-        </div>
       </CardContent>
     </Card>
   );

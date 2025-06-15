@@ -26,109 +26,57 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      console.log("Checking admin authentication...");
-      
-      // First check localStorage for admin session
       const storedUser = localStorage.getItem("walletmaster_user");
       if (storedUser) {
         try {
           const userObj = JSON.parse(storedUser);
-          console.log("Stored user:", userObj);
-          
-          // Check if user has admin role or is the hardcoded admin
-          if (userObj.isAdmin || userObj.role === "admin" || userObj.email === "kingabdalla982@gmail.com") {
-            console.log("Admin found in localStorage");
+          if (userObj.isAdmin && userObj.email) {
             setCurrentAdmin(userObj.email);
             setIsAdmin(true);
             setLoading(false);
             return;
           }
-        } catch (error) {
-          console.error("Error parsing stored user:", error);
-        }
+        } catch {}
       }
 
-      // Check Supabase session as fallback
+      // If no admin info in localStorage, check registration table:
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData?.session?.user) {
-          console.log("No session found, redirecting to login");
-          toast.error("Please sign in to access admin panel.");
+        const { data: sessionUser } = await supabase
+          .from("registration")
+          .select("*")
+          .eq("email", storedUser ? JSON.parse(storedUser).email : "")
+          .maybeSingle();
+
+        if (sessionUser && sessionUser.is_admin) {
+          setCurrentAdmin(sessionUser.email);
+          setIsAdmin(true);
+          localStorage.setItem(
+            "walletmaster_user",
+            JSON.stringify({
+              email: sessionUser.email,
+              full_name: sessionUser.full_name,
+              isAdmin: true,
+              id: sessionUser.id,
+            })
+          );
+        } else {
+          toast.error("Admin privileges required");
           navigate("/login");
           return;
         }
-        
-        const session: Session = sessionData.session;
-        const userEmail: string = session.user.email!;
-        console.log("Supabase user email:", userEmail);
-        setCurrentAdmin(userEmail);
-
-        // Check if user is admin in database
-        try {
-          const { data } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", session.user.id)
-            .maybeSingle();
-
-          console.log("User role data:", data);
-
-          // Allow access if user has admin role OR is the hardcoded admin email
-          if (data?.role === "admin" || userEmail === "kingabdalla982@gmail.com") {
-            setIsAdmin(true);
-            
-            // Update localStorage with admin status
-            localStorage.setItem(
-              "walletmaster_user",
-              JSON.stringify({
-                email: userEmail,
-                role: "admin",
-                isAdmin: true,
-              })
-            );
-          } else {
-            console.log("User is not admin");
-            toast.error("Admin privileges required");
-            navigate("/login");
-            return;
-          }
-        } catch (roleError) {
-          console.error("Error checking user role:", roleError);
-          
-          // If it's the hardcoded admin email, allow access even if role check fails
-          if (userEmail === "kingabdalla982@gmail.com") {
-            setIsAdmin(true);
-            localStorage.setItem(
-              "walletmaster_user",
-              JSON.stringify({
-                email: userEmail,
-                role: "admin",
-                isAdmin: true,
-              })
-            );
-          } else {
-            toast.error("Error checking admin privileges");
-            navigate("/login");
-            return;
-          }
-        }
-      } catch (error) {
-        console.error("Error checking session:", error);
+      } catch {
         toast.error("Authentication error");
         navigate("/login");
         return;
       }
-
       setLoading(false);
     };
-    
+
     checkAdmin();
   }, [navigate]);
 
   const handleLogout = async () => {
     localStorage.removeItem("walletmaster_user");
-    await supabase.auth.signOut();
     navigate("/login");
   };
 

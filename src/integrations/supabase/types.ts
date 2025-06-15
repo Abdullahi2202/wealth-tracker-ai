@@ -263,6 +263,39 @@ export type Database = {
         }
         Relationships: []
       }
+      registration: {
+        Row: {
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          is_admin: boolean | null
+          password: string
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          is_admin?: boolean | null
+          password: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_admin?: boolean | null
+          password?: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           description: string | null
