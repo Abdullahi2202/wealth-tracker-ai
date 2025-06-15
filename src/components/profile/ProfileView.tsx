@@ -19,18 +19,6 @@ interface ProfileData {
   verification_status?: string;
 }
 
-interface RegistrationData {
-  id: string;
-  email: string;
-  full_name: string;
-  phone: string;
-  passport_number: string;
-  image_url: string;
-  document_type: string;
-  verification_status: string;
-  created_at: string;
-}
-
 export default function ProfileView() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<string>("unverified");
@@ -50,45 +38,25 @@ export default function ProfileView() {
         return;
       }
 
-      // Get profile data
-      const { data: profileData } = await supabase
-        .from("profiles")
+      // Get user data from users table
+      const { data: userData } = await supabase
+        .from("users")
         .select("*")
         .eq("email", user.email!)
         .single();
-
-      // Get registration data with new columns
-      const { data: registrationData } = await supabase
-        .from("registrations")
-        .select("*")
-        .eq("email", user.email!)
-        .single();
-
-      // Get verification status
-      const { data: verificationData } = await supabase
-        .from("identity_verification_requests")
-        .select("status")
-        .eq("email", user.email!)
-        .order("requested_at", { ascending: false })
-        .limit(1);
 
       const combinedProfile: ProfileData = {
         email: user.email!,
-        full_name: profileData?.full_name || registrationData?.full_name,
-        phone: registrationData?.phone,
-        passport_number: registrationData?.passport_number,
-        image_url: registrationData?.image_url,
-        document_type: registrationData?.document_type || "passport",
-        verification_status: registrationData?.verification_status || "unverified"
+        full_name: userData?.full_name || user.user_metadata?.full_name,
+        phone: userData?.phone,
+        passport_number: userData?.passport_number,
+        image_url: userData?.image_url,
+        document_type: userData?.document_type || "passport",
+        verification_status: userData?.verification_status || "unverified"
       };
 
       setProfile(combinedProfile);
-      
-      if (verificationData && verificationData.length > 0) {
-        setVerificationStatus(verificationData[0].status);
-      } else {
-        setVerificationStatus(registrationData?.verification_status || "unverified");
-      }
+      setVerificationStatus(userData?.verification_status || "unverified");
 
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -114,12 +82,6 @@ export default function ProfileView() {
       case "rejected": return <XCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
-  };
-
-  const getDocumentUrl = (imagePath: string) => {
-    if (!imagePath) return null;
-    const { data } = supabase.storage.from('identity-docs').getPublicUrl(imagePath);
-    return data.publicUrl;
   };
 
   if (loading) {
@@ -224,20 +186,6 @@ export default function ProfileView() {
             </div>
           </div>
 
-          {profile.image_url && verificationStatus === "approved" && (
-            <div>
-              <p className="text-sm font-medium mb-2">Document Image</p>
-              <img
-                src={getDocumentUrl(profile.image_url)}
-                alt="Identity Document"
-                className="max-w-md rounded-lg border shadow-sm"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-          )}
-
           {verificationStatus === "rejected" && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <p className="text-sm text-red-800 mb-2">
@@ -270,6 +218,33 @@ export default function ProfileView() {
               <p className="text-sm text-yellow-800">
                 Your verification is pending review. You'll receive an email notification once it's processed.
               </p>
+            </div>
+          )}
+
+          {verificationStatus === "unverified" && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800 mb-2">
+                Please complete your identity verification to access all features.
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowUpload(!showUpload)}
+              >
+                Start Verification
+              </Button>
+              {showUpload && (
+                <div className="mt-4">
+                  <IdentityVerificationUpload
+                    email={profile.email}
+                    documentType={profile.document_type as "passport" | "license"}
+                    onSubmitted={() => {
+                      setShowUpload(false);
+                      fetchProfileData();
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </CardContent>
