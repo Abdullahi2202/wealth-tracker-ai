@@ -42,14 +42,14 @@ export function VerifyIdentityForm() {
       const fileName = `${userEmail}_${Date.now()}.${ext}`;
       const path = `${userEmail}/${fileName}`;
 
+      // Change storage bucket name to identity-docs
       const { data, error: storageError } = await supabase.storage
-        .from("identity-documents")
+        .from("identity-docs")
         .upload(path, file, {
           cacheControl: "3600",
           upsert: true,
         });
 
-      // Add better logging here
       if (storageError || !data) {
         console.error("Supabase storage upload error:", storageError);
         console.error("Supabase storage upload result:", data);
@@ -67,8 +67,9 @@ export function VerifyIdentityForm() {
         return;
       }
 
+      // Use the updated bucket name to get public URL
       const { data: urlResult } = supabase.storage
-        .from("identity-documents")
+        .from("identity-docs")
         .getPublicUrl(path);
 
       const publicUrl = urlResult?.publicUrl || null;
