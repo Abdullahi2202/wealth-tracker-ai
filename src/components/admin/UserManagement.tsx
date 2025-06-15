@@ -20,16 +20,8 @@ interface User {
   verification_status?: string;
   document_type?: string;
   created_at: string;
-  user_wallets?: Array<{
-    balance: number;
-    currency: string;
-    is_frozen: boolean;
-  }>;
-  stored_payment_methods?: Array<{
-    id: string;
-    card_brand: string;
-    card_last4: string;
-  }>;
+  is_active?: boolean;
+  updated_at?: string;
 }
 
 const UserManagement = () => {
@@ -53,15 +45,17 @@ const UserManagement = () => {
 
       if (error) {
         console.error('Error fetching users from edge function:', error);
-        toast.error('Failed to fetch users');
+        toast.error('Failed to fetch users: ' + (error.message || 'Unknown error'));
+        setUsers([]);
         return;
       }
 
       console.log('Users fetched successfully:', data?.length || 0);
-      setUsers(data || []);
-    } catch (error) {
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (error: any) {
       console.error('Error:', error);
-      toast.error('Failed to fetch users');
+      toast.error('Failed to fetch users: ' + (error.message || 'Unknown error'));
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -80,15 +74,15 @@ const UserManagement = () => {
 
       if (error) {
         console.error('Error verifying user:', error);
-        toast.error('Failed to verify user');
+        toast.error('Failed to verify user: ' + (error.message || 'Unknown error'));
         return;
       }
 
       toast.success('User verified successfully');
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error verifying user:', error);
-      toast.error('Failed to verify user');
+      toast.error('Failed to verify user: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -105,15 +99,15 @@ const UserManagement = () => {
 
       if (error) {
         console.error('Error deleting user:', error);
-        toast.error('Failed to delete user');
+        toast.error('Failed to delete user: ' + (error.message || 'Unknown error'));
         return;
       }
 
       toast.success('User deleted successfully');
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting user:', error);
-      toast.error('Failed to delete user');
+      toast.error('Failed to delete user: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -245,7 +239,7 @@ const UserManagement = () => {
                         </span>
                       </div>
                       <div>
-                        <div className="font-medium">{user.full_name}</div>
+                        <div className="font-medium">{user.full_name || 'N/A'}</div>
                         <div className="text-sm text-muted-foreground">{user.email}</div>
                       </div>
                     </div>
@@ -303,7 +297,7 @@ const UserManagement = () => {
             </TableBody>
           </Table>
           
-          {filteredUsers.length === 0 && (
+          {filteredUsers.length === 0 && !loading && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No users found</p>
             </div>

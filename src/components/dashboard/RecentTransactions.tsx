@@ -5,17 +5,8 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface TransactionData {
-  id: string;
-  name: string;
-  category: string;
-  amount: number;
-  date: string;
-  type: "income" | "expense";
-}
-
 const RecentTransactions = () => {
-  const [transactionList, setTransactionList] = useState<TransactionData[]>([]);
+  const [transactionList, setTransactionList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,8 +34,8 @@ const RecentTransactions = () => {
         .eq("email", email)
         .order("date", { ascending: false })
         .limit(10);
-      if (!error && Array.isArray(data)) {
-        setTransactionList(data as TransactionData[]);
+      if (!error && data) {
+        setTransactionList(data);
       } else {
         setTransactionList([]);
       }
@@ -65,7 +56,7 @@ const RecentTransactions = () => {
           ) : transactionList.length === 0 ? (
             <div className="text-center text-muted-foreground">No transactions found.</div>
           ) : (
-            transactionList.map((transaction) => (
+            transactionList.map((transaction: any) => (
               <div
                 key={transaction.id}
                 className="flex items-center justify-between border-b border-border pb-4 last:border-0 last:pb-0"
@@ -101,7 +92,7 @@ const RecentTransactions = () => {
                         : "text-finance-expense"
                     )}
                   >
-                    {transaction.type === "income" ? "+" : "-"} ${transaction.amount.toFixed(2)}
+                    {transaction.type === "income" ? "+" : "-"} ${Number(transaction.amount).toFixed(2)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(transaction.date).toLocaleDateString()}

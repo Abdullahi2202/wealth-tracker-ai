@@ -23,15 +23,26 @@ Deno.serve(async (req) => {
         const { data: users, error } = await supabase
           .from('users')
           .select(`
-            *,
-            user_wallets(balance, currency, is_frozen),
-            stored_payment_methods(id, card_brand, card_last4)
+            id,
+            email,
+            full_name,
+            phone,
+            passport_number,
+            image_url,
+            verification_status,
+            document_type,
+            created_at,
+            is_active,
+            updated_at
           `)
           .order('created_at', { ascending: false })
 
         if (error) {
           console.error('Error fetching users:', error)
-          throw error
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
         }
 
         console.log('Users fetched successfully:', users?.length || 0)
@@ -55,7 +66,10 @@ Deno.serve(async (req) => {
 
           if (updateError) {
             console.error('Error updating user:', updateError)
-            throw updateError
+            return new Response(JSON.stringify({ error: updateError.message }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
           }
 
           console.log('User updated successfully:', user)
@@ -76,7 +90,10 @@ Deno.serve(async (req) => {
           const { error: authError } = await supabase.auth.admin.deleteUser(deleteId)
           if (authError) {
             console.error('Error deleting user from auth:', authError)
-            throw authError
+            return new Response(JSON.stringify({ error: authError.message }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
           }
 
           console.log('User deleted successfully:', deleteId)
@@ -102,7 +119,10 @@ Deno.serve(async (req) => {
 
         if (authError) {
           console.error('Error creating auth user:', authError)
-          throw authError
+          return new Response(JSON.stringify({ error: authError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
         }
 
         // Create user in public.users table
@@ -121,12 +141,15 @@ Deno.serve(async (req) => {
 
         if (userError) {
           console.error('Error creating user record:', userError)
-          throw userError
+          return new Response(JSON.stringify({ error: userError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
         }
 
         // Create wallet for user
         const { error: walletError } = await supabase
-          .from('user_wallets')
+          .from('wallets')
           .insert({
             user_id: authUser.user.id,
             balance: 0
