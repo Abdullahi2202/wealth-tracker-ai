@@ -1,4 +1,3 @@
-
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -68,62 +67,55 @@ const TransactionCharts = () => {
         Object.assign(colorsMap, fallbackCategoryColors);
         
         if (categoriesData) {
-          for (const category of categoriesData) {
+          categoriesData.forEach(category => {
             colorsMap[category.name] = category.color;
-          }
+          });
         }
         setCategoryColors(colorsMap);
 
-        // Fetch transactions
-        const { data: transactions, error } = await supabase
+        // Fetch transactions with explicit typing
+        const { data: rawTransactions, error } = await supabase
           .from("transactions")
           .select("id, amount, category, type")
           .eq("email", email);
 
-        if (!error && transactions) {
-          // Process income and expense data
-          const incomeCategories: { [key: string]: number } = {};
-          const expenseCategories: { [key: string]: number } = {};
+        if (!error && rawTransactions) {
+          // Convert raw data to our Transaction type
+          const transactions: Array<{ amount: number; category: string | null; type: string }> = rawTransactions.map(tx => ({
+            amount: Number(tx.amount),
+            category: tx.category,
+            type: tx.type
+          }));
 
-          for (let i = 0; i < transactions.length; i++) {
-            const tx = transactions[i];
-            const hasValidCategory = tx.category && tx.category in colorsMap;
-            const categoryName = hasValidCategory ? tx.category : "Miscellaneous";
-            const amount = Number(tx.amount);
+          // Process income and expense data
+          const incomeMap = new Map<string, number>();
+          const expenseMap = new Map<string, number>();
+
+          transactions.forEach(tx => {
+            const categoryName = (tx.category && colorsMap[tx.category]) ? tx.category : "Miscellaneous";
+            const amount = tx.amount;
             
             if (tx.type === "income") {
-              if (categoryName in incomeCategories) {
-                incomeCategories[categoryName] += amount;
-              } else {
-                incomeCategories[categoryName] = amount;
-              }
+              incomeMap.set(categoryName, (incomeMap.get(categoryName) || 0) + amount);
             } else if (tx.type === "expense") {
-              if (categoryName in expenseCategories) {
-                expenseCategories[categoryName] += amount;
-              } else {
-                expenseCategories[categoryName] = amount;
-              }
+              expenseMap.set(categoryName, (expenseMap.get(categoryName) || 0) + amount);
             }
-          }
+          });
 
           // Convert to chart data
-          const incomeChartData: ChartData[] = [];
-          const incomeKeys = Object.keys(incomeCategories);
-          for (let i = 0; i < incomeKeys.length; i++) {
-            const name = incomeKeys[i];
-            const value = incomeCategories[name];
-            const color = name in colorsMap ? colorsMap[name] : "#6b7280";
-            incomeChartData.push({ name, value, color, icon: name });
-          }
+          const incomeChartData: ChartData[] = Array.from(incomeMap.entries()).map(([name, value]) => ({
+            name,
+            value,
+            color: colorsMap[name] || "#6b7280",
+            icon: name,
+          }));
 
-          const expenseChartData: ChartData[] = [];
-          const expenseKeys = Object.keys(expenseCategories);
-          for (let i = 0; i < expenseKeys.length; i++) {
-            const name = expenseKeys[i];
-            const value = expenseCategories[name];
-            const color = name in colorsMap ? colorsMap[name] : "#6b7280";
-            expenseChartData.push({ name, value, color, icon: name });
-          }
+          const expenseChartData: ChartData[] = Array.from(expenseMap.entries()).map(([name, value]) => ({
+            name,
+            value,
+            color: colorsMap[name] || "#6b7280",
+            icon: name,
+          }));
 
           setIncomeData(incomeChartData);
           setExpenseData(expenseChartData);
