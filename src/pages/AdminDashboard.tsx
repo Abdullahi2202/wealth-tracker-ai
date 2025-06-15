@@ -30,6 +30,7 @@ const AdminDashboard = () => {
       if (storedUser) {
         try {
           const userObj = JSON.parse(storedUser);
+          // Only check localStorage (no longer in registration table)
           if (userObj.isAdmin && userObj.email) {
             setCurrentAdmin(userObj.email);
             setIsAdmin(true);
@@ -39,36 +40,9 @@ const AdminDashboard = () => {
         } catch {}
       }
 
-      // If no admin info in localStorage, check registration table:
-      try {
-        const { data: sessionUser } = await supabase
-          .from("registration")
-          .select("*")
-          .eq("email", storedUser ? JSON.parse(storedUser).email : "")
-          .maybeSingle();
-
-        if (sessionUser && sessionUser.is_admin) {
-          setCurrentAdmin(sessionUser.email);
-          setIsAdmin(true);
-          localStorage.setItem(
-            "walletmaster_user",
-            JSON.stringify({
-              email: sessionUser.email,
-              full_name: sessionUser.full_name,
-              isAdmin: true,
-              id: sessionUser.id,
-            })
-          );
-        } else {
-          toast.error("Admin privileges required");
-          navigate("/login");
-          return;
-        }
-      } catch {
-        toast.error("Authentication error");
-        navigate("/login");
-        return;
-      }
+      // Fallback: No admin info means no access
+      toast.error("Admin privileges required");
+      navigate("/login");
       setLoading(false);
     };
 

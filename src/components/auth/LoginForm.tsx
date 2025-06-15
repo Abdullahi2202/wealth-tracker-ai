@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,13 +42,13 @@ const Login = () => {
         return;
       }
 
-      // 3. Store user info in localStorage
+      // 3. Store user info in localStorage -- everyone is *not* admin
       localStorage.setItem(
         "walletmaster_user",
         JSON.stringify({
           email: user.email,
           full_name: user.full_name,
-          isAdmin: !!user.is_admin,
+          isAdmin: false,
           id: user.id,
         })
       );
@@ -57,11 +56,7 @@ const Login = () => {
       toast.success("Logged in successfully!");
 
       // 4. Redirect
-      if (user.is_admin) {
-        navigate("/admin-dashboard");
-      } else {
-        navigate("/dashboard");
-      }
+      navigate("/dashboard");
     } catch (err) {
       toast.error("Login failed, please try again.");
     } finally {
