@@ -41,35 +41,36 @@ const ExpenseChart = () => {
       }
 
       try {
-        // Get user profile using direct query
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', email)
-          .single();
-
-        if (profileError || !profileData) {
+        // Get user profile - break down the query to avoid deep type inference
+        const profileQuery = supabase.from('profiles').select('id').eq('email', email);
+        const profileResponse = await profileQuery.single();
+        
+        if (profileResponse.error || !profileResponse.data) {
           setData([]);
           setLoading(false);
-          console.error("Profile fetch error for expense chart:", profileError);
+          console.error("Profile fetch error for expense chart:", profileResponse.error);
           return;
         }
 
-        // Fetch transactions using direct query
-        const { data: transactionData, error: transactionError } = await supabase
+        const userId = profileResponse.data.id;
+
+        // Fetch transactions - simplified query structure
+        const transactionQuery = supabase
           .from("transactions")
           .select("id, amount, category, type")
-          .eq("user_id", profileData.id)
+          .eq("user_id", userId)
           .eq("type", "expense");
         
-        if (transactionError) {
-          console.error("Transactions fetch error for expense chart:", transactionError);
+        const transactionResponse = await transactionQuery;
+        
+        if (transactionResponse.error) {
+          console.error("Transactions fetch error for expense chart:", transactionResponse.error);
           setData([]);
           setLoading(false);
           return;
         }
 
-        const transactions = transactionData || [];
+        const transactions = transactionResponse.data || [];
         const categoryTotals: Record<string, number> = {};
         
         // Process transactions
