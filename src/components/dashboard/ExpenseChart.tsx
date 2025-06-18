@@ -15,11 +15,9 @@ const categoryColors: Record<string, string> = {
 
 interface Transaction {
   id: string;
-  name: string;
   category: string | null;
   amount: number;
-  date: string;
-  type: string; // "income" or "expense"
+  type: string;
 }
 
 interface CategorySummary {
@@ -30,10 +28,10 @@ interface CategorySummary {
 
 const ExpenseChart = () => {
   const [data, setData] = useState<CategorySummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const fetchExpenses = async () => {
+    const fetchExpenses = async (): Promise<void> => {
       setLoading(true);
       let email = "";
       const storedUser = localStorage.getItem("walletmaster_user");
@@ -66,21 +64,27 @@ const ExpenseChart = () => {
       // Fetch user's expense transactions (not income) using user_id
       const { data: txs, error } = await supabase
         .from("transactions")
-        .select("id, amount, category, date, type")
+        .select("id, amount, category, type")
         .eq("user_id", profile.id)
         .eq("type", "expense");
         
       if (!error && Array.isArray(txs)) {
-        const catMap: Record<string, number> = {};
-        txs.forEach((tx) => {
+        const catMap: { [key: string]: number } = {};
+        
+        for (const tx of txs) {
           const cat = tx.category && categoryColors[tx.category] ? tx.category : "Misc";
           catMap[cat] = (catMap[cat] || 0) + Number(tx.amount);
-        });
-        const finalData = Object.entries(catMap).map(([name, value]) => ({
-          name,
-          value,
-          color: categoryColors[name] || "#6b7280",
-        }));
+        }
+        
+        const finalData: CategorySummary[] = [];
+        for (const [name, value] of Object.entries(catMap)) {
+          finalData.push({
+            name,
+            value,
+            color: categoryColors[name] || "#6b7280",
+          });
+        }
+        
         setData(finalData);
       } else {
         if (error) console.error("Transactions fetch error for expense chart:", error);
