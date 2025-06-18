@@ -1,4 +1,5 @@
 
+
 import { PieChart, Pie, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -97,14 +98,14 @@ const ExpenseChart = () => {
     fetchExpenses();
   }, []);
 
-  // Simplified chart config to avoid deep type instantiation
-  const chartConfig = data.reduce((config, item) => {
-    config[item.name] = {
+  // Create a simple config object without complex type inference
+  const chartConfig: any = {};
+  data.forEach((item) => {
+    chartConfig[item.name] = {
       label: item.name,
       color: item.color,
     };
-    return config;
-  }, {} as Record<string, { label: string; color: string }>);
+  });
 
   return (
     <Card className="h-full">
@@ -153,3 +154,4 @@ const ExpenseChart = () => {
 };
 
 export default ExpenseChart;
+
