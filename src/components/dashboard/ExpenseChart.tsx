@@ -1,14 +1,8 @@
 
-
 import { PieChart, Pie, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
 
 const categoryColors: Record<string, string> = {
   Food: '#f97316',
@@ -98,14 +92,17 @@ const ExpenseChart = () => {
     fetchExpenses();
   }, []);
 
-  // Create a simple config object without complex type inference
-  const chartConfig: any = {};
-  data.forEach((item) => {
-    chartConfig[item.name] = {
-      label: item.name,
-      color: item.color,
-    };
-  });
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-2 border rounded shadow">
+          <p className="text-sm">{`${payload[0].name}: $${payload[0].value}`}</p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <Card className="h-full">
@@ -119,15 +116,8 @@ const ExpenseChart = () => {
           ) : data.length === 0 ? (
             <div className="flex h-full items-center justify-center text-muted-foreground">No expenses found.</div>
           ) : (
-            <ChartContainer
-              config={chartConfig}
-              className="mx-auto aspect-square h-full"
-            >
-              <PieChart>
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent hideLabel formatter={(value) => `$${value}`} />}
-                />
+            <div className="w-full h-full flex items-center justify-center">
+              <PieChart width={300} height={300}>
                 <Pie
                   data={data}
                   dataKey="value"
@@ -144,8 +134,9 @@ const ExpenseChart = () => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
+                <CustomTooltip />
               </PieChart>
-            </ChartContainer>
+            </div>
           )}
         </div>
       </CardContent>
@@ -154,4 +145,3 @@ const ExpenseChart = () => {
 };
 
 export default ExpenseChart;
-
