@@ -63,11 +63,11 @@ const OverviewDashboard = () => {
         .select('id', { count: 'exact' })
         .eq('status', 'pending');
 
-      // Try to get payment methods (handle gracefully if table doesn't exist yet)
+      // Get payment methods count
       let activeCards = 0;
       try {
         const { data: paymentMethods } = await supabase
-          .from('payment_methods' as any)
+          .from('payment_methods')
           .select('id', { count: 'exact' })
           .eq('is_active', true);
         activeCards = paymentMethods?.length || 0;
@@ -175,6 +175,8 @@ const OverviewDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {statCards.map((stat, index) => {
           const IconComponent = stat.icon;
+          const numericValue = typeof stat.value === 'number' ? stat.value : 0;
+          
           return (
             <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -185,12 +187,12 @@ const OverviewDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
-                {stat.title === "Fraud Alerts" && stat.value > 0 && (
+                {stat.title === "Fraud Alerts" && numericValue > 0 && (
                   <Badge variant="destructive" className="mt-2">
                     Requires Attention
                   </Badge>
                 )}
-                {stat.title === "Pending Verifications" && stat.value > 0 && (
+                {stat.title === "Pending Verifications" && numericValue > 0 && (
                   <Badge variant="secondary" className="mt-2">
                     Needs Review
                   </Badge>

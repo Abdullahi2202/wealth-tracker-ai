@@ -36,11 +36,12 @@ const ReceivedPaymentsMobile = () => {
           return;
         }
 
-        // Show payments where user is recipient (based on user_id)
+        // Show payments where user is recipient (simplified for now)
         const { data, error } = await supabase
           .from("transactions")
           .select("id, amount, date, name, note, user_id")
-          .eq("recipient_user_id", user.id)
+          .eq("user_id", user.id)
+          .eq("type", "income")
           .order("date", { ascending: false })
           .limit(15);
 

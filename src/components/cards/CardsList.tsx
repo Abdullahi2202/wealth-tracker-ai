@@ -65,7 +65,7 @@ const CardsList = () => {
 
   const { data: paymentMethods, isLoading, error, refetch } = useQuery({
     queryKey: ['payment-methods'],
-    queryFn: async () => {
+    queryFn: async (): Promise<PaymentMethod[]> => {
       console.log('Fetching payment methods...');
       
       try {
@@ -105,9 +105,9 @@ const CardsList = () => {
           }
         }
 
-        // Fetch payment methods using any type to bypass TypeScript issues temporarily
+        // Fetch payment methods
         const { data, error } = await supabase
-          .from('payment_methods' as any)
+          .from('payment_methods')
           .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
@@ -130,7 +130,7 @@ const CardsList = () => {
   const deletePaymentMethod = async (paymentMethodId: string) => {
     try {
       const { error } = await supabase
-        .from('payment_methods' as any)
+        .from('payment_methods')
         .update({ is_active: false })
         .eq('id', paymentMethodId);
 
@@ -152,7 +152,7 @@ const CardsList = () => {
 
       // First, unset all other default payment methods for this user
       const { error: unsetError } = await supabase
-        .from('payment_methods' as any)
+        .from('payment_methods')
         .update({ is_default: false })
         .eq('user_id', user.id);
 
@@ -160,7 +160,7 @@ const CardsList = () => {
 
       // Then set the selected one as default
       const { error: setError } = await supabase
-        .from('payment_methods' as any)
+        .from('payment_methods')
         .update({ is_default: true })
         .eq('id', paymentMethodId);
 

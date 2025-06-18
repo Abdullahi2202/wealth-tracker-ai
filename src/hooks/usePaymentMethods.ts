@@ -30,9 +30,9 @@ export function usePaymentMethods() {
         return;
       }
 
-      // Use any type to bypass TypeScript issues temporarily
+      // Fetch payment methods
       const { data, error } = await supabase
-        .from("payment_methods" as any)
+        .from("payment_methods")
         .select("id, type, label, brand, exp_month, exp_year, last4, is_active, is_default, created_at")
         .eq("user_id", user.id)
         .eq("is_active", true)
