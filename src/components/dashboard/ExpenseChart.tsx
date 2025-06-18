@@ -41,51 +41,56 @@ const ExpenseChart = () => {
       }
 
       try {
-        // First, get user_id from email
-        const profileResponse = await supabase
+        // Get user profile with explicit typing
+        const profileQuery = supabase
           .from('profiles')
           .select('id')
           .eq('email', email)
           .single();
 
-        if (profileResponse.error || !profileResponse.data) {
+        const profileResult = await profileQuery;
+
+        if (profileResult.error || !profileResult.data) {
           setData([]);
           setLoading(false);
-          console.error("Profile fetch error for expense chart:", profileResponse.error);
+          console.error("Profile fetch error for expense chart:", profileResult.error);
           return;
         }
 
-        // Fetch user's expense transactions using user_id
-        const transactionsResponse = await supabase
+        const userId = profileResult.data.id;
+
+        // Fetch transactions with explicit typing
+        const transactionsQuery = supabase
           .from("transactions")
           .select("id, amount, category, type")
-          .eq("user_id", profileResponse.data.id)
+          .eq("user_id", userId)
           .eq("type", "expense");
         
-        if (transactionsResponse.error) {
-          console.error("Transactions fetch error for expense chart:", transactionsResponse.error);
+        const transactionsResult = await transactionsQuery;
+        
+        if (transactionsResult.error) {
+          console.error("Transactions fetch error for expense chart:", transactionsResult.error);
           setData([]);
           setLoading(false);
           return;
         }
 
-        const transactions = transactionsResponse.data || [];
-        const categoryMap = new Map<string, number>();
+        const transactions = transactionsResult.data || [];
+        const categoryTotals: Record<string, number> = {};
         
-        transactions.forEach(tx => {
+        // Process transactions
+        for (const tx of transactions) {
           const category = (tx.category && categoryColors[tx.category]) ? tx.category : "Misc";
-          const currentAmount = categoryMap.get(category) || 0;
-          categoryMap.set(category, currentAmount + Number(tx.amount));
-        });
+          const amount = Number(tx.amount) || 0;
+          categoryTotals[category] = (categoryTotals[category] || 0) + amount;
+        }
         
-        const chartData: CategorySummary[] = [];
-        categoryMap.forEach((value, name) => {
-          chartData.push({
-            name,
-            value,
-            color: categoryColors[name] || "#6b7280",
-          });
-        });
+        // Convert to chart data
+        const chartData: CategorySummary[] = Object.entries(categoryTotals).map(([name, value]) => ({
+          name,
+          value,
+          color: categoryColors[name] || "#6b7280",
+        }));
         
         setData(chartData);
       } catch (error) {
