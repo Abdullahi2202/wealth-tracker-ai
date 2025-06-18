@@ -41,41 +41,38 @@ const ExpenseChart = () => {
       }
 
       try {
-        // Simple profile lookup
-        const profileResult = await supabase
+        // Get profile ID first
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('id')
           .eq('email', email)
-          .limit(1);
+          .single();
         
-        if (profileResult.error || !profileResult.data?.[0]) {
+        if (profileError || !profileData) {
+          console.error("Profile fetch error:", profileError);
           setData([]);
           setLoading(false);
-          console.error("Profile fetch error for expense chart:", profileResult.error);
           return;
         }
 
-        const userId = profileResult.data[0].id;
-
-        // Simple transactions lookup
-        const transactionResult = await supabase
+        // Get transactions
+        const { data: transactions, error: transactionError } = await supabase
           .from("transactions")
           .select("amount, category, type")
-          .eq("user_id", userId)
+          .eq("user_id", profileData.id)
           .eq("type", "expense");
         
-        if (transactionResult.error) {
-          console.error("Transactions fetch error for expense chart:", transactionResult.error);
+        if (transactionError) {
+          console.error("Transactions fetch error:", transactionError);
           setData([]);
           setLoading(false);
           return;
         }
 
-        const transactions = transactionResult.data || [];
         const categoryTotals: Record<string, number> = {};
         
         // Process transactions
-        for (const tx of transactions) {
+        for (const tx of transactions || []) {
           const category = (tx.category && categoryColors[tx.category]) ? tx.category : "Misc";
           const amount = Number(tx.amount) || 0;
           categoryTotals[category] = (categoryTotals[category] || 0) + amount;

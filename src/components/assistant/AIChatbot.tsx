@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Send, Bot, User, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import FinancialInsights from "./FinancialInsights";
 
 interface Message {
   id: string;
@@ -25,7 +26,7 @@ export default function AIChatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
-      content: "Hello! I'm your WalletMaster AI assistant. I can help you with financial questions, payment issues, and general wallet management. How can I assist you today?",
+      content: "Hello! I'm your WalletMaster AI assistant with access to your real financial data. I can help you analyze your spending patterns, suggest budget improvements, provide investment advice based on your actual financial situation, and answer any questions about your wallet. How can I assist you today?",
       role: "assistant",
       timestamp: new Date(),
     },
@@ -76,14 +77,13 @@ export default function AIChatbot() {
     setIsLoading(true);
 
     try {
-      // Create enhanced context with user information
       const enhancedContext = `
         User Information:
         - Name: ${userContext.full_name || 'Unknown'}
         - Email: ${userContext.email || 'Unknown'}
         - User Type: ${userContext.isAdmin ? 'Admin' : 'Regular User'}
         
-        Context: Financial assistant for WalletMaster app - User is asking for help with their wallet and financial management.
+        Context: Financial assistant for WalletMaster app with access to real user financial data including spending patterns, income, expenses, and investment opportunities. User is asking for personalized financial advice based on their actual data.
       `;
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
@@ -115,7 +115,6 @@ export default function AIChatbot() {
       console.error("Error sending message:", error);
       toast.error("Failed to send message. Please try again.");
       
-      // Add fallback response
       const fallbackMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: "I'm sorry, I'm currently experiencing technical difficulties. Please try again later or contact support if the issue persists.",
@@ -136,7 +135,7 @@ export default function AIChatbot() {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto">
+    <div className="flex flex-col h-full max-w-6xl mx-auto">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-lg">
         <div className="flex items-center gap-3">
@@ -144,10 +143,15 @@ export default function AIChatbot() {
           <div>
             <h2 className="text-xl font-semibold">WalletMaster AI Assistant</h2>
             <p className="text-blue-100 text-sm">
-              {userContext.full_name ? `Hello ${userContext.full_name}! ` : ''}Your personal financial advisor
+              {userContext.full_name ? `Hello ${userContext.full_name}! ` : ''}Your personal financial advisor with real-time data
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Financial Insights */}
+      <div className="p-4 bg-gray-50">
+        <FinancialInsights />
       </div>
 
       {/* Messages */}
@@ -197,7 +201,7 @@ export default function AIChatbot() {
             <Card className="bg-white border border-gray-200 p-3">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm text-gray-600">Thinking...</span>
+                <span className="text-sm text-gray-600">Analyzing your financial data...</span>
               </div>
             </Card>
           </div>
@@ -213,7 +217,7 @@ export default function AIChatbot() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask me anything about your wallet, payments, or finances..."
+            placeholder="Ask about your spending, savings, investments, or financial goals..."
             disabled={isLoading}
             className="flex-1"
           />
@@ -227,7 +231,7 @@ export default function AIChatbot() {
           </Button>
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          Press Enter to send • Shift+Enter for new line
+          Press Enter to send • Ask about your real spending patterns, investment advice, or budget optimization
         </p>
       </div>
     </div>
