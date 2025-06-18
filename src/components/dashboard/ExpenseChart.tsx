@@ -41,36 +41,37 @@ const ExpenseChart = () => {
       }
 
       try {
-        // Get user profile - break down the query to avoid deep type inference
-        const profileQuery = supabase.from('profiles').select('id').eq('email', email);
-        const profileResponse = await profileQuery.single();
+        // Simple profile lookup
+        const profileResult = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .limit(1);
         
-        if (profileResponse.error || !profileResponse.data) {
+        if (profileResult.error || !profileResult.data?.[0]) {
           setData([]);
           setLoading(false);
-          console.error("Profile fetch error for expense chart:", profileResponse.error);
+          console.error("Profile fetch error for expense chart:", profileResult.error);
           return;
         }
 
-        const userId = profileResponse.data.id;
+        const userId = profileResult.data[0].id;
 
-        // Fetch transactions - simplified query structure
-        const transactionQuery = supabase
+        // Simple transactions lookup
+        const transactionResult = await supabase
           .from("transactions")
-          .select("id, amount, category, type")
+          .select("amount, category, type")
           .eq("user_id", userId)
           .eq("type", "expense");
         
-        const transactionResponse = await transactionQuery;
-        
-        if (transactionResponse.error) {
-          console.error("Transactions fetch error for expense chart:", transactionResponse.error);
+        if (transactionResult.error) {
+          console.error("Transactions fetch error for expense chart:", transactionResult.error);
           setData([]);
           setLoading(false);
           return;
         }
 
-        const transactions = transactionResponse.data || [];
+        const transactions = transactionResult.data || [];
         const categoryTotals: Record<string, number> = {};
         
         // Process transactions
