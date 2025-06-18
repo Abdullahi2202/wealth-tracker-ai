@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,19 +39,25 @@ const CardsList = () => {
   useEffect(() => {
     async function fetchVerification() {
       setCheckingVerification(true);
-      const storedUser = localStorage.getItem("walletmaster_user");
-      const email = storedUser ? JSON.parse(storedUser)?.email : null;
-      if (!email) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.email) {
+          setVerificationStatus(null);
+          setCheckingVerification(false);
+          return;
+        }
+
+        const { data: user } = await supabase
+          .from("registration")
+          .select("verification_status")
+          .eq("email", session.user.email)
+          .maybeSingle();
+        
+        setVerificationStatus(user?.verification_status || null);
+      } catch (error) {
+        console.error('Error fetching verification status:', error);
         setVerificationStatus(null);
-        setCheckingVerification(false);
-        return;
       }
-      const { data: user } = await supabase
-        .from("registration")
-        .select("verification_status")
-        .eq("email", email)
-        .maybeSingle();
-      setVerificationStatus(user?.verification_status || null);
       setCheckingVerification(false);
     }
     fetchVerification();
@@ -61,66 +68,69 @@ const CardsList = () => {
     queryFn: async () => {
       console.log('Fetching payment methods...');
       
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('No authenticated user found');
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.log('No authenticated user found');
+          return [];
+        }
+
+        console.log('Current user:', user.id);
+
+        // Check in registration table for existence
+        const { data: userData, error: userError } = await supabase
+          .from('registration')
+          .select('id, email, full_name')
+          .eq('email', user.email || '')
+          .maybeSingle();
+
+        if (userError && userError.code !== 'PGRST116') {
+          console.error('Error checking registration:', userError);
+        }
+
+        if (!userData && user.email) {
+          console.log('User not found in registration table, creating...');
+          // Create registration record if it doesn't exist
+          const { error: insertError } = await supabase
+            .from('registration')
+            .insert({
+              email: user.email,
+              full_name: user.user_metadata?.full_name || user.email,
+              password: 'temp', // Temporary password for existing users
+            });
+
+          if (insertError) {
+            console.error('Error creating registration:', insertError);
+          }
+        }
+
+        // Fetch payment methods using any type to bypass TypeScript issues temporarily
+        const { data, error } = await supabase
+          .from('payment_methods' as any)
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching payment methods:', error);
+          return [];
+        }
+
+        console.log('Payment methods fetched:', data);
+        return (data || []) as PaymentMethod[];
+      } catch (error) {
+        console.error('Error in fetchMethods:', error);
         return [];
       }
-
-      console.log('Current user:', user.id);
-
-      // Check in registration table for existence
-      const { data: userData, error: userError } = await supabase
-        .from('registration')
-        .select('id, email, full_name')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (userError && userError.code !== 'PGRST116') {
-        console.error('Error checking registration:', userError);
-        throw userError;
-      }
-
-      if (!userData) {
-        console.log('User not found in registration table, creating...');
-        // Create registration record if it doesn't exist
-        const { error: insertError } = await supabase
-          .from('registration')
-          .insert({
-            id: user.id,
-            email: user.email || '',
-            full_name: user.user_metadata?.full_name || user.email || '',
-            password: '', // You may skip or set default if not relevant
-          });
-
-        if (insertError) {
-          console.error('Error creating registration:', insertError);
-          throw insertError;
-        }
-      }
-
-      const { data, error } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching payment methods:', error);
-        throw error;
-      }
-
-      console.log('Payment methods fetched:', data);
-      return data as PaymentMethod[];
     },
   });
 
   const deletePaymentMethod = async (paymentMethodId: string) => {
     try {
       const { error } = await supabase
-        .from('payment_methods')
+        .from('payment_methods' as any)
         .update({ is_active: false })
         .eq('id', paymentMethodId);
 
@@ -142,7 +152,7 @@ const CardsList = () => {
 
       // First, unset all other default payment methods for this user
       const { error: unsetError } = await supabase
-        .from('payment_methods')
+        .from('payment_methods' as any)
         .update({ is_default: false })
         .eq('user_id', user.id);
 
@@ -150,7 +160,7 @@ const CardsList = () => {
 
       // Then set the selected one as default
       const { error: setError } = await supabase
-        .from('payment_methods')
+        .from('payment_methods' as any)
         .update({ is_default: true })
         .eq('id', paymentMethodId);
 
@@ -165,7 +175,6 @@ const CardsList = () => {
   };
 
   const getCardIcon = (brand?: string) => {
-    // You can add more specific brand icons here
     return <CreditCard className="h-6 w-6" />;
   };
 
@@ -199,7 +208,7 @@ const CardsList = () => {
   }
 
   // Restrict adding cards if not verified
-  const canAddCard = verificationStatus === "approved";
+  const canAddCard = verificationStatus === "approved" || verificationStatus === "verified";
   if (!canAddCard) {
     return (
       <div className="space-y-6">

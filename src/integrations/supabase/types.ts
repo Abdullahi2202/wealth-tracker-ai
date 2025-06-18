@@ -234,6 +234,51 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          brand: string | null
+          created_at: string | null
+          exp_month: number | null
+          exp_year: number | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          label: string | null
+          last4: string | null
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          label?: string | null
+          last4?: string | null
+          type?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          label?: string | null
+          last4?: string | null
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
