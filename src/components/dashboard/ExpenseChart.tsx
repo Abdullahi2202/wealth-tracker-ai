@@ -19,14 +19,14 @@ type CategorySummary = {
   color: string;
 };
 
-type Transaction = {
+type TransactionData = {
   id: string;
   amount: number;
   category: string | null;
   type: string;
 };
 
-type Profile = {
+type ProfileData = {
   id: string;
 };
 
@@ -52,26 +52,32 @@ const ExpenseChart = () => {
       }
 
       try {
-        // Get user profile - simplified approach
-        const profileResult = await supabase
+        // Get user profile with explicit typing
+        const profileQuery = supabase
           .from('profiles')
           .select('id')
           .eq('email', email)
           .single();
+        
+        const profileResult = await profileQuery;
+        const profile = profileResult.data as ProfileData | null;
 
-        if (profileResult.error || !profileResult.data) {
+        if (profileResult.error || !profile) {
           setData([]);
           setLoading(false);
           console.error("Profile fetch error for expense chart:", profileResult.error);
           return;
         }
 
-        // Fetch transactions - simplified approach
-        const transactionsResult = await supabase
+        // Fetch transactions with explicit typing
+        const transactionsQuery = supabase
           .from("transactions")
           .select("id, amount, category, type")
-          .eq("user_id", profileResult.data.id)
+          .eq("user_id", profile.id)
           .eq("type", "expense");
+        
+        const transactionsResult = await transactionsQuery;
+        const transactions = transactionsResult.data as TransactionData[] | null;
         
         if (transactionsResult.error) {
           console.error("Transactions fetch error for expense chart:", transactionsResult.error);
@@ -80,7 +86,7 @@ const ExpenseChart = () => {
           return;
         }
 
-        const transactionList = transactionsResult.data || [];
+        const transactionList = transactions || [];
         const categoryTotals: Record<string, number> = {};
         
         // Process transactions
