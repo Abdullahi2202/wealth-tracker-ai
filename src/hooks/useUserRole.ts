@@ -7,54 +7,38 @@ export function useUserRole() {
 
   useEffect(() => {
     async function fetchRole() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      
       if (!session?.user) {
         setRole(null);
         return;
       }
       
       try {
-        // Use the new get_user_role function to avoid recursion
-        const { data: roleData, error } = await supabase
-          .rpc('get_user_role', { user_uuid: session.user.id });
-
-        if (error) {
-          console.error("Error fetching role:", error);
-          // Fallback: check if user is hardcoded admin
-          if (session.user.email === "kingabdalla982@gmail.com") {
-            setRole("admin");
-          } else {
-            setRole("user");
-          }
+        // Check if user is hardcoded admin
+        if (session.user.email === "kingabdalla982@gmail.com") {
+          setRole("admin");
           return;
         }
 
-        const userRole = roleData;
-        if (userRole === "admin") {
+        // Check user roles table
+        const { data: roleData, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (!error && roleData?.role === 'admin') {
           setRole("admin");
-        } else if (userRole === "user") {
-          setRole("user");
         } else {
-          // Default to user if no role found, or admin for hardcoded email
-          if (session.user.email === "kingabdalla982@gmail.com") {
-            setRole("admin");
-          } else {
-            setRole("user");
-          }
+          setRole("user");
         }
       } catch (error) {
         console.error("Error in fetchRole:", error);
-        // Fallback: check if user is hardcoded admin
-        const session_data = await supabase.auth.getSession();
-        if (session_data.data.session?.user?.email === "kingabdalla982@gmail.com") {
-          setRole("admin");
-        } else {
-          setRole("user");
-        }
+        setRole("user");
       }
     }
+    
     fetchRole();
   }, []);
 

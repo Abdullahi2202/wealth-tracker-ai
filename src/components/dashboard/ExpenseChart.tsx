@@ -26,44 +26,27 @@ const ExpenseChart = () => {
   useEffect(() => {
     const fetchExpenses = async () => {
       setLoading(true);
-      let email = "";
-      const storedUser = localStorage.getItem("walletmaster_user");
-      if (storedUser) {
-        try {
-          const userObj = JSON.parse(storedUser);
-          email = userObj.email || "";
-        } catch {}
-      }
-      if (!email) {
-        setData([]);
-        setLoading(false);
-        return;
-      }
-
+      
       try {
-        // Get profile ID first
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', email)
-          .single();
-        
-        if (profileError || !profileData) {
-          console.error("Profile fetch error:", profileError);
+        // Get current auth user
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
           setData([]);
           setLoading(false);
           return;
         }
 
-        // Get transactions
-        const { data: transactions, error: transactionError } = await supabase
+        const userId = session.user.id;
+
+        // Get transactions for the current user
+        const { data: transactions, error } = await supabase
           .from("transactions")
           .select("amount, category, type")
-          .eq("user_id", profileData.id)
+          .eq("user_id", userId)
           .eq("type", "expense");
         
-        if (transactionError) {
-          console.error("Transactions fetch error:", transactionError);
+        if (error) {
+          console.error("Transactions fetch error:", error);
           setData([]);
           setLoading(false);
           return;

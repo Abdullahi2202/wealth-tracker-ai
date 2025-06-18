@@ -36,48 +36,39 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching users via edge function...');
       
-      // Use edge function which has service role access
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'GET'
-      });
+      // Fetch users from registration table
+      const { data, error } = await supabase
+        .from('registration')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Edge function error:', error);
-        toast.error('Failed to fetch users: ' + (error.message || 'Unknown error'));
+        console.error('Error fetching users:', error);
+        toast.error('Failed to fetch users: ' + error.message);
         setUsers([]);
       } else {
-        console.log('Edge function successful:', data?.length || 0);
-        setUsers(Array.isArray(data) ? data : []);
+        setUsers(data || []);
       }
     } catch (error: any) {
       console.error('Error:', error);
-      toast.error('Failed to fetch users: ' + (error.message || 'Unknown error'));
+      toast.error('Failed to fetch users: ' + error.message);
       setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRefresh = () => {
-    fetchUsers();
-  };
-
   const handleVerifyUser = async (userId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'PUT',
-        body: {
-          id: userId,
-          action: 'update',
-          verification_status: 'verified'
-        }
-      });
+      const { error } = await supabase
+        .from('registration')
+        .update({ verification_status: 'verified' })
+        .eq('id', userId);
 
       if (error) {
         console.error('Error verifying user:', error);
-        toast.error('Failed to verify user: ' + (error.message || 'Unknown error'));
+        toast.error('Failed to verify user: ' + error.message);
         return;
       }
 
@@ -85,7 +76,7 @@ const UserManagement = () => {
       fetchUsers();
     } catch (error: any) {
       console.error('Error verifying user:', error);
-      toast.error('Failed to verify user: ' + (error.message || 'Unknown error'));
+      toast.error('Failed to verify user: ' + error.message);
     }
   };
 
@@ -95,14 +86,14 @@ const UserManagement = () => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'DELETE',
-        body: { id: userId }
-      });
+      const { error } = await supabase
+        .from('registration')
+        .delete()
+        .eq('id', userId);
 
       if (error) {
         console.error('Error deleting user:', error);
-        toast.error('Failed to delete user: ' + (error.message || 'Unknown error'));
+        toast.error('Failed to delete user: ' + error.message);
         return;
       }
 
@@ -110,7 +101,7 @@ const UserManagement = () => {
       fetchUsers();
     } catch (error: any) {
       console.error('Error deleting user:', error);
-      toast.error('Failed to delete user: ' + (error.message || 'Unknown error'));
+      toast.error('Failed to delete user: ' + error.message);
     }
   };
 
@@ -144,14 +135,13 @@ const UserManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-xl font-semibold">User Management</h2>
           <p className="text-sm text-muted-foreground">Manage users, verification, and account status</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
+          <Button variant="outline" size="sm" onClick={fetchUsers}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -314,7 +304,7 @@ const UserManagement = () => {
           {filteredUsers.length === 0 && !loading && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No users found</p>
-              <Button variant="outline" className="mt-2" onClick={handleRefresh}>
+              <Button variant="outline" className="mt-2" onClick={fetchUsers}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh to reload users
               </Button>

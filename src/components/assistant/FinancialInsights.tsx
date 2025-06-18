@@ -12,20 +12,6 @@ interface FinancialSummary {
   savingsRate: number;
 }
 
-interface ProfileData {
-  id: string;
-}
-
-interface WalletData {
-  balance: number;
-}
-
-interface TransactionData {
-  amount: number;
-  category: string | null;
-  type: string;
-}
-
 export default function FinancialInsights() {
   const [insights, setInsights] = useState<FinancialSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,81 +19,60 @@ export default function FinancialInsights() {
   useEffect(() => {
     const fetchInsights = async () => {
       try {
-        const storedUser = localStorage.getItem("walletmaster_user");
-        if (!storedUser) {
+        // Get current auth user
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
           setLoading(false);
           return;
         }
 
-        const user = JSON.parse(storedUser);
-        const email = user.email;
-        if (!email) {
-          setLoading(false);
-          return;
-        }
+        const userId = session.user.id;
 
-        // Step 1: Get user profile with explicit typing
-        const profileResponse = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', email);
-
-        if (profileResponse.error) {
-          console.error('Profile query error:', profileResponse.error);
-          setLoading(false);
-          return;
-        }
-
-        const profiles = profileResponse.data as ProfileData[];
-        if (!profiles || profiles.length === 0) {
-          console.error('No profile found for email:', email);
-          setLoading(false);
-          return;
-        }
-
-        const profileId = profiles[0].id;
-
-        // Step 2: Get wallet balance
-        const walletResponse = await supabase
+        // Get wallet balance
+        const { data: walletData } = await supabase
           .from('wallets')
           .select('balance')
-          .eq('user_id', profileId);
+          .eq('user_id', userId)
+          .single();
 
-        const wallets = walletResponse.data as WalletData[];
-        const walletBalance = wallets && wallets.length > 0 ? wallets[0].balance : 0;
+        const walletBalance = walletData?.balance || 0;
 
-        // Step 3: Get current month transactions
+        // Get current month transactions
         const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
         
-        const transactionsResponse = await supabase
+        const { data: transactions } = await supabase
           .from('transactions')
           .select('amount, category, type')
-          .eq('user_id', profileId)
+          .eq('user_id', userId)
           .gte('date', startOfMonth);
 
-        if (transactionsResponse.error) {
-          console.error('Transactions query error:', transactionsResponse.error);
+        if (!transactions) {
+          setInsights({
+            totalBalance: Number(walletBalance),
+            monthlyIncome: 0,
+            monthlyExpenses: 0,
+            topSpendingCategory: 'None',
+            savingsRate: 0
+          });
           setLoading(false);
           return;
         }
-
-        const transactions = transactionsResponse.data as TransactionData[] || [];
 
         // Calculate insights
         const monthlyIncome = transactions
-          .filter((t: TransactionData) => t.type === 'income')
-          .reduce((sum: number, t: TransactionData) => sum + Number(t.amount), 0);
+          .filter(t => t.type === 'income')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
 
         const monthlyExpenses = transactions
-          .filter((t: TransactionData) => t.type === 'expense')
-          .reduce((sum: number, t: TransactionData) => sum + Number(t.amount), 0);
+          .filter(t => t.type === 'expense')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
 
         // Find top spending category
         const categoryTotals: Record<string, number> = {};
         transactions
-          .filter((t: TransactionData) => t.type === 'expense')
-          .forEach((t: TransactionData) => {
+          .filter(t => t.type === 'expense')
+          .forEach(t => {
             const category = t.category || 'Misc';
             categoryTotals[category] = (categoryTotals[category] || 0) + Number(t.amount);
           });

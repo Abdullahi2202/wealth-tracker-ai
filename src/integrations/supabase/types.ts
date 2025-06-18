@@ -196,15 +196,7 @@ export type Database = {
           transaction_id?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "fraud_alerts_transaction_id_fkey"
-            columns: ["transaction_id"]
-            isOneToOne: false
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       identity_verification_requests: {
         Row: {
@@ -242,72 +234,30 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_methods: {
-        Row: {
-          brand: string | null
-          created_at: string | null
-          details: Json | null
-          exp_month: number | null
-          exp_year: number | null
-          id: string
-          is_active: boolean | null
-          is_default: boolean | null
-          label: string | null
-          last4: string | null
-          stripe_payment_method_id: string | null
-          type: string
-          user_id: string | null
-        }
-        Insert: {
-          brand?: string | null
-          created_at?: string | null
-          details?: Json | null
-          exp_month?: number | null
-          exp_year?: number | null
-          id?: string
-          is_active?: boolean | null
-          is_default?: boolean | null
-          label?: string | null
-          last4?: string | null
-          stripe_payment_method_id?: string | null
-          type: string
-          user_id?: string | null
-        }
-        Update: {
-          brand?: string | null
-          created_at?: string | null
-          details?: Json | null
-          exp_month?: number | null
-          exp_year?: number | null
-          id?: string
-          is_active?: boolean | null
-          is_default?: boolean | null
-          label?: string | null
-          last4?: string | null
-          stripe_payment_method_id?: string | null
-          type?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string | null
+          email: string | null
           full_name: string | null
           id: string
-          is_admin: boolean | null
+          phone: string | null
+          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
+          email?: string | null
           full_name?: string | null
           id: string
-          is_admin?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
-          is_admin?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -477,15 +427,7 @@ export type Database = {
           transaction_type?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "transaction_logs_transaction_id_fkey"
-            columns: ["transaction_id"]
-            isOneToOne: false
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       transactions: {
         Row: {
@@ -496,9 +438,6 @@ export type Database = {
           id: string
           name: string
           note: string | null
-          payment_method_id: string | null
-          recipient_user_id: string | null
-          scheduled_for: string | null
           status: string | null
           type: string
           user_id: string | null
@@ -511,9 +450,6 @@ export type Database = {
           id?: string
           name: string
           note?: string | null
-          payment_method_id?: string | null
-          recipient_user_id?: string | null
-          scheduled_for?: string | null
           status?: string | null
           type: string
           user_id?: string | null
@@ -526,33 +462,28 @@ export type Database = {
           id?: string
           name?: string
           note?: string | null
-          payment_method_id?: string | null
-          recipient_user_id?: string | null
-          scheduled_for?: string | null
           status?: string | null
           type?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "transactions_payment_method_id_fkey"
-            columns: ["payment_method_id"]
-            isOneToOne: false
-            referencedRelation: "payment_methods"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_roles: {
         Row: {
+          created_at: string | null
+          id: string
           role: string
           user_id: string
         }
         Insert: {
-          role: string
+          created_at?: string | null
+          id?: string
+          role?: string
           user_id: string
         }
         Update: {
+          created_at?: string | null
+          id?: string
           role?: string
           user_id?: string
         }

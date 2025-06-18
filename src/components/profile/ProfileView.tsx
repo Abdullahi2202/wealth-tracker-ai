@@ -33,26 +33,46 @@ export default function ProfileView() {
     try {
       // Get current user from Supabase Auth
       const { data: { session } } = await supabase.auth.getSession();
-      const userEmail = session?.user?.email ?? null;
+      const userEmail = session?.user?.email;
+      
       if (!userEmail) {
         setProfile(null);
         setLoading(false);
         return;
       }
-      // Fetch from registration table directly using real auth user
+
+      // Fetch from registration table using the authenticated user's email
       const { data: profileData } = await supabase
         .from("registration")
         .select("*")
         .eq("email", userEmail)
         .maybeSingle();
+
       if (!profileData) {
-        setProfile(null);
+        // Try to fetch from profiles table as fallback
+        const { data: authProfile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (authProfile) {
+          setProfile({
+            email: authProfile.email || userEmail,
+            full_name: authProfile.full_name,
+            phone: authProfile.phone,
+            verification_status: 'unverified'
+          });
+        } else {
+          setProfile(null);
+        }
         setLoading(false);
         return;
       }
 
       setProfile(profileData as ProfileData);
     } catch (error) {
+      console.error('Error fetching profile:', error);
       toast.error("Failed to load profile data");
     } finally {
       setLoading(false);
@@ -61,7 +81,7 @@ export default function ProfileView() {
 
   const getStatusBadge = (status: string | undefined) => {
     switch (status) {
-      case "approved":
+      case "verified":
         return (
           <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1">
             <CheckCircle className="h-4 w-4" /> Verified
@@ -128,7 +148,7 @@ export default function ProfileView() {
             <span className="text-sm font-medium">Verification Status:</span>
             {getStatusBadge(profile.verification_status)}
           </div>
-          {(profile.verification_status !== "approved") && (
+          {(profile.verification_status !== "verified") && (
             <div className="mt-3">
               <Button
                 variant="outline"
@@ -171,7 +191,7 @@ export default function ProfileView() {
       </Card>
 
       {/* Identity Document */}
-      {profile.verification_status === "approved" && (
+      {profile.verification_status === "verified" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
