@@ -13,25 +13,18 @@ const categoryColors: Record<string, string> = {
   Misc: '#6b7280',
 };
 
-interface Transaction {
-  id: string;
-  category: string | null;
-  amount: number;
-  type: string;
-}
-
-interface CategorySummary {
+type CategorySummary = {
   name: string;
   value: number;
   color: string;
-}
+};
 
 const ExpenseChart = () => {
-  const [data, setData] = useState<CategorySummary[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [data, setData] = useState([] as CategorySummary[]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchExpenses = async (): Promise<void> => {
+    const fetchExpenses = async () => {
       setLoading(true);
       let email = "";
       const storedUser = localStorage.getItem("walletmaster_user");
@@ -69,21 +62,19 @@ const ExpenseChart = () => {
         .eq("type", "expense");
         
       if (!error && Array.isArray(txs)) {
-        const catMap: { [key: string]: number } = {};
+        const catMap = new Map<string, number>();
         
         for (const tx of txs) {
-          const cat = tx.category && categoryColors[tx.category] ? tx.category : "Misc";
-          catMap[cat] = (catMap[cat] || 0) + Number(tx.amount);
+          const cat = (tx.category && categoryColors[tx.category]) ? tx.category : "Misc";
+          const currentAmount = catMap.get(cat) || 0;
+          catMap.set(cat, currentAmount + Number(tx.amount));
         }
         
-        const finalData: CategorySummary[] = [];
-        for (const [name, value] of Object.entries(catMap)) {
-          finalData.push({
-            name,
-            value,
-            color: categoryColors[name] || "#6b7280",
-          });
-        }
+        const finalData: CategorySummary[] = Array.from(catMap.entries()).map(([name, value]) => ({
+          name,
+          value,
+          color: categoryColors[name] || "#6b7280",
+        }));
         
         setData(finalData);
       } else {
