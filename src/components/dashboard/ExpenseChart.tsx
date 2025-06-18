@@ -19,17 +19,6 @@ type CategorySummary = {
   color: string;
 };
 
-type TransactionData = {
-  id: string;
-  amount: number;
-  category: string | null;
-  type: string;
-};
-
-type ProfileData = {
-  id: string;
-};
-
 const ExpenseChart = () => {
   const [data, setData] = useState<CategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,45 +41,39 @@ const ExpenseChart = () => {
       }
 
       try {
-        // Get user profile with explicit typing
-        const profileQuery = supabase
+        // Get user profile using direct query
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('id')
           .eq('email', email)
           .single();
-        
-        const profileResult = await profileQuery;
-        const profile = profileResult.data as ProfileData | null;
 
-        if (profileResult.error || !profile) {
+        if (profileError || !profileData) {
           setData([]);
           setLoading(false);
-          console.error("Profile fetch error for expense chart:", profileResult.error);
+          console.error("Profile fetch error for expense chart:", profileError);
           return;
         }
 
-        // Fetch transactions with explicit typing
-        const transactionsQuery = supabase
+        // Fetch transactions using direct query
+        const { data: transactionData, error: transactionError } = await supabase
           .from("transactions")
           .select("id, amount, category, type")
-          .eq("user_id", profile.id)
+          .eq("user_id", profileData.id)
           .eq("type", "expense");
         
-        const transactionsResult = await transactionsQuery;
-        const transactions = transactionsResult.data as TransactionData[] | null;
-        
-        if (transactionsResult.error) {
-          console.error("Transactions fetch error for expense chart:", transactionsResult.error);
+        if (transactionError) {
+          console.error("Transactions fetch error for expense chart:", transactionError);
           setData([]);
           setLoading(false);
           return;
         }
 
-        const transactionList = transactions || [];
+        const transactions = transactionData || [];
         const categoryTotals: Record<string, number> = {};
         
         // Process transactions
-        for (const tx of transactionList) {
+        for (const tx of transactions) {
           const category = (tx.category && categoryColors[tx.category]) ? tx.category : "Misc";
           const amount = Number(tx.amount) || 0;
           categoryTotals[category] = (categoryTotals[category] || 0) + amount;
