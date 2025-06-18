@@ -13,6 +13,7 @@ export interface PaymentMethod {
   is_active: boolean;
   is_default: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export function usePaymentMethods() {
@@ -30,10 +31,10 @@ export function usePaymentMethods() {
         return;
       }
 
-      // Fetch payment methods
+      // Fetch payment methods with proper typing
       const { data, error } = await supabase
         .from("payment_methods")
-        .select("id, type, label, brand, exp_month, exp_year, last4, is_active, is_default, created_at")
+        .select("id, type, label, brand, exp_month, exp_year, last4, is_active, is_default, created_at, updated_at")
         .eq("user_id", user.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
@@ -42,7 +43,7 @@ export function usePaymentMethods() {
         console.error("Error fetching payment methods:", error);
         setMethods([]);
       } else {
-        setMethods((data || []) as PaymentMethod[]);
+        setMethods(data || []);
       }
     } catch (error) {
       console.error("Error in fetchMethods:", error);

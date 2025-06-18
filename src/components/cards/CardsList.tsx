@@ -27,6 +27,7 @@ interface PaymentMethod {
   is_active: boolean;
   label?: string;
   created_at: string;
+  updated_at: string;
 }
 
 const CardsList = () => {
@@ -105,10 +106,10 @@ const CardsList = () => {
           }
         }
 
-        // Fetch payment methods
+        // Fetch payment methods with proper type safety
         const { data, error } = await supabase
           .from('payment_methods')
-          .select('*')
+          .select('id, type, brand, last4, exp_month, exp_year, is_default, is_active, label, created_at, updated_at')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .order('created_at', { ascending: false });
@@ -119,7 +120,7 @@ const CardsList = () => {
         }
 
         console.log('Payment methods fetched:', data);
-        return (data || []) as PaymentMethod[];
+        return data || [];
       } catch (error) {
         console.error('Error in fetchMethods:', error);
         return [];

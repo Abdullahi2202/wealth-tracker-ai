@@ -33,20 +33,20 @@ const OverviewDashboard = () => {
   const fetchDashboardStats = async () => {
     try {
       // Get total users from registration table
-      const { data: users } = await supabase
+      const { count: totalUsers } = await supabase
         .from('registration')
-        .select('id', { count: 'exact' });
+        .select('*', { count: 'exact', head: true });
 
       // Get pending identity verifications
-      const { data: pendingVerifications } = await supabase
+      const { count: pendingVerifications } = await supabase
         .from('identity_verification_requests')
-        .select('id', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
       // Get total transactions
-      const { data: transactions } = await supabase
+      const { count: totalTransactions } = await supabase
         .from('transactions')
-        .select('id', { count: 'exact' });
+        .select('*', { count: 'exact', head: true });
 
       // Get current month transactions for revenue calculation
       const startOfMonth = new Date();
@@ -58,33 +58,27 @@ const OverviewDashboard = () => {
         .gte('created_at', startOfMonth.toISOString());
 
       // Get fraud alerts
-      const { data: fraudAlerts } = await supabase
+      const { count: fraudAlerts } = await supabase
         .from('fraud_alerts')
-        .select('id', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
       // Get payment methods count
-      let activeCards = 0;
-      try {
-        const { data: paymentMethods } = await supabase
-          .from('payment_methods')
-          .select('id', { count: 'exact' })
-          .eq('is_active', true);
-        activeCards = paymentMethods?.length || 0;
-      } catch (error) {
-        console.log('Payment methods table not accessible yet');
-      }
+      const { count: activeCards } = await supabase
+        .from('payment_methods')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
 
       const monthlyRevenue = monthlyTransactions?.reduce((sum, transaction) => 
         sum + (Number(transaction.amount) || 0), 0) || 0;
 
       setStats({
-        totalUsers: users?.length || 0,
-        activeCards,
-        pendingVerifications: pendingVerifications?.length || 0,
-        totalTransactions: transactions?.length || 0,
+        totalUsers: totalUsers || 0,
+        activeCards: activeCards || 0,
+        pendingVerifications: pendingVerifications || 0,
+        totalTransactions: totalTransactions || 0,
         monthlyRevenue,
-        fraudAlerts: fraudAlerts?.length || 0
+        fraudAlerts: fraudAlerts || 0
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);

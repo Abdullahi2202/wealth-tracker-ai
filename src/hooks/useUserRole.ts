@@ -21,12 +21,12 @@ export function useUserRole() {
           return;
         }
 
-        // Check user roles table
+        // Check user roles table with proper error handling
         const { data: roleData, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
-          .single();
+          .maybeSingle();
 
         if (!error && roleData?.role === 'admin') {
           setRole("admin");

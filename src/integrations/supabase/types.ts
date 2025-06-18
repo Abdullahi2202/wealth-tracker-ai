@@ -196,7 +196,15 @@ export type Database = {
           transaction_id?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fraud_alerts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       identity_verification_requests: {
         Row: {
@@ -472,7 +480,15 @@ export type Database = {
           transaction_type?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transaction_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {
@@ -483,6 +499,9 @@ export type Database = {
           id: string
           name: string
           note: string | null
+          payment_method_id: string | null
+          recipient_user_id: string | null
+          sender_user_id: string | null
           status: string | null
           type: string
           user_id: string | null
@@ -495,6 +514,9 @@ export type Database = {
           id?: string
           name: string
           note?: string | null
+          payment_method_id?: string | null
+          recipient_user_id?: string | null
+          sender_user_id?: string | null
           status?: string | null
           type: string
           user_id?: string | null
@@ -507,11 +529,22 @@ export type Database = {
           id?: string
           name?: string
           note?: string | null
+          payment_method_id?: string | null
+          recipient_user_id?: string | null
+          sender_user_id?: string | null
           status?: string | null
           type?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -542,6 +575,7 @@ export type Database = {
           id: string
           is_frozen: boolean | null
           updated_at: string | null
+          user_email: string | null
           user_id: string | null
         }
         Insert: {
@@ -551,6 +585,7 @@ export type Database = {
           id?: string
           is_frozen?: boolean | null
           updated_at?: string | null
+          user_email?: string | null
           user_id?: string | null
         }
         Update: {
@@ -560,6 +595,7 @@ export type Database = {
           id?: string
           is_frozen?: boolean | null
           updated_at?: string | null
+          user_email?: string | null
           user_id?: string | null
         }
         Relationships: []

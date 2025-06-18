@@ -34,7 +34,31 @@ const RegistrationForm = () => {
     try {
       console.log("Starting registration process for:", email);
       
-      // 1. Register with Supabase Auth
+      // First, create record in registration table
+      const { error: registrationError } = await supabase
+        .from("registration")
+        .insert({
+          email,
+          full_name: fullName,
+          password: password, // In production, this should be hashed
+          phone,
+          document_type: 'passport',
+          verification_status: 'unverified'
+        });
+
+      if (registrationError) {
+        console.error("Registration table error:", registrationError);
+        if (registrationError.code === '23505') { // Unique violation
+          toast.error("An account with this email already exists.");
+          setApiError("An account with this email already exists.");
+          return;
+        }
+        toast.error("Registration failed: " + registrationError.message);
+        setApiError("Registration failed: " + registrationError.message);
+        return;
+      }
+
+      // Then register with Supabase Auth
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -49,38 +73,12 @@ const RegistrationForm = () => {
       
       if (signUpError) {
         console.error("Supabase signup error:", signUpError);
-        toast.error("Signup failed: " + signUpError.message);
-        setApiError("Signup failed: " + signUpError.message);
+        toast.error("Auth signup failed: " + signUpError.message);
+        setApiError("Auth signup failed: " + signUpError.message);
         return;
       }
 
-      console.log("Supabase auth registration successful:", authData.user?.id);
-
-      // 2. Create user profile using the edge function
-      if (authData.user) {
-        try {
-          const { data: userCreated, error: userError } = await supabase.functions.invoke('user-management', {
-            method: 'POST',
-            body: {
-              email,
-              full_name: fullName,
-              phone,
-              document_type: 'passport'
-            }
-          });
-
-          if (userError) {
-            console.error("User profile creation error:", userError);
-            // Don't fail the registration if profile creation fails
-            console.log("Profile creation failed, but auth user exists");
-          } else {
-            console.log("User profile created successfully:", userCreated);
-          }
-        } catch (profileError) {
-          console.error("Profile creation exception:", profileError);
-          // Continue with successful auth registration
-        }
-      }
+      console.log("Registration successful:", authData.user?.id);
 
       toast.success(
         "Registration successful! Please check your email to verify. You can now log in.",
