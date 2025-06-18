@@ -18,35 +18,140 @@ Deno.serve(async (req) => {
 
     switch (method) {
       case 'GET':
-        // Default to listing users if no specific action
-        console.log('Fetching users list...')
-        const { data: users, error } = await supabase
-          .from('users')
-          .select(`
-            id,
-            email,
-            full_name,
-            phone,
-            passport_number,
-            image_url,
-            verification_status,
-            document_type,
-            created_at,
-            is_active,
-            updated_at
-          `)
-          .order('created_at', { ascending: false })
+        console.log('Fetching all users...')
+        
+        // Try to fetch from multiple sources and combine the data
+        const sources = [
+          // Fetch from registration table
+          supabase
+            .from('registration')
+            .select('*')
+            .order('created_at', { ascending: false }),
+          
+          // Fetch from users table if it exists
+          supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false }),
+            
+          // Fetch from profiles table
+          supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false })
+        ]
 
-        if (error) {
-          console.error('Error fetching users:', error)
-          return new Response(JSON.stringify({ error: error.message }), {
+        const results = await Promise.allSettled(sources)
+        let allUsers: any[] = []
+
+        // Combine data from all sources
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled' && result.value.data) {
+            console.log(`Source ${index} returned ${result.value.data.length} users`)
+            allUsers = [...allUsers, ...result.value.data]
+          } else if (result.status === 'rejected') {
+            console.log(`Source ${index} failed:`, result.reason)
+          }
+        })
+
+        // Remove duplicates by email
+        const uniqueUsers = allUsers.reduce((acc, user) => {
+          const existing = acc.find((u: any) => u.email === user.email)
+          if (!existing) {
+            acc.push(user)
+          }
+          return acc
+        }, [])
+
+        console.log('Total unique users found:', uniqueUsers.length)
+        return new Response(JSON.stringify(uniqueUsers), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+
+      case 'POST':
+        const createBody = await req.json()
+        console.log('Create request body:', createBody)
+        
+        const { email, full_name, phone, passport_number, document_type } = createBody
+        
+        if (!email || !full_name) {
+          return new Response(JSON.stringify({ error: 'Email and full name are required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        // Create user in auth
+        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password: Math.random().toString(36).slice(-8), // Temporary password
+          email_confirm: true,
+          user_metadata: { full_name, phone, passport_number, document_type }
+        })
+
+        if (authError) {
+          console.error('Error creating auth user:', authError)
+          return new Response(JSON.stringify({ error: authError.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
 
-        console.log('Users fetched successfully:', users?.length || 0)
-        return new Response(JSON.stringify(users || []), {
+        const userId = authUser.user.id
+
+        // Create user in registration table
+        const { data: regUser, error: regError } = await supabase
+          .from('registration')
+          .insert({
+            id: userId,
+            email,
+            full_name,
+            phone: phone || null,
+            passport_number: passport_number || null,
+            document_type: document_type || 'passport',
+            verification_status: 'pending',
+            password: 'temp_password' // Required field
+          })
+          .select()
+          .single()
+
+        if (regError) {
+          console.error('Error creating registration record:', regError)
+        }
+
+        // Create user in profiles table
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email,
+            full_name,
+            phone: phone || null
+          })
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError)
+        }
+
+        // Create wallet for user
+        const { error: walletError } = await supabase
+          .from('wallets')
+          .insert({
+            user_id: userId,
+            user_email: email,
+            balance: 0,
+            currency: 'USD'
+          })
+
+        if (walletError) {
+          console.error('Error creating wallet:', walletError)
+        }
+
+        console.log('User created successfully:', userId)
+        return new Response(JSON.stringify({ 
+          user: regUser || { id: userId, email, full_name }, 
+          user_id: userId 
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
 
@@ -56,28 +161,67 @@ Deno.serve(async (req) => {
         
         const { id, action, ...updates } = updateBody
         
-        if (action === 'update') {
-          const { data: user, error: updateError } = await supabase
+        if (!id) {
+          return new Response(JSON.stringify({ error: 'User ID is required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        // Update in registration table
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('registration')
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (updateError) {
+          console.error('Error updating user in registration:', updateError)
+          
+          // Try updating in users table if registration update fails
+          const { data: userUpdate, error: userError } = await supabase
             .from('users')
             .update({ ...updates, updated_at: new Date().toISOString() })
             .eq('id', id)
             .select()
             .single()
 
-          if (updateError) {
-            console.error('Error updating user:', updateError)
-            return new Response(JSON.stringify({ error: updateError.message }), {
+          if (userError) {
+            console.error('Error updating user in users table:', userError)
+            return new Response(JSON.stringify({ error: 'Failed to update user' }), {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             })
           }
 
-          console.log('User updated successfully:', user)
-          return new Response(JSON.stringify(user), {
+          console.log('User updated in users table:', userUpdate)
+          return new Response(JSON.stringify(userUpdate), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
-        break
+
+        // Also update profiles table if full_name, phone, or email changed
+        if (updates.full_name || updates.phone || updates.email) {
+          const profileUpdates: any = {}
+          if (updates.full_name) profileUpdates.full_name = updates.full_name
+          if (updates.phone) profileUpdates.phone = updates.phone
+          if (updates.email) profileUpdates.email = updates.email
+          
+          const { error: profileUpdateError } = await supabase
+            .from('profiles')
+            .update(profileUpdates)
+            .eq('id', id)
+
+          if (profileUpdateError) {
+            console.error('Error updating profile:', profileUpdateError)
+          }
+        }
+
+        console.log('User updated successfully:', updatedUser)
+        return new Response(JSON.stringify(updatedUser), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
 
       case 'DELETE':
         const deleteBody = await req.json()
@@ -85,113 +229,47 @@ Deno.serve(async (req) => {
         
         const { id: deleteId } = deleteBody
         
-        if (deleteId) {
-          // Delete from auth (will cascade to other tables)
-          const { error: authError } = await supabase.auth.admin.deleteUser(deleteId)
-          if (authError) {
-            console.error('Error deleting user from auth:', authError)
-            return new Response(JSON.stringify({ error: authError.message }), {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
-          }
-
-          console.log('User deleted successfully:', deleteId)
-          return new Response(JSON.stringify({ success: true }), {
+        if (!deleteId) {
+          return new Response(JSON.stringify({ error: 'User ID is required' }), {
+            status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
-        break
 
-      case 'POST':
-        const createBody = await req.json()
-        console.log('Create request body:', createBody)
-        
-        const { email, full_name, phone, passport_number, image_url, document_type } = createBody
-        
-        // Try to get the auth user first to get their ID
-        const { data: authUser, error: authFetchError } = await supabase.auth.admin.listUsers()
-        
-        let userId = null
-        if (!authFetchError && authUser?.users) {
-          const foundUser = authUser.users.find(user => user.email === email)
-          if (foundUser) {
-            userId = foundUser.id
-            console.log('Found existing auth user:', userId)
-          }
-        }
+        // Delete from registration table first
+        const { error: regDeleteError } = await supabase
+          .from('registration')
+          .delete()
+          .eq('id', deleteId)
 
-        if (!userId) {
-          // If no auth user found, create one
-          const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
-            email,
-            password: Math.random().toString(36).slice(-8), // Temporary password
-            email_confirm: true,
-            user_metadata: { full_name, phone, passport_number, document_type }
-          })
-
-          if (authError) {
-            console.error('Error creating auth user:', authError)
-            return new Response(JSON.stringify({ error: authError.message }), {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
-          }
-          userId = newAuthUser.user.id
-          console.log('Created new auth user:', userId)
-        }
-
-        // Create user in public.users table
-        const { data: user, error: userError } = await supabase
+        // Delete from users table
+        const { error: userDeleteError } = await supabase
           .from('users')
-          .insert({
-            id: userId,
-            email,
-            full_name,
-            phone,
-            passport_number,
-            image_url: image_url || null,
-            document_type: document_type || 'passport',
-            verification_status: 'pending',
-            is_active: true
-          })
-          .select()
-          .single()
+          .delete()
+          .eq('id', deleteId)
 
-        if (userError) {
-          console.error('Error creating user record:', userError)
-          return new Response(JSON.stringify({ error: userError.message }), {
+        // Delete from auth (this will cascade to profiles due to foreign key)
+        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(deleteId)
+        
+        if (authDeleteError) {
+          console.error('Error deleting user from auth:', authDeleteError)
+          return new Response(JSON.stringify({ error: authDeleteError.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
 
-        // Create wallet for user
-        const { error: walletError } = await supabase
-          .from('wallets')
-          .insert({
-            user_id: userId,
-            balance: 0,
-            currency: 'USD'
-          })
+        console.log('User deleted successfully:', deleteId)
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
 
-        if (walletError) {
-          console.error('Error creating user wallet:', walletError)
-          // Don't throw here, user is created successfully
-        } else {
-          console.log('Wallet created successfully for user:', userId)
-        }
-
-        console.log('User created successfully:', user)
-        return new Response(JSON.stringify({ user, user_id: userId }), {
+      default:
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+          status: 405,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
     }
-
-    return new Response(JSON.stringify({ error: 'Invalid request method or missing parameters' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
 
   } catch (error) {
     console.error('User management error:', error)

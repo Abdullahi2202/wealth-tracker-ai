@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,9 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, Download, Eye, Edit, Trash2, CheckCircle, XCircle, Clock, RefreshCw } from "lucide-react";
+import { Search, Filter, Download, Eye, Edit, Trash2, CheckCircle, XCircle, Clock, RefreshCw, Plus, UserCheck, UserX } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface User {
   id: string;
@@ -23,11 +28,30 @@ interface User {
   updated_at?: string;
 }
 
+interface CreateUserData {
+  email: string;
+  full_name: string;
+  phone?: string;
+  passport_number?: string;
+  document_type: string;
+}
+
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [createUserData, setCreateUserData] = useState<CreateUserData>({
+    email: "",
+    full_name: "",
+    phone: "",
+    passport_number: "",
+    document_type: "passport"
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -36,18 +60,18 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      console.log("Fetching users from user-management function...");
       
-      // Fetch users from registration table
-      const { data, error } = await supabase
-        .from('registration')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'GET'
+      });
 
       if (error) {
         console.error('Error fetching users:', error);
         toast.error('Failed to fetch users: ' + error.message);
         setUsers([]);
       } else {
+        console.log('Users fetched successfully:', data);
         setUsers(data || []);
       }
     } catch (error: any) {
@@ -59,24 +83,66 @@ const UserManagement = () => {
     }
   };
 
-  const handleVerifyUser = async (userId: string) => {
+  const handleCreateUser = async () => {
     try {
-      const { error } = await supabase
-        .from('registration')
-        .update({ verification_status: 'verified' })
-        .eq('id', userId);
-
-      if (error) {
-        console.error('Error verifying user:', error);
-        toast.error('Failed to verify user: ' + error.message);
+      if (!createUserData.email || !createUserData.full_name) {
+        toast.error('Email and full name are required');
         return;
       }
 
-      toast.success('User verified successfully');
+      const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'POST',
+        body: createUserData
+      });
+
+      if (error) {
+        console.error('Error creating user:', error);
+        toast.error('Failed to create user: ' + error.message);
+        return;
+      }
+
+      toast.success('User created successfully');
+      setShowCreateDialog(false);
+      setCreateUserData({
+        email: "",
+        full_name: "",
+        phone: "",
+        passport_number: "",
+        document_type: "passport"
+      });
       fetchUsers();
     } catch (error: any) {
-      console.error('Error verifying user:', error);
-      toast.error('Failed to verify user: ' + error.message);
+      console.error('Error creating user:', error);
+      toast.error('Failed to create user: ' + error.message);
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    try {
+      if (!selectedUser) return;
+
+      const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'PUT',
+        body: {
+          id: selectedUser.id,
+          action: 'update',
+          ...selectedUser
+        }
+      });
+
+      if (error) {
+        console.error('Error updating user:', error);
+        toast.error('Failed to update user: ' + error.message);
+        return;
+      }
+
+      toast.success('User updated successfully');
+      setShowEditDialog(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      toast.error('Failed to update user: ' + error.message);
     }
   };
 
@@ -86,10 +152,10 @@ const UserManagement = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('registration')
-        .delete()
-        .eq('id', userId);
+      const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'DELETE',
+        body: { id: userId }
+      });
 
       if (error) {
         console.error('Error deleting user:', error);
@@ -105,9 +171,36 @@ const UserManagement = () => {
     }
   };
 
+  const handleVerificationStatus = async (userId: string, status: 'verified' | 'pending' | 'rejected') => {
+    try {
+      const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'PUT',
+        body: {
+          id: userId,
+          action: 'update',
+          verification_status: status
+        }
+      });
+
+      if (error) {
+        console.error('Error updating verification status:', error);
+        toast.error('Failed to update verification status: ' + error.message);
+        return;
+      }
+
+      toast.success(`User ${status} successfully`);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error updating verification status:', error);
+      toast.error('Failed to update verification status: ' + error.message);
+    }
+  };
+
   const getStatusBadge = (user: User) => {
     if (user.verification_status === 'verified') {
       return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Verified</Badge>;
+    } else if (user.verification_status === 'rejected') {
+      return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
     }
     return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
   };
@@ -119,7 +212,8 @@ const UserManagement = () => {
     
     const matchesStatus = statusFilter === "all" || 
                          (statusFilter === "verified" && user.verification_status === 'verified') ||
-                         (statusFilter === "pending" && user.verification_status !== 'verified');
+                         (statusFilter === "pending" && user.verification_status === 'pending') ||
+                         (statusFilter === "rejected" && user.verification_status === 'rejected');
     
     return matchesSearch && matchesStatus;
   });
@@ -141,6 +235,75 @@ const UserManagement = () => {
           <p className="text-sm text-muted-foreground">Manage users, verification, and account status</p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create User
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New User</DialogTitle>
+                <DialogDescription>Add a new user to the system</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="email" className="text-right">Email</Label>
+                  <Input
+                    id="email"
+                    value={createUserData.email}
+                    onChange={(e) => setCreateUserData(prev => ({ ...prev, email: e.target.value }))}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="full_name" className="text-right">Full Name</Label>
+                  <Input
+                    id="full_name"
+                    value={createUserData.full_name}
+                    onChange={(e) => setCreateUserData(prev => ({ ...prev, full_name: e.target.value }))}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="phone" className="text-right">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={createUserData.phone}
+                    onChange={(e) => setCreateUserData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="passport_number" className="text-right">Document ID</Label>
+                  <Input
+                    id="passport_number"
+                    value={createUserData.passport_number}
+                    onChange={(e) => setCreateUserData(prev => ({ ...prev, passport_number: e.target.value }))}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="document_type" className="text-right">Document Type</Label>
+                  <Select value={createUserData.document_type} onValueChange={(value) => setCreateUserData(prev => ({ ...prev, document_type: value }))}>
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="passport">Passport</SelectItem>
+                      <SelectItem value="id_card">ID Card</SelectItem>
+                      <SelectItem value="driver_license">Driver License</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
+                <Button onClick={handleCreateUser}>Create User</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" size="sm" onClick={fetchUsers}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -148,10 +311,6 @@ const UserManagement = () => {
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export
-          </Button>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
           </Button>
         </div>
       </div>
@@ -177,13 +336,14 @@ const UserManagement = () => {
               <option value="all">All Status</option>
               <option value="verified">Verified</option>
               <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
         </CardContent>
       </Card>
 
       {/* User Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{users.length}</div>
@@ -201,9 +361,17 @@ const UserManagement = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-yellow-600">
-              {users.filter(u => u.verification_status !== 'verified').length}
+              {users.filter(u => u.verification_status === 'pending').length}
             </div>
             <p className="text-sm text-muted-foreground">Pending</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-red-600">
+              {users.filter(u => u.verification_status === 'rejected').length}
+            </div>
+            <p className="text-sm text-muted-foreground">Rejected</p>
           </CardContent>
         </Card>
       </div>
@@ -271,26 +439,106 @@ const UserManagement = () => {
                     {format(new Date(user.created_at), 'MMM dd, yyyy')}
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {user.verification_status !== 'verified' && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleVerifyUser(user.id)}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
+                    <div className="flex gap-1 flex-wrap">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>User Details</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid gap-4 py-4">
+                            <div><strong>Name:</strong> {user.full_name}</div>
+                            <div><strong>Email:</strong> {user.email}</div>
+                            <div><strong>Phone:</strong> {user.phone || 'N/A'}</div>
+                            <div><strong>Document:</strong> {user.passport_number || 'N/A'}</div>
+                            <div><strong>Type:</strong> {user.document_type || 'passport'}</div>
+                            <div><strong>Status:</strong> {user.verification_status}</div>
+                            <div><strong>Created:</strong> {format(new Date(user.created_at), 'PPP')}</div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      
+                      {user.verification_status === 'pending' && (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleVerificationStatus(user.id, 'verified')}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <UserCheck className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleVerificationStatus(user.id, 'rejected')}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      
+                      <Dialog open={showEditDialog && selectedUser?.id === user.id} onOpenChange={(open) => {
+                        setShowEditDialog(open);
+                        if (!open) setSelectedUser(null);
+                      }}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Edit User</DialogTitle>
+                          </DialogHeader>
+                          {selectedUser && (
+                            <div className="grid gap-4 py-4">
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit_email" className="text-right">Email</Label>
+                                <Input
+                                  id="edit_email"
+                                  value={selectedUser.email}
+                                  onChange={(e) => setSelectedUser(prev => prev ? { ...prev, email: e.target.value } : null)}
+                                  className="col-span-3"
+                                />
+                              </div>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit_name" className="text-right">Full Name</Label>
+                                <Input
+                                  id="edit_name"
+                                  value={selectedUser.full_name}
+                                  onChange={(e) => setSelectedUser(prev => prev ? { ...prev, full_name: e.target.value } : null)}
+                                  className="col-span-3"
+                                />
+                              </div>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit_phone" className="text-right">Phone</Label>
+                                <Input
+                                  id="edit_phone"
+                                  value={selectedUser.phone || ''}
+                                  onChange={(e) => setSelectedUser(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                                  className="col-span-3"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => {setShowEditDialog(false); setSelectedUser(null);}}>Cancel</Button>
+                            <Button onClick={handleUpdateUser}>Update User</Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                      
                       <Button 
                         variant="outline" 
                         size="sm"
                         onClick={() => handleDeleteUser(user.id)}
+                        className="text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
