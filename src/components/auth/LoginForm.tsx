@@ -18,29 +18,53 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setApiError(null);
+    
     if (!email || !password) {
       toast.error("Please enter email and password.");
       setApiError("Email and password are required.");
       return;
     }
+    
     setLoading(true);
+    
     try {
-      // Supabase Auth: sign in
+      console.log("Attempting login for:", email);
+      
+      // Check if this is the hardcoded admin
+      if (email === "kingabdalla982@gmail.com" && password === "Ali@2202") {
+        console.log("Admin login detected, storing admin data in localStorage");
+        
+        // Store admin info in localStorage for admin dashboard access
+        localStorage.setItem("walletmaster_user", JSON.stringify({
+          email: email,
+          isAdmin: true,
+          fullName: "Admin User"
+        }));
+        
+        toast.success("Admin logged in successfully!");
+        navigate("/admin");
+        return;
+      }
+      
+      // Regular Supabase Auth login for other users
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error || !data.session) {
+        console.error("Supabase login error:", error);
         toast.error("Login error: " + (error?.message ?? "Could not log in."));
         setApiError("Login error: " + (error?.message ?? "Could not log in."));
-        setLoading(false);
         return;
       }
 
+      console.log("Regular user login successful:", data.user?.email);
       toast.success("Logged in successfully!");
       navigate("/dashboard");
+      
     } catch (err: any) {
+      console.error("Login exception:", err);
       toast.error("Login failed, please try again.");
       setApiError("Login failed due to an unexpected error: " + (err?.message || JSON.stringify(err)));
     } finally {
@@ -104,4 +128,3 @@ const Login = () => {
 };
 
 export default Login;
-

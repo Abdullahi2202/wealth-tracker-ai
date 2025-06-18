@@ -48,6 +48,21 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_credentials: {
+        Row: {
+          email: string
+          password_hash: string
+        }
+        Insert: {
+          email: string
+          password_hash: string
+        }
+        Update: {
+          email?: string
+          password_hash?: string
+        }
+        Relationships: []
+      }
       admin_users: {
         Row: {
           created_at: string | null
@@ -278,24 +293,21 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
-          email: string | null
           full_name: string | null
           id: string
-          updated_at: string | null
+          is_admin: boolean | null
         }
         Insert: {
           created_at?: string | null
-          email?: string | null
           full_name?: string | null
           id: string
-          updated_at?: string | null
+          is_admin?: boolean | null
         }
         Update: {
           created_at?: string | null
-          email?: string | null
           full_name?: string | null
           id?: string
-          updated_at?: string | null
+          is_admin?: boolean | null
         }
         Relationships: []
       }
@@ -531,6 +543,21 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          role: string
+          user_id: string
+        }
+        Insert: {
+          role: string
+          user_id: string
+        }
+        Update: {
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       wallets: {
         Row: {
           balance: number | null
@@ -566,6 +593,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_email_change_token_new: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      check_admin_login: {
+        Args: { email_input: string; password_input: string }
+        Returns: boolean
+      }
+      check_login: {
+        Args: { email_input: string; password_input: string }
+        Returns: boolean
+      }
+      check_user_role: {
+        Args: { email_input: string }
+        Returns: string
+      }
       get_user_role: {
         Args: { user_uuid: string }
         Returns: string
@@ -580,6 +623,14 @@ export type Database = {
       }
       make_user_admin: {
         Args: { user_email: string }
+        Returns: undefined
+      }
+      register_user: {
+        Args: { email_input: string; password_input: string }
+        Returns: undefined
+      }
+      set_admin_role: {
+        Args: { email_input: string }
         Returns: undefined
       }
     }

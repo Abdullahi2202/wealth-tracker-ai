@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +15,6 @@ import ActivityTracking from "@/components/admin/ActivityTracking";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Shield, LogOut, Menu } from "lucide-react";
-import type { Session } from "@supabase/supabase-js";
 
 const AdminDashboard = () => {
   const [currentAdmin, setCurrentAdmin] = useState<string | null>(null);
@@ -26,21 +26,64 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const checkAdmin = async () => {
+      console.log("Checking admin access...");
+      
+      // Check localStorage first for admin credentials
       const storedUser = localStorage.getItem("walletmaster_user");
       if (storedUser) {
         try {
           const userObj = JSON.parse(storedUser);
-          // Only check localStorage (no longer in registration table)
-          if (userObj.isAdmin && userObj.email) {
+          console.log("Stored user data:", userObj);
+          
+          if (userObj.isAdmin && userObj.email === "kingabdalla982@gmail.com") {
+            console.log("Admin access granted from localStorage");
             setCurrentAdmin(userObj.email);
             setIsAdmin(true);
             setLoading(false);
             return;
           }
-        } catch {}
+        } catch (error) {
+          console.error("Error parsing stored user:", error);
+          localStorage.removeItem("walletmaster_user");
+        }
       }
 
-      // Fallback: No admin info means no access
+      // Check if user is logged in via Supabase and has admin role
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        console.log("Checking Supabase user for admin role:", session.user.email);
+        
+        // Check if this is the admin email
+        if (session.user.email === "kingabdalla982@gmail.com") {
+          console.log("Admin user detected via Supabase");
+          setCurrentAdmin(session.user.email);
+          setIsAdmin(true);
+          setLoading(false);
+          return;
+        }
+        
+        // Check user roles table
+        try {
+          const { data: roleData, error } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .single();
+            
+          if (!error && roleData?.role === 'admin') {
+            console.log("Admin role found in database");
+            setCurrentAdmin(session.user.email || 'admin');
+            setIsAdmin(true);
+            setLoading(false);
+            return;
+          }
+        } catch (roleError) {
+          console.error("Error checking user role:", roleError);
+        }
+      }
+
+      // No admin access found
+      console.log("No admin access found, redirecting to login");
       toast.error("Admin privileges required");
       navigate("/login");
       setLoading(false);
@@ -50,7 +93,15 @@ const AdminDashboard = () => {
   }, [navigate]);
 
   const handleLogout = async () => {
+    console.log("Admin logging out");
     localStorage.removeItem("walletmaster_user");
+    
+    // Also sign out from Supabase if logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await supabase.auth.signOut();
+    }
+    
     navigate("/login");
   };
 

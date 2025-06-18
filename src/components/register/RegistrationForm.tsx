@@ -21,55 +21,78 @@ const RegistrationForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setApiError(null); // reset error
+    setApiError(null);
+    
     const { fullName, email, password, phone } = form;
     if (!fullName || !email || !password || !phone) {
       toast.error("Please fill in all required fields.");
       return;
     }
+    
     setLoading(true);
+    
     try {
+      console.log("Starting registration process for:", email);
+      
       // 1. Register with Supabase Auth
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // Only works in hosted environment, but here it's required
           emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: fullName,
+            phone: phone
+          }
         },
       });
+      
       if (signUpError) {
+        console.error("Supabase signup error:", signUpError);
         toast.error("Signup failed: " + signUpError.message);
         setApiError("Signup failed: " + signUpError.message);
-        setLoading(false);
         return;
       }
 
-      // 2. Add user profile to registration table
-      const { error: dbError } = await supabase.from("registration").insert({
-        email,
-        password,
-        full_name: fullName,
-        phone,
-        verification_status: "unverified",
-      });
-      if (dbError) {
-        toast.error("Registration failed (database problem): " + dbError.message);
-        setApiError("Registration failed (database problem): " + dbError.message);
-        setLoading(false);
-        return;
+      console.log("Supabase auth registration successful:", authData.user?.id);
+
+      // 2. Create user profile using the edge function
+      if (authData.user) {
+        try {
+          const { data: userCreated, error: userError } = await supabase.functions.invoke('user-management', {
+            method: 'POST',
+            body: {
+              email,
+              full_name: fullName,
+              phone,
+              document_type: 'passport'
+            }
+          });
+
+          if (userError) {
+            console.error("User profile creation error:", userError);
+            // Don't fail the registration if profile creation fails
+            console.log("Profile creation failed, but auth user exists");
+          } else {
+            console.log("User profile created successfully:", userCreated);
+          }
+        } catch (profileError) {
+          console.error("Profile creation exception:", profileError);
+          // Continue with successful auth registration
+        }
       }
 
       toast.success(
-        "✅ Registration successful! Please check your email to verify. You can now log in.",
-        {
-          duration: 4200,
-        }
+        "Registration successful! Please check your email to verify. You can now log in.",
+        { duration: 4200 }
       );
+      
       setTimeout(() => navigate("/login"), 1800);
+      
     } catch (err: any) {
-      toast.error("Registration failed: " + (err?.message || JSON.stringify(err)));
-      setApiError("Registration failed: " + (err?.message || JSON.stringify(err)));
+      console.error("Registration exception:", err);
+      toast.error("Registration failed: " + (err?.message || "Unknown error"));
+      setApiError("Registration failed: " + (err?.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
