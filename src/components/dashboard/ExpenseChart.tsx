@@ -20,7 +20,7 @@ type CategorySummary = {
 };
 
 const ExpenseChart = () => {
-  const [data, setData] = useState([] as CategorySummary[]);
+  const [data, setData] = useState<CategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,47 +40,59 @@ const ExpenseChart = () => {
         return;
       }
 
-      // First, get user_id from email
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .single();
+      try {
+        // First, get user_id from email
+        const profileResponse = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .single();
 
-      if (profileError || !profile) {
-        setData([]);
-        setLoading(false);
-        console.error("Profile fetch error for expense chart:", profileError);
-        return;
-      }
-
-      // Fetch user's expense transactions (not income) using user_id
-      const { data: txs, error } = await supabase
-        .from("transactions")
-        .select("id, amount, category, type")
-        .eq("user_id", profile.id)
-        .eq("type", "expense");
-        
-      if (!error && Array.isArray(txs)) {
-        const catMap = new Map<string, number>();
-        
-        for (const tx of txs) {
-          const cat = (tx.category && categoryColors[tx.category]) ? tx.category : "Misc";
-          const currentAmount = catMap.get(cat) || 0;
-          catMap.set(cat, currentAmount + Number(tx.amount));
+        if (profileResponse.error || !profileResponse.data) {
+          setData([]);
+          setLoading(false);
+          console.error("Profile fetch error for expense chart:", profileResponse.error);
+          return;
         }
+
+        // Fetch user's expense transactions using user_id
+        const transactionsResponse = await supabase
+          .from("transactions")
+          .select("id, amount, category, type")
+          .eq("user_id", profileResponse.data.id)
+          .eq("type", "expense");
         
-        const finalData: CategorySummary[] = Array.from(catMap.entries()).map(([name, value]) => ({
-          name,
-          value,
-          color: categoryColors[name] || "#6b7280",
-        }));
+        if (transactionsResponse.error) {
+          console.error("Transactions fetch error for expense chart:", transactionsResponse.error);
+          setData([]);
+          setLoading(false);
+          return;
+        }
+
+        const transactions = transactionsResponse.data || [];
+        const categoryMap = new Map<string, number>();
         
-        setData(finalData);
-      } else {
-        if (error) console.error("Transactions fetch error for expense chart:", error);
+        transactions.forEach(tx => {
+          const category = (tx.category && categoryColors[tx.category]) ? tx.category : "Misc";
+          const currentAmount = categoryMap.get(category) || 0;
+          categoryMap.set(category, currentAmount + Number(tx.amount));
+        });
+        
+        const chartData: CategorySummary[] = [];
+        categoryMap.forEach((value, name) => {
+          chartData.push({
+            name,
+            value,
+            color: categoryColors[name] || "#6b7280",
+          });
+        });
+        
+        setData(chartData);
+      } catch (error) {
+        console.error("Error fetching expenses:", error);
         setData([]);
       }
+      
       setLoading(false);
     };
 
