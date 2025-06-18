@@ -53,34 +53,34 @@ const ExpenseChart = () => {
 
       try {
         // Get user profile - simplified approach
-        const { data: profile, error: profileError } = await supabase
+        const profileResult = await supabase
           .from('profiles')
           .select('id')
           .eq('email', email)
-          .single() as { data: Profile | null; error: any };
+          .single();
 
-        if (profileError || !profile) {
+        if (profileResult.error || !profileResult.data) {
           setData([]);
           setLoading(false);
-          console.error("Profile fetch error for expense chart:", profileError);
+          console.error("Profile fetch error for expense chart:", profileResult.error);
           return;
         }
 
         // Fetch transactions - simplified approach
-        const { data: transactions, error: transactionsError } = await supabase
+        const transactionsResult = await supabase
           .from("transactions")
           .select("id, amount, category, type")
-          .eq("user_id", profile.id)
-          .eq("type", "expense") as { data: Transaction[] | null; error: any };
+          .eq("user_id", profileResult.data.id)
+          .eq("type", "expense");
         
-        if (transactionsError) {
-          console.error("Transactions fetch error for expense chart:", transactionsError);
+        if (transactionsResult.error) {
+          console.error("Transactions fetch error for expense chart:", transactionsResult.error);
           setData([]);
           setLoading(false);
           return;
         }
 
-        const transactionList = transactions || [];
+        const transactionList = transactionsResult.data || [];
         const categoryTotals: Record<string, number> = {};
         
         // Process transactions
