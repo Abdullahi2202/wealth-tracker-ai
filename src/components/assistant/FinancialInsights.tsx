@@ -25,45 +25,57 @@ export default function FinancialInsights() {
         const user = JSON.parse(storedUser);
         const email = user.email;
 
-        // Get user profile
-        const { data: profile } = await supabase
+        // Get user profile - simplified query
+        const profileQuery = await supabase
           .from('profiles')
           .select('id')
           .eq('email', email)
-          .single();
+          .limit(1);
 
-        if (!profile) return;
+        if (profileQuery.error || !profileQuery.data || profileQuery.data.length === 0) {
+          console.error('Profile not found:', profileQuery.error);
+          return;
+        }
 
-        // Get wallet balance
-        const { data: wallet } = await supabase
+        const profile = profileQuery.data[0];
+
+        // Get wallet balance - simplified query
+        const walletQuery = await supabase
           .from('wallets')
           .select('balance')
           .eq('user_id', profile.id)
-          .single();
+          .limit(1);
 
         // Get current month transactions
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         
-        const { data: transactions } = await supabase
+        const transactionsQuery = await supabase
           .from('transactions')
           .select('amount, category, type')
           .eq('user_id', profile.id)
           .gte('date', startOfMonth);
 
+        if (transactionsQuery.error) {
+          console.error('Transactions query error:', transactionsQuery.error);
+          return;
+        }
+
+        const transactions = transactionsQuery.data || [];
+
         // Calculate insights
         const monthlyIncome = transactions
-          ?.filter(t => t.type === 'income')
-          .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+          .filter(t => t.type === 'income')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
 
         const monthlyExpenses = transactions
-          ?.filter(t => t.type === 'expense')
-          .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+          .filter(t => t.type === 'expense')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
 
         // Find top spending category
         const categoryTotals: Record<string, number> = {};
         transactions
-          ?.filter(t => t.type === 'expense')
+          .filter(t => t.type === 'expense')
           .forEach(t => {
             const category = t.category || 'Misc';
             categoryTotals[category] = (categoryTotals[category] || 0) + Number(t.amount);
@@ -75,8 +87,12 @@ export default function FinancialInsights() {
         const savingsRate = monthlyIncome > 0 ? 
           ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
 
+        const walletBalance = walletQuery.data && walletQuery.data.length > 0 
+          ? walletQuery.data[0].balance || 0 
+          : 0;
+
         setInsights({
-          totalBalance: wallet?.balance || 0,
+          totalBalance: walletBalance,
           monthlyIncome,
           monthlyExpenses,
           topSpendingCategory: topCategory,
