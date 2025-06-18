@@ -1,14 +1,13 @@
+
 import { PieChart, Pie, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartLegend,
 } from "@/components/ui/chart";
-import type { ChartConfig } from "@/components/ui/chart";
 
 const categoryColors: Record<string, string> = {
   Food: '#f97316',
@@ -98,18 +97,14 @@ const ExpenseChart = () => {
     fetchExpenses();
   }, []);
 
-  const chartConfig = useMemo(() => {
-    const config: ChartConfig = {};
-    if (data.length > 0) {
-      data.forEach((item) => {
-        config[item.name] = {
-          label: item.name,
-          color: item.color,
-        };
-      });
-    }
+  // Simplified chart config to avoid deep type instantiation
+  const chartConfig = data.reduce((config, item) => {
+    config[item.name] = {
+      label: item.name,
+      color: item.color,
+    };
     return config;
-  }, [data]);
+  }, {} as Record<string, { label: string; color: string }>);
 
   return (
     <Card className="h-full">
