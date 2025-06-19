@@ -17,7 +17,7 @@ import { CardTypeSelect, CardType } from "./CardTypeSelect";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 
-// Use your actual Stripe publishable key
+// Use the test publishable key that matches your test secret key
 const STRIPE_PUBLISHABLE_KEY = "pk_test_51RXgVBRhotlUiiXdPUuoNpTNFEyH8HNLK9jFVg4lcrobEoNKtwH1QFUI4pWLCsMUFurVQEfrFxPahW8lDilmrp2j00iibXBiw8";
 
 export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
@@ -27,19 +27,19 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
   const [loading, setLoading] = useState(false);
   const [cardType, setCardType] = useState<CardType>("visa");
 
-  // Get logged in user's email from localStorage
-  const storedUser = typeof window !== "undefined" ? localStorage.getItem("walletmaster_user") : null;
-  const email = storedUser ? (() => { try { return JSON.parse(storedUser).email; } catch { return ""; } })() : "";
+  // Get logged in user's email from Supabase auth
+  const getAuthenticatedUser = async () => {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user?.email) {
+      throw new Error('User not authenticated or email not available');
+    }
+    return user;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) {
       toast.error("Stripe is not loaded. Please check your Stripe configuration.");
-      return;
-    }
-
-    if (!email) {
-      toast.error("User email not found. Please log in again.");
       return;
     }
 
@@ -53,17 +53,26 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
     }
 
     try {
-      console.log('Starting card addition process for email:', email);
+      console.log('Starting card addition process...');
+      
+      // Get authenticated user
+      const user = await getAuthenticatedUser();
+      console.log('User authenticated:', user.email);
       
       // 1. Create SetupIntent using Supabase client
       console.log('Creating setup intent...');
       const { data: setupData, error: setupError } = await supabase.functions.invoke('create-setup-intent', {
-        body: { email }
+        body: { email: user.email }
       });
 
-      if (setupError || !setupData) {
+      if (setupError) {
         console.error('Setup intent creation failed:', setupError);
-        throw new Error(`Failed to create setup intent: ${setupError?.message || 'Unknown error'}`);
+        throw new Error(`Failed to create setup intent: ${setupError.message}`);
+      }
+
+      if (!setupData?.client_secret || !setupData?.setup_intent_id) {
+        console.error('Invalid setup intent response:', setupData);
+        throw new Error('Invalid response from setup intent creation');
       }
 
       const { client_secret, setup_intent_id } = setupData;
@@ -75,7 +84,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
         payment_method: {
           card: numberElement,
           billing_details: { 
-            email: email 
+            email: user.email 
           }
         }
       });
@@ -100,15 +109,18 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       console.log('Saving card to database...');
       const { data: saveData, error: saveError } = await supabase.functions.invoke('add-stripe-card', {
         body: {
-          email,
+          email: user.email,
           label: label || `${cardType.toUpperCase()} Card`,
           setupIntentId: setupIntent.id,
         }
       });
       
-      if (saveError || !saveData?.success) {
-        console.error('Save failed:', saveError || saveData);
-        toast.error(saveData?.error || saveError?.message || "Failed to save card");
+      if (saveError) {
+        console.error('Save failed:', saveError);
+        toast.error(saveError.message || "Failed to save card");
+      } else if (!saveData?.success) {
+        console.error('Save failed:', saveData);
+        toast.error(saveData?.error || "Failed to save card");
       } else {
         console.log('Card saved successfully:', saveData);
         toast.success(saveData.message || "Card added successfully!");

@@ -15,6 +15,14 @@ Deno.serve(async (req) => {
   try {
     console.log('Starting add card process...')
     
+    // Validate environment variables
+    if (!stripeKey) {
+      throw new Error('STRIPE_SECRET_KEY is not configured')
+    }
+    if (!supabaseServiceKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { email, label, setupIntentId } = await req.json()
 
@@ -51,7 +59,7 @@ Deno.serve(async (req) => {
     const { data: authUser, error: authError } = await supabase.auth.admin.getUserByEmail(email)
     if (authError || !authUser.user) {
       console.error('Auth error:', authError)
-      throw new Error('User not found or authentication failed')
+      throw new Error(`User not found: ${authError?.message || 'User lookup failed'}`)
     }
 
     console.log('Found user:', authUser.user.id)

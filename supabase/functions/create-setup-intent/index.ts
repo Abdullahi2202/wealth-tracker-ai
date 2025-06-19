@@ -15,6 +15,14 @@ Deno.serve(async (req) => {
   try {
     console.log('Creating setup intent...')
     
+    // Validate environment variables
+    if (!stripeKey) {
+      throw new Error('STRIPE_SECRET_KEY is not configured')
+    }
+    if (!stripeKey.startsWith('sk_test_') && !stripeKey.startsWith('sk_live_')) {
+      throw new Error('Invalid Stripe secret key format')
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { email } = await req.json()
 
@@ -24,7 +32,7 @@ Deno.serve(async (req) => {
       throw new Error('Email is required')
     }
 
-    console.log('Initializing Stripe...')
+    console.log('Initializing Stripe with key type:', stripeKey.substring(0, 8) + '...')
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
     })
@@ -37,6 +45,9 @@ Deno.serve(async (req) => {
       console.log('Creating new Stripe customer...')
       const customer = await stripe.customers.create({ email })
       customerId = customer.id
+      console.log('Created customer:', customerId)
+    } else {
+      console.log('Found existing customer:', customerId)
     }
 
     console.log('Creating SetupIntent...')
@@ -46,7 +57,11 @@ Deno.serve(async (req) => {
       usage: 'off_session',
     })
 
-    console.log('SetupIntent created successfully:', setupIntent.id)
+    console.log('SetupIntent created successfully:', {
+      id: setupIntent.id,
+      client_secret: setupIntent.client_secret ? 'present' : 'missing',
+      status: setupIntent.status
+    })
 
     return new Response(JSON.stringify({ 
       client_secret: setupIntent.client_secret,
@@ -58,7 +73,8 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error creating setup intent:', error)
     return new Response(JSON.stringify({ 
-      error: error.message 
+      error: error.message,
+      details: error.code ? `Stripe error code: ${error.code}` : 'Server error'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
