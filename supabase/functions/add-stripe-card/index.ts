@@ -18,6 +18,8 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { email, label, paymentMethodId } = await req.json()
 
+    console.log('Request data:', { email, label, paymentMethodId })
+
     if (!email || !paymentMethodId) {
       throw new Error('Email and payment method ID are required')
     }
@@ -27,9 +29,22 @@ Deno.serve(async (req) => {
       apiVersion: '2023-10-16',
     })
 
-    console.log('Retrieving payment method from Stripe...')
-    // Retrieve the payment method from Stripe
-    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
+    console.log('Retrieving payment method from Stripe...', paymentMethodId)
+    
+    // Add delay to ensure payment method is fully created
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    let paymentMethod
+    try {
+      paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
+    } catch (stripeError) {
+      console.error('Stripe error retrieving payment method:', stripeError)
+      
+      if (stripeError.code === 'resource_missing') {
+        throw new Error('Payment method not found. This can happen with test cards. Please try again with a different card or refresh the page.')
+      }
+      throw stripeError
+    }
 
     if (!paymentMethod.card) {
       throw new Error('Invalid card payment method')
@@ -91,7 +106,10 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error adding card:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: error.code ? `Stripe error: ${error.code}` : 'Unknown error'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
