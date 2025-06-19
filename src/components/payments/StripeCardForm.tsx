@@ -1,5 +1,3 @@
-
-
 import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -40,29 +38,61 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
     setLoading(true);
 
     const numberElement = elements.getElement(CardNumberElement);
-    const expiryElement = elements.getElement(CardExpiryElement);
-    const cvcElement = elements.getElement(CardCvcElement);
-    if (!numberElement || !expiryElement || !cvcElement) {
+    if (!numberElement) {
       toast.error("Card form not loaded.");
       setLoading(false);
       return;
     }
 
-    // 1. Create PaymentMethod with Stripe.js using individual elements
-    const { error, paymentMethod } = await stripe.createPaymentMethod({
-      type: "card",
-      card: numberElement,
-      billing_details: { email }
-    });
-    if (error || !paymentMethod) {
-      toast.error(error ? error.message : "Failed to create payment method");
-      setLoading(false);
-      return;
-    }
-    
-    // 2. Call Supabase Edge Function to vault and save method
     try {
-      const res = await fetch(
+      // 1. Create SetupIntent on the backend
+      console.log('Creating setup intent...');
+      const setupResponse = await fetch(
+        "https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/create-setup-intent",
+        {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("sb-cbhtifqmlkdoevxmbjmm-auth-token") || ""}`
+          },
+          body: JSON.stringify({ email }),
+        }
+      );
+
+      if (!setupResponse.ok) {
+        const errorData = await setupResponse.json();
+        throw new Error(errorData.error || "Failed to create setup intent");
+      }
+
+      const { client_secret, setup_intent_id } = await setupResponse.json();
+      console.log('Setup intent created:', setup_intent_id);
+
+      // 2. Confirm the SetupIntent with Stripe.js
+      console.log('Confirming card setup...');
+      const { error, setupIntent } = await stripe.confirmCardSetup(client_secret, {
+        payment_method: {
+          card: numberElement,
+          billing_details: { email }
+        }
+      });
+
+      if (error) {
+        console.error('Card setup error:', error);
+        toast.error(error.message || "Failed to set up card");
+        setLoading(false);
+        return;
+      }
+
+      if (setupIntent.status !== 'succeeded') {
+        toast.error("Card setup was not completed successfully");
+        setLoading(false);
+        return;
+      }
+
+      console.log('Card setup confirmed:', setupIntent.id);
+      
+      // 3. Save the payment method to our database
+      const saveResponse = await fetch(
         "https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/add-stripe-card",
         {
           method: "POST",
@@ -73,17 +103,17 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
           body: JSON.stringify({
             email,
             label: label || `${cardType} Card`,
-            paymentMethodId: paymentMethod.id,
+            setupIntentId: setupIntent.id,
           }),
         }
       );
       
-      if (res.ok) {
+      if (saveResponse.ok) {
         toast.success("Card added securely! You can now use it for payments.");
         setLoading(false);
         onSuccess();
       } else {
-        const data = await res.json();
+        const data = await saveResponse.json();
         toast.error(data.error || "Card addition failed.");
         setLoading(false);
       }
@@ -218,4 +248,3 @@ export default function StripeCardFormWrapper(props: { onSuccess: () => void; on
     </Elements>
   );
 }
-

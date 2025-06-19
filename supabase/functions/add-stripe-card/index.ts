@@ -16,89 +16,49 @@ Deno.serve(async (req) => {
     console.log('Starting add card process...')
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { email, label, paymentMethodId } = await req.json()
+    const { email, label, setupIntentId } = await req.json()
 
-    console.log('Request data:', { email, label, paymentMethodId })
+    console.log('Request data:', { email, label, setupIntentId })
 
-    if (!email || !paymentMethodId) {
-      throw new Error('Email and payment method ID are required')
+    if (!email || !setupIntentId) {
+      throw new Error('Email and setup intent ID are required')
     }
 
-    console.log('Initializing Stripe with API key...')
+    console.log('Initializing Stripe...')
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
     })
 
-    console.log('Retrieving payment method from Stripe with retry logic...', paymentMethodId)
+    console.log('Retrieving setup intent...', setupIntentId)
+    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId)
     
-    // Retry logic for retrieving payment method
-    let paymentMethod
-    let retryCount = 0
-    const maxRetries = 3
-    
-    while (retryCount < maxRetries) {
-      try {
-        // Progressive delay: 1s, 2s, 3s
-        if (retryCount > 0) {
-          const delay = retryCount * 1000
-          console.log(`Retry attempt ${retryCount}, waiting ${delay}ms...`)
-          await new Promise(resolve => setTimeout(resolve, delay))
-        }
-        
-        paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
-        console.log('Payment method retrieved successfully:', paymentMethod.id)
-        break
-        
-      } catch (stripeError) {
-        console.error(`Stripe error on attempt ${retryCount + 1}:`, stripeError)
-        
-        if (stripeError.code === 'resource_missing') {
-          retryCount++
-          if (retryCount >= maxRetries) {
-            throw new Error('Payment method not found after multiple attempts. This may be due to network issues or an invalid test card. Please try refreshing the page and using a different card number like 4242424242424242.')
-          }
-          continue
-        }
-        
-        // For other errors, don't retry
-        throw stripeError
-      }
+    if (setupIntent.status !== 'succeeded') {
+      throw new Error('Setup intent not completed successfully')
     }
+
+    if (!setupIntent.payment_method) {
+      throw new Error('No payment method attached to setup intent')
+    }
+
+    console.log('Retrieving payment method...', setupIntent.payment_method)
+    const paymentMethod = await stripe.paymentMethods.retrieve(setupIntent.payment_method as string)
 
     if (!paymentMethod.card) {
       throw new Error('Invalid card payment method')
     }
 
-    // Check if customer exists, create if not
-    let customers = await stripe.customers.list({ email, limit: 1 })
-    let customerId = customers.data[0]?.id
-
-    if (!customerId) {
-      console.log('Creating new Stripe customer...')
-      const customer = await stripe.customers.create({ email })
-      customerId = customer.id
-    }
-
-    console.log('Attaching payment method to customer...')
-    // Attach payment method to customer
-    await stripe.paymentMethods.attach(paymentMethodId, {
-      customer: customerId,
-    })
-
     console.log('Getting user ID from email...')
-    // Get user ID from email
     const { data: authUser } = await supabase.auth.admin.getUserByEmail(email)
     if (!authUser.user) {
       throw new Error('User not found')
     }
 
     console.log('Storing payment method in database...')
-    // Store payment method details in database
     const { data, error } = await supabase
       .from('payment_methods')
       .insert({
         user_id: authUser.user.id,
-        stripe_payment_method_id: paymentMethodId,
+        stripe_payment_method_id: paymentMethod.id,
         type: 'card',
         brand: paymentMethod.card.brand,
         exp_month: paymentMethod.card.exp_month,
