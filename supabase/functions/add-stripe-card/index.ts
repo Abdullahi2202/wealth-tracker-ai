@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     const setupIntent = await stripe.setupIntents.retrieve(setupIntentId)
     
     if (setupIntent.status !== 'succeeded') {
-      throw new Error('Setup intent not completed successfully')
+      throw new Error(`Setup intent status is ${setupIntent.status}, expected 'succeeded'`)
     }
 
     if (!setupIntent.payment_method) {
@@ -47,10 +47,32 @@ Deno.serve(async (req) => {
       throw new Error('Invalid card payment method')
     }
 
-    console.log('Getting user ID from email...')
-    const { data: authUser } = await supabase.auth.admin.getUserByEmail(email)
-    if (!authUser.user) {
-      throw new Error('User not found')
+    console.log('Getting user from auth...')
+    const { data: authUser, error: authError } = await supabase.auth.admin.getUserByEmail(email)
+    if (authError || !authUser.user) {
+      console.error('Auth error:', authError)
+      throw new Error('User not found or authentication failed')
+    }
+
+    console.log('Found user:', authUser.user.id)
+
+    // Check if this payment method already exists
+    const { data: existingMethod } = await supabase
+      .from('payment_methods')
+      .select('id')
+      .eq('stripe_payment_method_id', paymentMethod.id)
+      .eq('user_id', authUser.user.id)
+      .single()
+    
+    if (existingMethod) {
+      console.log('Payment method already exists, returning existing record')
+      return new Response(JSON.stringify({ 
+        success: true, 
+        paymentMethod: existingMethod,
+        message: 'Card already exists in your account'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     console.log('Storing payment method in database...')
@@ -63,7 +85,7 @@ Deno.serve(async (req) => {
         brand: paymentMethod.card.brand,
         exp_month: paymentMethod.card.exp_month,
         exp_year: paymentMethod.card.exp_year,
-        label: label || `${paymentMethod.card.brand} **** ${paymentMethod.card.last4}`,
+        label: label || `${paymentMethod.card.brand?.toUpperCase()} **** ${paymentMethod.card.last4}`,
         last4: paymentMethod.card.last4,
         is_active: true,
         is_default: false
@@ -73,11 +95,15 @@ Deno.serve(async (req) => {
 
     if (error) {
       console.error('Database error:', error)
-      throw error
+      throw new Error(`Database error: ${error.message}`)
     }
 
-    console.log('Card added successfully!')
-    return new Response(JSON.stringify({ success: true, paymentMethod: data }), {
+    console.log('Card added successfully!', data)
+    return new Response(JSON.stringify({ 
+      success: true, 
+      paymentMethod: data,
+      message: 'Card added successfully'
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
@@ -85,7 +111,7 @@ Deno.serve(async (req) => {
     console.error('Error adding card:', error)
     return new Response(JSON.stringify({ 
       error: error.message,
-      details: error.code ? `Stripe error: ${error.code}` : 'Unknown error'
+      details: error.code ? `Stripe error: ${error.code}` : 'Server error'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

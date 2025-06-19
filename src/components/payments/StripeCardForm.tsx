@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -35,6 +36,12 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       toast.error("Stripe is not loaded. Please check your Stripe configuration.");
       return;
     }
+
+    if (!email) {
+      toast.error("User email not found. Please log in again.");
+      return;
+    }
+
     setLoading(true);
 
     const numberElement = elements.getElement(CardNumberElement);
@@ -45,6 +52,8 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
     }
 
     try {
+      console.log('Starting card addition process for email:', email);
+      
       // 1. Create SetupIntent on the backend
       console.log('Creating setup intent...');
       const setupResponse = await fetch(
@@ -60,8 +69,9 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       );
 
       if (!setupResponse.ok) {
-        const errorData = await setupResponse.json();
-        throw new Error(errorData.error || "Failed to create setup intent");
+        const errorText = await setupResponse.text();
+        console.error('Setup intent creation failed:', errorText);
+        throw new Error(`Failed to create setup intent: ${errorText}`);
       }
 
       const { client_secret, setup_intent_id } = await setupResponse.json();
@@ -72,18 +82,21 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       const { error, setupIntent } = await stripe.confirmCardSetup(client_secret, {
         payment_method: {
           card: numberElement,
-          billing_details: { email }
+          billing_details: { 
+            email: email 
+          }
         }
       });
 
       if (error) {
         console.error('Card setup error:', error);
-        toast.error(error.message || "Failed to set up card");
+        toast.error(error.message || "Card setup failed");
         setLoading(false);
         return;
       }
 
       if (setupIntent.status !== 'succeeded') {
+        console.error('Setup intent not succeeded:', setupIntent.status);
         toast.error("Card setup was not completed successfully");
         setLoading(false);
         return;
@@ -92,6 +105,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       console.log('Card setup confirmed:', setupIntent.id);
       
       // 3. Save the payment method to our database
+      console.log('Saving card to database...');
       const saveResponse = await fetch(
         "https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/add-stripe-card",
         {
@@ -102,24 +116,27 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
           },
           body: JSON.stringify({
             email,
-            label: label || `${cardType} Card`,
+            label: label || `${cardType.toUpperCase()} Card`,
             setupIntentId: setupIntent.id,
           }),
         }
       );
       
-      if (saveResponse.ok) {
-        toast.success("Card added securely! You can now use it for payments.");
-        setLoading(false);
+      const saveData = await saveResponse.json();
+      
+      if (saveResponse.ok && saveData.success) {
+        console.log('Card saved successfully:', saveData);
+        toast.success(saveData.message || "Card added successfully!");
         onSuccess();
       } else {
-        const data = await saveResponse.json();
-        toast.error(data.error || "Card addition failed.");
-        setLoading(false);
+        console.error('Save failed:', saveData);
+        toast.error(saveData.error || "Failed to save card");
       }
+      
     } catch (error) {
       console.error("Error adding card:", error);
-      toast.error("Failed to add card. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to add card. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -223,15 +240,16 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
             variant="outline"
             onClick={onCancel}
             className="flex-1 h-11 font-semibold text-base border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700"
+            disabled={loading}
           >
             Cancel
           </Button>
           <Button
             type="submit"
             className="flex-1 h-11 font-semibold text-base bg-finance-purple hover:bg-finance-indigo text-white shadow-md"
-            disabled={loading}
+            disabled={loading || !stripe || !elements}
           >
-            {loading ? "Saving..." : "Save Card"}
+            {loading ? "Adding Card..." : "Save Card"}
           </Button>
         </div>
       </form>
