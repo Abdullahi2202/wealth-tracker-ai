@@ -29,28 +29,45 @@ Deno.serve(async (req) => {
       apiVersion: '2023-10-16',
     })
 
-    console.log('Retrieving payment method from Stripe...', paymentMethodId)
+    console.log('Retrieving payment method from Stripe with retry logic...', paymentMethodId)
     
-    // Add delay to ensure payment method is fully created
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
+    // Retry logic for retrieving payment method
     let paymentMethod
-    try {
-      paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
-    } catch (stripeError) {
-      console.error('Stripe error retrieving payment method:', stripeError)
-      
-      if (stripeError.code === 'resource_missing') {
-        throw new Error('Payment method not found. This can happen with test cards. Please try again with a different card or refresh the page.')
+    let retryCount = 0
+    const maxRetries = 3
+    
+    while (retryCount < maxRetries) {
+      try {
+        // Progressive delay: 1s, 2s, 3s
+        if (retryCount > 0) {
+          const delay = retryCount * 1000
+          console.log(`Retry attempt ${retryCount}, waiting ${delay}ms...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+        
+        paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
+        console.log('Payment method retrieved successfully:', paymentMethod.id)
+        break
+        
+      } catch (stripeError) {
+        console.error(`Stripe error on attempt ${retryCount + 1}:`, stripeError)
+        
+        if (stripeError.code === 'resource_missing') {
+          retryCount++
+          if (retryCount >= maxRetries) {
+            throw new Error('Payment method not found after multiple attempts. This may be due to network issues or an invalid test card. Please try refreshing the page and using a different card number like 4242424242424242.')
+          }
+          continue
+        }
+        
+        // For other errors, don't retry
+        throw stripeError
       }
-      throw stripeError
     }
 
     if (!paymentMethod.card) {
       throw new Error('Invalid card payment method')
     }
-
-    console.log('Payment method retrieved successfully:', paymentMethod.id)
 
     // Check if customer exists, create if not
     let customers = await stripe.customers.list({ email, limit: 1 })
