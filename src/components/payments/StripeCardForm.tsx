@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { CreditCard, Calendar, Lock } from "lucide-react";
 import { CardTypeSelect, CardType } from "./CardTypeSelect";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
 
 // Use your actual Stripe publishable key
 const STRIPE_PUBLISHABLE_KEY = "pk_test_51RXgVBRhotlUiiXdPUuoNpTNFEyH8HNLK9jFVg4lcrobEoNKtwH1QFUI4pWLCsMUFurVQEfrFxPahW8lDilmrp2j00iibXBiw8";
@@ -54,27 +55,18 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
     try {
       console.log('Starting card addition process for email:', email);
       
-      // 1. Create SetupIntent on the backend
+      // 1. Create SetupIntent using Supabase client
       console.log('Creating setup intent...');
-      const setupResponse = await fetch(
-        "https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/create-setup-intent",
-        {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("sb-cbhtifqmlkdoevxmbjmm-auth-token") || ""}`
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
+      const { data: setupData, error: setupError } = await supabase.functions.invoke('create-setup-intent', {
+        body: { email }
+      });
 
-      if (!setupResponse.ok) {
-        const errorText = await setupResponse.text();
-        console.error('Setup intent creation failed:', errorText);
-        throw new Error(`Failed to create setup intent: ${errorText}`);
+      if (setupError || !setupData) {
+        console.error('Setup intent creation failed:', setupError);
+        throw new Error(`Failed to create setup intent: ${setupError?.message || 'Unknown error'}`);
       }
 
-      const { client_secret, setup_intent_id } = await setupResponse.json();
+      const { client_secret, setup_intent_id } = setupData;
       console.log('Setup intent created:', setup_intent_id);
 
       // 2. Confirm the SetupIntent with Stripe.js
@@ -104,33 +96,23 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
 
       console.log('Card setup confirmed:', setupIntent.id);
       
-      // 3. Save the payment method to our database
+      // 3. Save the payment method to our database using Supabase client
       console.log('Saving card to database...');
-      const saveResponse = await fetch(
-        "https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/add-stripe-card",
-        {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("sb-cbhtifqmlkdoevxmbjmm-auth-token") || ""}`
-          },
-          body: JSON.stringify({
-            email,
-            label: label || `${cardType.toUpperCase()} Card`,
-            setupIntentId: setupIntent.id,
-          }),
+      const { data: saveData, error: saveError } = await supabase.functions.invoke('add-stripe-card', {
+        body: {
+          email,
+          label: label || `${cardType.toUpperCase()} Card`,
+          setupIntentId: setupIntent.id,
         }
-      );
+      });
       
-      const saveData = await saveResponse.json();
-      
-      if (saveResponse.ok && saveData.success) {
+      if (saveError || !saveData?.success) {
+        console.error('Save failed:', saveError || saveData);
+        toast.error(saveData?.error || saveError?.message || "Failed to save card");
+      } else {
         console.log('Card saved successfully:', saveData);
         toast.success(saveData.message || "Card added successfully!");
         onSuccess();
-      } else {
-        console.error('Save failed:', saveData);
-        toast.error(saveData.error || "Failed to save card");
       }
       
     } catch (error) {
