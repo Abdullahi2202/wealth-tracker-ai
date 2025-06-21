@@ -53,11 +53,14 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       
       console.log('User authenticated:', user.email);
 
-      // Step 2: Create Setup Intent via backend
-      console.log('Creating Setup Intent...');
+      // Step 2: Create Setup Intent via backend - ALWAYS fresh
+      console.log('Creating fresh Setup Intent...');
       const { data: setupData, error: setupError } = await supabase.functions.invoke('create-setup-intent', {
         body: { email: user.email }
       });
+
+      console.log('Raw setup response:', setupData);
+      console.log('Setup error (if any):', setupError);
 
       if (setupError) {
         console.error('Setup Intent creation error:', setupError);
@@ -65,17 +68,25 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       }
 
       if (!setupData?.client_secret) {
-        console.error('Invalid setup data:', setupData);
+        console.error('Invalid setup data received:', setupData);
         throw new Error('No client secret received from server');
       }
 
       console.log('Setup Intent created successfully:', {
         setup_intent_id: setupData.setup_intent_id,
-        has_client_secret: !!setupData.client_secret
+        has_client_secret: !!setupData.client_secret,
+        client_secret_prefix: setupData.client_secret.substring(0, 15),
+        full_client_secret: setupData.client_secret // DEBUG: Log full secret
       });
 
+      // Validate client_secret format
+      if (!setupData.client_secret.startsWith('seti_')) {
+        throw new Error(`Invalid client_secret format: ${setupData.client_secret}`);
+      }
+
       // Step 3: Confirm the Setup Intent with Stripe
-      console.log('Confirming card setup with Stripe...');
+      console.log('Confirming card setup with Stripe using client_secret:', setupData.client_secret);
+      
       const { setupIntent, error: confirmError } = await stripe.confirmCardSetup(
         setupData.client_secret,
         {
@@ -89,6 +100,8 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
         }
       );
 
+      console.log('Stripe confirmCardSetup result:', { setupIntent, confirmError });
+
       if (confirmError) {
         console.error('Card setup confirmation error:', confirmError);
         throw new Error(confirmError.message || 'Failed to confirm card setup');
@@ -98,7 +111,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
         throw new Error(`Card setup failed with status: ${setupIntent?.status || 'unknown'}`);
       }
 
-      console.log('Card setup confirmed successfully');
+      console.log('Card setup confirmed successfully with setupIntent:', setupIntent.id);
 
       // Step 4: Save the payment method to database
       console.log('Saving payment method to database...');

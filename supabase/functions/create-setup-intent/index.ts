@@ -15,6 +15,14 @@ Deno.serve(async (req) => {
   try {
     console.log('=== CREATE SETUP INTENT START ===')
     
+    // Debug: Check if Stripe key exists
+    if (!stripeKey) {
+      console.error('STRIPE_SECRET_KEY is missing!')
+      throw new Error('Stripe secret key is not configured')
+    }
+    
+    console.log('Stripe key configured:', stripeKey.substring(0, 10) + '...')
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { email } = await req.json()
 
@@ -70,7 +78,7 @@ Deno.serve(async (req) => {
     const user = users[0]
     console.log('Found user:', user.id)
 
-    // Create SetupIntent with fresh instance
+    // Create SetupIntent - ALWAYS create a fresh one
     console.log('Creating fresh SetupIntent...')
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
@@ -88,7 +96,8 @@ Deno.serve(async (req) => {
       id: setupIntent.id,
       status: setupIntent.status,
       customer: customerId,
-      has_client_secret: !!setupIntent.client_secret
+      has_client_secret: !!setupIntent.client_secret,
+      client_secret_prefix: setupIntent.client_secret?.substring(0, 15)
     })
 
     // Validate client_secret exists and has correct format
@@ -100,14 +109,21 @@ Deno.serve(async (req) => {
       throw new Error('Invalid client_secret format received')
     }
 
+    // DEBUG: Log the full client_secret for debugging
+    console.log('Full client_secret:', setupIntent.client_secret)
+
     console.log('=== CREATE SETUP INTENT SUCCESS ===')
 
-    return new Response(JSON.stringify({ 
+    const response = { 
       client_secret: setupIntent.client_secret,
       setup_intent_id: setupIntent.id,
       customer_id: customerId,
       status: setupIntent.status
-    }), {
+    }
+
+    console.log('Returning response:', response)
+
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
