@@ -29,7 +29,7 @@ export const useWalletNumber = () => {
           return;
         }
 
-        if (data?.wallet_number) {
+        if (data && data.wallet_number) {
           setWalletNumber(data.wallet_number.toString());
         }
       } catch (err) {

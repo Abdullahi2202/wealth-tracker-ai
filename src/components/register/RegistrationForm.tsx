@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,15 +83,18 @@ const RegistrationForm = () => {
 
       // Fetch the wallet number for the newly created user
       if (authData.user?.id) {
-        const { data: walletData, error: walletError } = await supabase
-          .from("wallets")
-          .select("wallet_number")
-          .eq("user_id", authData.user.id)
-          .single();
+        // Wait a moment for the wallet to be created by the trigger
+        setTimeout(async () => {
+          const { data: walletData, error: walletError } = await supabase
+            .from("wallets")
+            .select("wallet_number")
+            .eq("user_id", authData.user.id)
+            .single();
 
-        if (!walletError && walletData?.wallet_number) {
-          setWalletNumber(walletData.wallet_number.toString());
-        }
+          if (!walletError && walletData?.wallet_number) {
+            setWalletNumber(walletData.wallet_number.toString());
+          }
+        }, 1000);
       }
 
       toast.success(

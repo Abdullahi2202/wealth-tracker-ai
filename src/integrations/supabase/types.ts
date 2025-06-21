@@ -835,6 +835,7 @@ export type Database = {
           updated_at: string | null
           user_email: string | null
           user_id: string | null
+          wallet_number: number
         }
         Insert: {
           balance?: number | null
@@ -845,6 +846,7 @@ export type Database = {
           updated_at?: string | null
           user_email?: string | null
           user_id?: string | null
+          wallet_number?: number
         }
         Update: {
           balance?: number | null
@@ -855,6 +857,7 @@ export type Database = {
           updated_at?: string | null
           user_email?: string | null
           user_id?: string | null
+          wallet_number?: number
         }
         Relationships: []
       }
