@@ -25,6 +25,8 @@ Deno.serve(async (req) => {
     const body = await req.json()
     const { session_id } = body
 
+    console.log('Request body received:', { session_id })
+
     if (!session_id) {
       console.error('Missing session_id')
       return new Response(JSON.stringify({ error: 'Missing session_id' }), {
@@ -40,27 +42,38 @@ Deno.serve(async (req) => {
     console.log('Stripe session retrieved:', { 
       id: session.id, 
       payment_status: session.payment_status,
-      amount_total: session.amount_total 
+      amount_total: session.amount_total,
+      customer: session.customer,
+      metadata: session.metadata
     })
 
     if (session.payment_status !== 'paid') {
       console.error('Payment not completed:', session.payment_status)
-      return new Response(JSON.stringify({ error: 'Payment not completed' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Payment not completed', 
+        payment_status: session.payment_status 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     // Find the topup session using the stripe_session_id
+    console.log('Looking for topup session with stripe_session_id:', session_id)
     const { data: topupSession, error: fetchError } = await supabase
       .from('topup_sessions')
       .select('*')
       .eq('stripe_session_id', session_id)
       .single()
 
+    console.log('Topup session query result:', { topupSession, fetchError })
+
     if (fetchError || !topupSession) {
       console.error('Error fetching topup session:', fetchError)
-      return new Response(JSON.stringify({ error: 'Topup session not found' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Topup session not found',
+        details: fetchError?.message || 'Session not found in database'
+      }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -70,12 +83,17 @@ Deno.serve(async (req) => {
 
     if (topupSession.status === 'completed') {
       console.log('Payment already processed')
-      return new Response(JSON.stringify({ success: true, message: 'Already processed' }), {
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'Already processed',
+        already_completed: true
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     // Update topup session status to completed
+    console.log('Updating topup session status to completed')
     const { error: updateError } = await supabase
       .from('topup_sessions')
       .update({ 
@@ -93,10 +111,12 @@ Deno.serve(async (req) => {
 
     // Update wallet balance using the RPC function
     console.log('Updating wallet balance for user:', topupSession.user_id, 'amount:', session.amount_total)
-    const { error: walletError } = await supabase.rpc('increment_wallet_balance', {
+    const { data: rpcResult, error: walletError } = await supabase.rpc('increment_wallet_balance', {
       user_id_param: topupSession.user_id,
       topup_amount_cents: session.amount_total
     })
+
+    console.log('RPC function result:', { rpcResult, walletError })
 
     if (walletError) {
       console.error('Error updating wallet balance:', walletError)
@@ -106,6 +126,7 @@ Deno.serve(async (req) => {
     console.log('Wallet balance updated successfully')
 
     // Record transaction
+    console.log('Recording transaction')
     const { error: transactionError } = await supabase
       .from('transactions')
       .insert({
@@ -129,7 +150,9 @@ Deno.serve(async (req) => {
     
     return new Response(JSON.stringify({ 
       success: true,
-      message: 'Payment verified and wallet updated'
+      message: 'Payment verified and wallet updated',
+      amount: session.amount_total / 100,
+      session_id: session_id
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -138,7 +161,8 @@ Deno.serve(async (req) => {
     console.error('=== VERIFY PAYMENT ERROR ===')
     console.error('Error details:', error)
     return new Response(JSON.stringify({ 
-      error: 'Payment verification failed'
+      error: 'Payment verification failed',
+      details: error.message || 'Unknown error'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

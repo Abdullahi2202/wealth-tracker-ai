@@ -27,81 +27,89 @@ const TopUpWallet = () => {
   // Handle success/cancel URL parameters
   useEffect(() => {
     const handleUrlParams = async () => {
-      const success = searchParams.get('success');
-      const canceled = searchParams.get('canceled');
-      const sessionId = searchParams.get('session_id');
-      const topupAmount = searchParams.get('amount');
+      try {
+        const success = searchParams.get('success');
+        const canceled = searchParams.get('canceled');
+        const sessionId = searchParams.get('session_id');
+        const topupAmount = searchParams.get('amount');
 
-      if (success === 'true' && sessionId) {
-        console.log('Payment success detected, verifying payment:', { sessionId, topupAmount });
-        setVerifyingPayment(true);
-        
-        try {
-          // Verify payment with backend
-          console.log('Calling verify-payment function with session_id:', sessionId);
-          const { data, error } = await supabase.functions.invoke('verify-payment', {
-            body: { session_id: sessionId }
-          });
+        console.log('URL params:', { success, canceled, sessionId, topupAmount });
 
-          console.log('Verify payment response:', { data, error });
-
-          if (error) {
-            console.error('Payment verification error:', error);
-            toast.error(
-              <div className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <span>Payment verification failed: {error.message || 'Unknown error'}</span>
-              </div>
-            );
-          } else if (data?.success) {
-            console.log('Payment verified successfully:', data);
-            toast.success(
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>Successfully topped up ${topupAmount || 'your wallet'}!</span>
-              </div>
-            );
+        if (success === 'true' && sessionId) {
+          console.log('Payment success detected, verifying payment:', { sessionId, topupAmount });
+          setVerifyingPayment(true);
+          
+          try {
+            // Verify payment with backend
+            console.log('Calling verify-payment function with session_id:', sessionId);
             
-            // Refresh wallet balance multiple times to ensure it's updated
-            setTimeout(() => refetch(), 500);
-            setTimeout(() => refetch(), 2000);
-            setTimeout(() => refetch(), 5000);
-          } else {
-            console.error('Payment verification failed:', data);
+            const { data, error } = await supabase.functions.invoke('verify-payment', {
+              body: { session_id: sessionId }
+            });
+
+            console.log('Verify payment response:', { data, error });
+
+            if (error) {
+              console.error('Payment verification error:', error);
+              toast.error(
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <span>Payment verification failed: {error.message || 'Unknown error'}</span>
+                </div>
+              );
+            } else if (data?.success) {
+              console.log('Payment verified successfully:', data);
+              toast.success(
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Successfully topped up ${topupAmount || 'your wallet'}!</span>
+                </div>
+              );
+              
+              // Refresh wallet balance multiple times to ensure it's updated
+              setTimeout(() => refetch(), 500);
+              setTimeout(() => refetch(), 2000);
+              setTimeout(() => refetch(), 5000);
+            } else {
+              console.error('Payment verification failed:', data);
+              toast.error(
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <span>Payment verification failed</span>
+                </div>
+              );
+            }
+          } catch (verificationError) {
+            console.error('Payment verification exception:', verificationError);
             toast.error(
               <div className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <span>Payment verification failed</span>
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <span>Failed to verify payment</span>
               </div>
             );
+          } finally {
+            setVerifyingPayment(false);
           }
-        } catch (error) {
-          console.error('Payment verification exception:', error);
+          
+          // Clean up URL parameters
+          navigate('/payments/topup', { replace: true });
+        } else if (canceled === 'true') {
+          console.log('Payment canceled detected');
           toast.error(
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span>Failed to verify payment</span>
+              <XCircle className="h-4 w-4 text-red-600" />
+              <span>Payment was canceled</span>
             </div>
           );
-        } finally {
-          setVerifyingPayment(false);
+          // Clean up URL parameters
+          navigate('/payments/topup', { replace: true });
         }
-        
-        // Clean up URL parameters
-        navigate('/payments/topup', { replace: true });
-      } else if (canceled === 'true') {
-        console.log('Payment canceled detected');
-        toast.error(
-          <div className="flex items-center gap-2">
-            <XCircle className="h-4 w-4 text-red-600" />
-            <span>Payment was canceled</span>
-          </div>
-        );
-        // Clean up URL parameters
-        navigate('/payments/topup', { replace: true });
+      } catch (error) {
+        console.error('Error handling URL params:', error);
+        toast.error('An error occurred processing the payment result');
+      } finally {
+        setInitializing(false);
       }
-
-      setInitializing(false);
     };
 
     handleUrlParams();
@@ -219,6 +227,7 @@ const TopUpWallet = () => {
     }
   };
 
+  // Show loading screen while initializing or verifying payment
   if (initializing || verifyingPayment) {
     return (
       <div className="min-h-screen bg-muted pt-3 px-2 flex items-center justify-center">
