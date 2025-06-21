@@ -23,13 +23,25 @@ export function usePaymentMethods() {
   const fetchMethods = async () => {
     setLoading(true);
     try {
+      console.log('Fetching payment methods...');
+      
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('User auth error:', userError);
         setMethods([]);
         setLoading(false);
         return;
       }
+
+      if (!user) {
+        console.log('No authenticated user found');
+        setMethods([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('Current user:', user.id);
 
       // Fetch payment methods with proper typing
       const { data, error } = await supabase
@@ -43,6 +55,7 @@ export function usePaymentMethods() {
         console.error("Error fetching payment methods:", error);
         setMethods([]);
       } else {
+        console.log('Payment methods fetched:', data);
         setMethods(data || []);
       }
     } catch (error) {

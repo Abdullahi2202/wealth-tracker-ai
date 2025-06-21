@@ -49,7 +49,9 @@ const TopUpWallet = () => {
 
   const handleTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) {
+    
+    const amountValue = parseFloat(amount);
+    if (!amount || amountValue <= 0) {
       toast.error("Enter a valid amount.");
       return;
     }
@@ -60,7 +62,6 @@ const TopUpWallet = () => {
     }
     
     setLoading(true);
-    const amountValue = parseFloat(amount);
 
     try {
       console.log('Starting top-up process...', { amount: amountValue, method, note });
@@ -68,15 +69,23 @@ const TopUpWallet = () => {
       // Get current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session) {
+        console.error('Session error:', sessionError);
         throw new Error('You must be logged in to top up your wallet');
       }
 
+      console.log('Session token length:', session.access_token.length);
+
+      // Create the request body
+      const requestBody = { 
+        amount: amountValue,
+        currency: 'usd'
+      };
+
+      console.log('Sending request body:', requestBody);
+
       // Create Stripe checkout session for top-up
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: JSON.stringify({ 
-          amount: amountValue,
-          currency: 'usd'
-        }),
+        body: requestBody,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
@@ -95,14 +104,15 @@ const TopUpWallet = () => {
         // Redirect to Stripe checkout
         window.location.href = data.checkout_url;
       } else {
-        throw new Error('No checkout URL received');
+        console.error('No checkout URL received:', data);
+        throw new Error('No checkout URL received from payment processor');
       }
     } catch (error) {
       console.error("Top-up error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to process top-up. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (
@@ -134,11 +144,11 @@ const TopUpWallet = () => {
         <CardContent>
           <form onSubmit={handleTopUp} className="space-y-4">
             <div>
-              <label className="block text-sm mb-1 font-medium">Amount</label>
+              <label className="block text-sm mb-1 font-medium">Amount ($)</label>
               <Input
                 type="number"
                 placeholder="0.00"
-                min={0.01}
+                min="0.01"
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
