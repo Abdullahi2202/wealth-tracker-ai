@@ -73,30 +73,44 @@ const TopUpWallet = () => {
         throw new Error('You must be logged in to top up your wallet');
       }
 
-      console.log('Session token length:', session.access_token.length);
+      console.log('Session authenticated, token length:', session.access_token.length);
 
-      // Create the request body
-      const requestBody = { 
+      // Create the request body - ensure it's properly stringified
+      const requestBody = JSON.stringify({ 
         amount: amountValue,
         currency: 'usd'
-      };
-
-      console.log('Sending request body:', requestBody);
-
-      // Create Stripe checkout session for top-up
-      const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: requestBody,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
       });
 
-      console.log('Function response:', { data, error });
+      console.log('Request body to send:', requestBody);
 
-      if (error) {
-        console.error('Top-up session error:', error);
-        throw new Error(error.message || 'Failed to create payment session');
+      // Create Stripe checkout session for top-up using direct fetch
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/create-topup-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabase.supabaseKey
+        },
+        body: requestBody
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', parseError);
+        throw new Error(`Server returned invalid response: ${responseText}`);
+      }
+
+      if (!response.ok) {
+        console.error('Top-up session error:', data);
+        throw new Error(data.error || `Server returned status ${response.status}`);
       }
 
       if (data?.checkout_url) {

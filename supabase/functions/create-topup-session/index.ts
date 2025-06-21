@@ -12,7 +12,12 @@ const stripe = new Stripe(stripeKey, {
 })
 
 Deno.serve(async (req) => {
+  console.log('=== CREATE TOPUP SESSION STARTED ===')
+  console.log('Request method:', req.method)
+  console.log('Request URL:', req.url)
+  
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request')
     return new Response(null, { headers: corsHeaders })
   }
 
@@ -20,6 +25,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     
     // Get authenticated user
+    console.log('Checking authorization header...')
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       console.error('No authorization header provided')
@@ -30,7 +36,7 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    console.log('Authenticating user with token length:', token.length)
+    console.log('Token received, length:', token.length)
     
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) {
@@ -43,29 +49,45 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', user.email)
 
-    // Parse request body
+    // Parse request body with detailed logging
+    console.log('Reading request body...')
+    let requestText = ''
+    try {
+      requestText = await req.text()
+      console.log('Raw request body received:', requestText)
+      console.log('Request body length:', requestText.length)
+    } catch (readError) {
+      console.error('Error reading request body:', readError)
+      return new Response(JSON.stringify({ 
+        error: 'Failed to read request body',
+        details: readError.message 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    
+    if (!requestText || requestText.trim() === '') {
+      console.error('Request body is empty')
+      return new Response(JSON.stringify({ 
+        error: 'Request body is required. Please provide amount and currency.' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    
     let body
     try {
-      const requestText = await req.text()
-      console.log('Raw request body:', requestText)
-      
-      if (!requestText || requestText.trim() === '') {
-        console.error('Request body is empty')
-        return new Response(JSON.stringify({ 
-          error: 'Request body is required. Please provide amount and currency.' 
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-      
       body = JSON.parse(requestText)
-      console.log('Parsed body:', body)
+      console.log('Successfully parsed request body:', body)
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
+      console.error('Failed to parse:', requestText)
       return new Response(JSON.stringify({ 
         error: 'Invalid JSON format in request body',
-        details: parseError.message 
+        details: parseError.message,
+        receivedBody: requestText 
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -154,7 +176,8 @@ Deno.serve(async (req) => {
         }
       })
 
-      console.log('Stripe session created:', session.id)
+      console.log('Stripe session created successfully:', session.id)
+      console.log('Checkout URL:', session.url)
     } catch (stripeError) {
       console.error('Stripe session creation error:', stripeError)
       return new Response(JSON.stringify({ 
@@ -185,9 +208,10 @@ Deno.serve(async (req) => {
         // Don't fail the request if DB save fails, but log it
         console.log('Continuing despite DB error - session created successfully')
       } else {
-        console.log('Topup session saved to database:', dbSession)
+        console.log('Topup session saved to database:', dbSession.id)
       }
 
+      console.log('=== SUCCESS: Returning checkout URL ===')
       return new Response(JSON.stringify({
         session_id: session.id,
         checkout_url: session.url,
@@ -212,7 +236,8 @@ Deno.serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Create topup session error:', error)
+    console.error('=== CREATE TOPUP SESSION ERROR ===')
+    console.error('Error details:', error)
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
       details: error.message,
