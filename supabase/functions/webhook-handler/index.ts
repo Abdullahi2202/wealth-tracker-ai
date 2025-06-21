@@ -14,7 +14,6 @@ const stripe = new Stripe(stripeKey, {
 Deno.serve(async (req) => {
   console.log('=== WEBHOOK HANDLER STARTED ===')
   console.log('Request method:', req.method)
-  console.log('Headers:', Object.fromEntries(req.headers.entries()))
   
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -48,107 +47,127 @@ Deno.serve(async (req) => {
         console.log('Session ID:', session.id)
         console.log('Session metadata:', session.metadata)
         
-        if (session.metadata?.type === 'wallet_topup') {
-          console.log('Processing wallet topup completion')
-          
-          const userId = session.metadata.user_id
-          const userEmail = session.metadata.user_email
-          const amountInCents = parseInt(session.metadata.amount_cents || '0')
-          const amountInDollars = amountInCents / 100
-          
-          console.log('Topup details:', {
-            userId,
-            userEmail,
-            amountInCents,
-            amountInDollars
-          })
-          
-          if (userId && userEmail && amountInCents > 0) {
-            // Update topup session status first
-            console.log('Updating topup session status to completed')
-            const { error: sessionError } = await supabase
+        // Find the topup session by stripe_session_id
+        console.log('Looking for topup session with stripe_session_id:', session.id)
+        const { data: topupSession, error: sessionError } = await supabase
               .from('topup_sessions')
-              .update({ 
-                status: 'completed',
-                updated_at: new Date().toISOString()
-              })
+              .select('*')
               .eq('stripe_session_id', session.id)
-
-            if (sessionError) {
-              console.error('Error updating topup session:', sessionError)
-            } else {
-              console.log('Topup session updated successfully')
-            }
-
-            // Get current wallet balance
-            console.log('Fetching current wallet balance for:', userEmail)
-            const { data: currentWallet, error: walletFetchError } = await supabase
-              .from('wallets')
-              .select('balance')
-              .eq('user_email', userEmail)
               .single()
 
-            if (walletFetchError) {
-              console.error('Error fetching wallet:', walletFetchError)
-              break
-            }
-
-            const currentBalance = Number(currentWallet.balance) || 0
-            const newBalance = currentBalance + amountInDollars
-            
-            console.log('Balance update:', {
-              currentBalance,
-              amountInDollars,
-              newBalance
-            })
-
-            // Update wallet balance
-            console.log('Updating wallet balance')
-            const { error: walletError } = await supabase
-              .from('wallets')
-              .update({ 
-                balance: newBalance,
-                updated_at: new Date().toISOString()
-              })
-              .eq('user_email', userEmail)
-
-            if (walletError) {
-              console.error('Error updating wallet:', walletError)
-            } else {
-              console.log('Wallet updated successfully from', currentBalance, 'to', newBalance)
-            }
-
-            // Record transaction
-            console.log('Recording transaction')
-            const { error: transactionError } = await supabase
-              .from('transactions')
-              .insert({
-                user_id: userId,
-                name: 'Wallet Top-up',
-                amount: amountInDollars,
-                type: 'income',
-                category: 'Top-up',
-                date: new Date().toISOString().split('T')[0],
-                status: 'completed'
-              })
-
-            if (transactionError) {
-              console.error('Error recording transaction:', transactionError)
-            } else {
-              console.log('Transaction recorded successfully')
-            }
-
-            console.log('=== WALLET TOPUP COMPLETED SUCCESSFULLY ===')
-          } else {
-            console.error('Missing required data for wallet topup:', {
-              userId: !!userId,
-              userEmail: !!userEmail,
-              amountInCents
-            })
-          }
-        } else {
-          console.log('Session metadata type is not wallet_topup:', session.metadata?.type)
+        if (sessionError || !topupSession) {
+          console.error('Topup session not found:', sessionError)
+          break
         }
+
+        console.log('Found topup session:', topupSession)
+
+        // Update topup session status to completed
+        console.log('Updating topup session status to completed')
+        const { error: updateSessionError } = await supabase
+          .from('topup_sessions')
+          .update({ 
+            status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', topupSession.id)
+
+        if (updateSessionError) {
+          console.error('Error updating topup session:', updateSessionError)
+        } else {
+          console.log('Topup session updated successfully')
+        }
+
+        // Get user info
+        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(topupSession.user_id)
+        if (userError || !userData.user) {
+          console.error('Error getting user:', userError)
+          break
+        }
+
+        const userEmail = userData.user.email
+        console.log('Processing topup for user:', userEmail)
+
+        // Get current wallet balance
+        console.log('Fetching current wallet balance for:', userEmail)
+        const { data: currentWallet, error: walletFetchError } = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_email', userEmail)
+          .single()
+
+        if (walletFetchError) {
+          console.error('Error fetching wallet:', walletFetchError)
+          
+          // Create wallet if it doesn't exist
+          console.log('Creating new wallet for user:', userEmail)
+          const { error: createWalletError } = await supabase
+            .from('wallets')
+            .insert({
+              user_id: topupSession.user_id,
+              user_email: userEmail,
+              balance: topupSession.amount / 100,
+              currency: 'USD',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+          
+          if (createWalletError) {
+            console.error('Error creating wallet:', createWalletError)
+            break
+          }
+          
+          console.log('New wallet created with balance:', topupSession.amount / 100)
+        } else {
+          // Update existing wallet balance
+          const currentBalance = Number(currentWallet.balance) || 0
+          const amountInDollars = topupSession.amount / 100
+          const newBalance = currentBalance + amountInDollars
+          
+          console.log('Balance update:', {
+            currentBalance,
+            amountInDollars,
+            newBalance
+          })
+
+          // Update wallet balance
+          console.log('Updating wallet balance')
+          const { error: walletError } = await supabase
+            .from('wallets')
+            .update({ 
+              balance: newBalance,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_email', userEmail)
+
+          if (walletError) {
+            console.error('Error updating wallet:', walletError)
+          } else {
+            console.log('Wallet updated successfully from', currentBalance, 'to', newBalance)
+          }
+        }
+
+        // Record transaction
+        console.log('Recording transaction')
+        const { error: transactionError } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: topupSession.user_id,
+            name: 'Wallet Top-up',
+            amount: topupSession.amount / 100,
+            type: 'income',
+            category: 'Top-up',
+            date: new Date().toISOString().split('T')[0],
+            status: 'completed'
+          })
+
+        if (transactionError) {
+          console.error('Error recording transaction:', transactionError)
+        } else {
+          console.log('Transaction recorded successfully')
+        }
+
+        console.log('=== WALLET TOPUP COMPLETED SUCCESSFULLY ===')
         break
 
       case 'payment_intent.succeeded':

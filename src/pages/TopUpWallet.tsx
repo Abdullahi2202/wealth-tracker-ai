@@ -44,6 +44,7 @@ const TopUpWallet = () => {
         setTimeout(() => refetch(), 1000);
         setTimeout(() => refetch(), 3000);
         setTimeout(() => refetch(), 5000);
+        setTimeout(() => refetch(), 10000);
         
         // Clean up URL parameters
         navigate('/payments/topup', { replace: true });
@@ -72,6 +73,15 @@ const TopUpWallet = () => {
       setMethod(cardMethod?.id || methods[0].id);
     }
   }, [methods, method]);
+
+  // Auto-refresh wallet balance periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetch();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [refetch]);
 
   const handleTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,14 +207,24 @@ const TopUpWallet = () => {
           <CardDescription>Add funds to your wallet securely via Stripe.</CardDescription>
           {wallet && (
             <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-700">
-                Current Balance: <span className="font-semibold">
-                  ${wallet.balance.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-blue-700">
+                  Current Balance: <span className="font-semibold">
+                    ${wallet.balance.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={refetch}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  Refresh
+                </Button>
+              </div>
             </div>
           )}
         </CardHeader>
