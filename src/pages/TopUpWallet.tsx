@@ -9,7 +9,7 @@ import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle, XCircle } from "lucide-react";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
@@ -33,7 +33,12 @@ const TopUpWallet = () => {
 
       if (success === 'true') {
         console.log('Top-up success detected:', { topupAmount, sessionId });
-        toast.success(`Successfully topped up $${topupAmount || 'your wallet'}!`);
+        toast.success(
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <span>Successfully topped up ${topupAmount || 'your wallet'}!</span>
+          </div>
+        );
         
         // Refresh wallet balance multiple times to ensure it's updated
         setTimeout(() => refetch(), 1000);
@@ -44,7 +49,12 @@ const TopUpWallet = () => {
         navigate('/payments/topup', { replace: true });
       } else if (canceled === 'true') {
         console.log('Top-up canceled detected');
-        toast.error('Top-up was canceled');
+        toast.error(
+          <div className="flex items-center gap-2">
+            <XCircle className="h-4 w-4 text-red-600" />
+            <span>Top-up was canceled</span>
+          </div>
+        );
         // Clean up URL parameters
         navigate('/payments/topup', { replace: true });
       }
@@ -133,7 +143,12 @@ const TopUpWallet = () => {
       setLoading(false);
       
       if (error instanceof Error) {
-        toast.error(error.message);
+        toast.error(
+          <div className="flex items-center gap-2">
+            <XCircle className="h-4 w-4 text-red-600" />
+            <span>{error.message}</span>
+          </div>
+        );
       } else {
         toast.error("Failed to process top-up. Please try again.");
       }
