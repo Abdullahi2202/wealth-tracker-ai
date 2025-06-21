@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -20,46 +19,52 @@ Deno.serve(async (req) => {
       case 'GET':
         console.log('Fetching all users with verification data...')
         
-        // Fetch users from registration table with their verification requests
-        const { data: users, error: usersError } = await supabase
+        // First, fetch users from registration table
+        const { data: registrationUsers, error: registrationError } = await supabase
           .from('registration')
-          .select(`
-            *,
-            identity_verification_requests (
-              id,
-              document_type,
-              document_number,
-              image_url,
-              status,
-              created_at,
-              reviewed_by,
-              reviewed_at
-            )
-          `)
+          .select('*')
           .order('created_at', { ascending: false })
 
-        if (usersError) {
-          console.error('Error fetching users:', usersError)
-          return new Response(JSON.stringify({ error: usersError.message }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
+        if (registrationError) {
+          console.error('Error fetching registration users:', registrationError)
         }
 
-        // Also try to fetch from profiles table to get additional user data
+        // Fetch users from profiles table
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('*')
           .order('created_at', { ascending: false })
 
-        let allUsers = users || []
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError)
+        }
 
-        // Merge profile data if available
-        if (profiles && !profilesError) {
+        // Fetch all identity verification requests
+        const { data: verificationRequests, error: verificationError } = await supabase
+          .from('identity_verification_requests')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (verificationError) {
+          console.error('Error fetching verification requests:', verificationError)
+        }
+
+        // Combine and merge the data
+        let allUsers: any[] = []
+
+        // Add registration users
+        if (registrationUsers) {
+          allUsers = registrationUsers.map(user => ({
+            ...user,
+            identity_verification_requests: []
+          }))
+        }
+
+        // Add profile users not already in registration
+        if (profiles) {
           profiles.forEach(profile => {
-            const existingUser = allUsers.find(user => user.email === profile.email)
+            const existingUser = allUsers.find(user => user.email === profile.email || user.id === profile.id)
             if (!existingUser && profile.email) {
-              // Add profile as a user if not already in registration
               allUsers.push({
                 id: profile.id,
                 email: profile.email,
@@ -69,6 +74,19 @@ Deno.serve(async (req) => {
                 verification_status: 'pending',
                 identity_verification_requests: []
               })
+            }
+          })
+        }
+
+        // Attach verification requests to users
+        if (verificationRequests) {
+          verificationRequests.forEach(request => {
+            const user = allUsers.find(u => u.email === request.user_email || u.id === request.user_id)
+            if (user) {
+              if (!user.identity_verification_requests) {
+                user.identity_verification_requests = []
+              }
+              user.identity_verification_requests.push(request)
             }
           })
         }
