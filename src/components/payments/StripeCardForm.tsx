@@ -26,105 +26,107 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
   const [loading, setLoading] = useState(false);
   const [cardType, setCardType] = useState<CardType>("visa");
 
-  const getAuthenticatedUser = async () => {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user?.email) {
-      throw new Error('User not authenticated');
-    }
-    return user;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!stripe || !elements) {
       toast.error("Stripe is not loaded");
       return;
     }
 
-    setLoading(true);
-
-    const numberElement = elements.getElement(CardNumberElement);
-    if (!numberElement) {
-      toast.error("Card form not loaded");
-      setLoading(false);
+    const cardElement = elements.getElement(CardNumberElement);
+    if (!cardElement) {
+      toast.error("Card element not found");
       return;
     }
 
+    setLoading(true);
+
     try {
-      console.log('=== STARTING CARD ADDITION ===');
+      console.log('=== STARTING CARD ADDITION PROCESS ===');
       
-      const user = await getAuthenticatedUser();
+      // Step 1: Get authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user?.email) {
+        throw new Error('User not authenticated');
+      }
+      
       console.log('User authenticated:', user.email);
-      
-      // 1. Create SetupIntent
-      console.log('Creating setup intent...');
+
+      // Step 2: Create Setup Intent via backend
+      console.log('Creating Setup Intent...');
       const { data: setupData, error: setupError } = await supabase.functions.invoke('create-setup-intent', {
         body: { email: user.email }
       });
 
       if (setupError) {
-        console.error('Setup intent creation failed:', setupError);
-        throw new Error(`Failed to create setup intent: ${setupError.message}`);
+        console.error('Setup Intent creation error:', setupError);
+        throw new Error(`Failed to create Setup Intent: ${setupError.message}`);
       }
 
-      if (!setupData?.client_secret || !setupData?.setup_intent_id) {
-        throw new Error('Invalid response from setup intent creation');
+      if (!setupData?.client_secret) {
+        console.error('Invalid setup data:', setupData);
+        throw new Error('No client secret received from server');
       }
 
-      const { client_secret, setup_intent_id, customer_id } = setupData;
-      console.log('Setup intent created:', { setup_intent_id, customer_id });
-
-      // 2. Confirm the SetupIntent
-      console.log('Confirming card setup...');
-      const confirmResult = await stripe.confirmCardSetup(client_secret, {
-        payment_method: {
-          card: numberElement,
-          billing_details: { 
-            email: user.email,
-            name: label || `${cardType.toUpperCase()} Card`
-          }
-        }
+      console.log('Setup Intent created successfully:', {
+        setup_intent_id: setupData.setup_intent_id,
+        has_client_secret: !!setupData.client_secret
       });
 
-      if (confirmResult.error) {
-        console.error('Card setup confirmation error:', confirmResult.error);
-        throw new Error(confirmResult.error.message || "Card setup failed");
+      // Step 3: Confirm the Setup Intent with Stripe
+      console.log('Confirming card setup with Stripe...');
+      const { setupIntent, error: confirmError } = await stripe.confirmCardSetup(
+        setupData.client_secret,
+        {
+          payment_method: {
+            card: cardElement,
+            billing_details: {
+              name: label || `${cardType.toUpperCase()} Card`,
+              email: user.email,
+            },
+          },
+        }
+      );
+
+      if (confirmError) {
+        console.error('Card setup confirmation error:', confirmError);
+        throw new Error(confirmError.message || 'Failed to confirm card setup');
       }
 
-      const { setupIntent } = confirmResult;
-      
       if (!setupIntent || setupIntent.status !== 'succeeded') {
         throw new Error(`Card setup failed with status: ${setupIntent?.status || 'unknown'}`);
       }
 
       console.log('Card setup confirmed successfully');
-      
-      // 3. Save the payment method
-      console.log('Saving card to database...');
-      const { data: saveData, error: saveError } = await supabase.functions.invoke('add-stripe-card', {
+
+      // Step 4: Save the payment method to database
+      console.log('Saving payment method to database...');
+      const { data: saveResult, error: saveError } = await supabase.functions.invoke('add-stripe-card', {
         body: {
           email: user.email,
           label: label || `${cardType.toUpperCase()} Card`,
           setupIntentId: setupIntent.id,
         }
       });
-      
+
       if (saveError) {
-        console.error('Card save failed:', saveError);
-        toast.error(saveError.message || "Failed to save card");
-      } else if (!saveData?.success) {
-        console.error('Card save failed:', saveData);
-        toast.error(saveData?.error || "Failed to save card");
-      } else {
-        console.log('Card saved successfully');
-        toast.success("Card added successfully!");
-        console.log('=== CARD ADDITION COMPLETED ===');
-        onSuccess();
+        console.error('Failed to save payment method:', saveError);
+        throw new Error(`Failed to save card: ${saveError.message}`);
       }
-      
+
+      if (!saveResult?.success) {
+        console.error('Save result error:', saveResult);
+        throw new Error(saveResult?.error || 'Failed to save payment method');
+      }
+
+      console.log('=== CARD ADDITION COMPLETED SUCCESSFULLY ===');
+      toast.success("Card added successfully!");
+      onSuccess();
+
     } catch (error) {
-      console.error("=== CARD ADDITION FAILED ===");
-      console.error("Error:", error);
+      console.error('=== CARD ADDITION FAILED ===');
+      console.error('Error details:', error);
       toast.error(error instanceof Error ? error.message : "Failed to add card");
     } finally {
       setLoading(false);

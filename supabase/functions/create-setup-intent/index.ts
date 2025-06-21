@@ -70,8 +70,8 @@ Deno.serve(async (req) => {
     const user = users[0]
     console.log('Found user:', user.id)
 
-    // Create SetupIntent
-    console.log('Creating SetupIntent...')
+    // Create SetupIntent with fresh instance
+    console.log('Creating fresh SetupIntent...')
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -79,18 +79,25 @@ Deno.serve(async (req) => {
       metadata: {
         user_id: user.id,
         user_email: email,
-        created_by: 'wallet_app'
+        created_by: 'wallet_app',
+        timestamp: new Date().toISOString()
       }
     })
 
-    console.log('SetupIntent created:', {
+    console.log('SetupIntent created successfully:', {
       id: setupIntent.id,
       status: setupIntent.status,
-      customer: customerId
+      customer: customerId,
+      has_client_secret: !!setupIntent.client_secret
     })
 
+    // Validate client_secret exists and has correct format
     if (!setupIntent.client_secret) {
       throw new Error('SetupIntent created without client_secret')
+    }
+
+    if (!setupIntent.client_secret.startsWith('seti_')) {
+      throw new Error('Invalid client_secret format received')
     }
 
     console.log('=== CREATE SETUP INTENT SUCCESS ===')
@@ -107,10 +114,12 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('=== CREATE SETUP INTENT ERROR ===')
     console.error('Error:', error.message)
+    console.error('Stack:', error.stack)
     
     return new Response(JSON.stringify({ 
       error: error.message,
-      code: 'SETUP_INTENT_ERROR'
+      code: 'SETUP_INTENT_ERROR',
+      timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
