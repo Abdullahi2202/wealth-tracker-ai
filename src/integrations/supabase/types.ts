@@ -883,6 +883,10 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: string
       }
+      increment_wallet_balance: {
+        Args: { user_id_param: string; topup_amount_cents: number }
+        Returns: undefined
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean

@@ -8,42 +8,57 @@ schemas = ["public", "storage", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
-[auth]
-enabled = true
-port = 54324
-site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://localhost:3000"]
-jwt_expiry = 3600
-enable_signup = true
-enable_anonymous_sign_ins = false
-
 [db]
 port = 54322
 shadow_port = 54320
 major_version = 15
 
-[functions.user-management]
-verify_jwt = false
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1:54321"
 
-[functions.payment-processing]
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+enabled = true
+port = 54327
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+port = 54328
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://cbhtifqmlkdoevxmbjmm.supabase.co/auth/v1/callback"]
+jwt_expiry = 3600
+enable_signup = true
+enable_confirmations = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[[auth.providers.oauth]]
+enabled = true
+provider = "google"
+
+[edge_runtime]
+enabled = true
+port = 54329
+
+[functions.create-topup-session]
+verify_jwt = true
+
+[functions.stripe-webhook]
 verify_jwt = false
 
 [functions.webhook-handler]
 verify_jwt = false
 
-[functions.admin-operations]
+[functions.stripe-webhook-enhanced]
 verify_jwt = false
-
-[functions.add-stripe-card]
-verify_jwt = false
-
-[functions.wallet-operations]
-verify_jwt = false
-
-[functions.ai-assistant]
-verify_jwt = false
-
-[storage]
-enabled = true
-port = 54323
-file_size_limit = "50MiB"
