@@ -14,6 +14,19 @@ const stripe = new Stripe(stripeKey, {
 Deno.serve(async (req) => {
   console.log('=== WEBHOOK HANDLER STARTED ===')
   console.log('Request method:', req.method)
+  console.log('Request URL:', req.url)
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()))
+  
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      }
+    })
+  }
   
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -22,14 +35,16 @@ Deno.serve(async (req) => {
 
     console.log('Webhook body length:', body.length)
     console.log('Stripe signature present:', !!sig)
+    console.log('Webhook secret configured:', !!webhookSecret)
 
     let event
     try {
-      if (webhookSecret) {
-        event = stripe.webhooks.constructEvent(body, sig!, webhookSecret)
+      if (webhookSecret && sig) {
+        console.log('Verifying webhook signature...')
+        event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
         console.log('Webhook signature verified successfully')
       } else {
-        console.log('No webhook secret configured, parsing body directly')
+        console.log('No webhook secret configured or no signature, parsing body directly')
         event = JSON.parse(body)
       }
     } catch (err) {
@@ -39,6 +54,7 @@ Deno.serve(async (req) => {
 
     console.log('Processing webhook event:', event.type)
     console.log('Event ID:', event.id)
+    console.log('Event data keys:', Object.keys(event.data?.object || {}))
 
     switch (event.type) {
       case 'checkout.session.completed':
@@ -46,6 +62,8 @@ Deno.serve(async (req) => {
         console.log('=== CHECKOUT SESSION COMPLETED ===')
         console.log('Session ID:', session.id)
         console.log('Session metadata:', session.metadata)
+        console.log('Session mode:', session.mode)
+        console.log('Session payment_status:', session.payment_status)
         
         // Find the topup session by stripe_session_id
         console.log('Looking for topup session with stripe_session_id:', session.id)
@@ -57,6 +75,13 @@ Deno.serve(async (req) => {
 
         if (sessionError || !topupSession) {
           console.error('Topup session not found:', sessionError)
+          console.log('Available topup sessions:')
+          const { data: allSessions } = await supabase
+            .from('topup_sessions')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(5)
+          console.log(allSessions)
           break
         }
 
@@ -125,42 +150,11 @@ Deno.serve(async (req) => {
         break
 
       case 'payment_intent.succeeded':
-        const paymentIntent = event.data.object
-        console.log('Payment intent succeeded:', paymentIntent.id)
-        
-        // Update payment transaction status
-        const { error: updateError } = await supabase
-          .from('payment_transactions')
-          .update({ 
-            status: 'succeeded',
-            processed_at: new Date().toISOString()
-          })
-          .eq('stripe_payment_intent_id', paymentIntent.id)
-
-        if (updateError) {
-          console.error('Error updating payment transaction:', updateError)
-        } else {
-          console.log('Payment transaction updated successfully')
-        }
+        console.log('Payment intent succeeded - not handling for topups')
         break
 
       case 'payment_intent.payment_failed':
-        const failedPayment = event.data.object
-        console.log('Payment intent failed:', failedPayment.id)
-        
-        const { error: failError } = await supabase
-          .from('payment_transactions')
-          .update({ 
-            status: 'failed',
-            processed_at: new Date().toISOString()
-          })
-          .eq('stripe_payment_intent_id', failedPayment.id)
-
-        if (failError) {
-          console.error('Error updating failed payment:', failError)
-        } else {
-          console.log('Failed payment updated successfully')
-        }
+        console.log('Payment intent failed - not handling for topups')
         break
 
       default:
@@ -169,12 +163,22 @@ Deno.serve(async (req) => {
 
     console.log('=== WEBHOOK PROCESSING COMPLETED ===')
     return new Response(JSON.stringify({ received: true }), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
     })
 
   } catch (error) {
     console.error('=== WEBHOOK PROCESSING ERROR ===')
     console.error('Error details:', error)
-    return new Response('Webhook processing failed', { status: 500 })
+    console.error('Error stack:', error.stack)
+    return new Response(JSON.stringify({ error: 'Webhook processing failed', details: error.message }), { 
+      status: 500,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    })
   }
 })
