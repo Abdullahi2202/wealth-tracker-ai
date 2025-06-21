@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       .select('id')
       .eq('stripe_payment_method_id', paymentMethod.id)
       .eq('user_id', authUser.user.id)
-      .single()
+      .maybeSingle()
     
     if (existingMethod) {
       console.log('Payment method already exists, returning existing record')
@@ -83,12 +83,16 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Get the customer ID from the setup intent
+    const customerId = typeof setupIntent.customer === 'string' ? setupIntent.customer : setupIntent.customer?.id
+
     console.log('Storing payment method in database...')
     const { data, error } = await supabase
       .from('payment_methods')
       .insert({
         user_id: authUser.user.id,
         stripe_payment_method_id: paymentMethod.id,
+        stripe_customer_id: customerId,
         type: 'card',
         brand: paymentMethod.card.brand,
         exp_month: paymentMethod.card.exp_month,

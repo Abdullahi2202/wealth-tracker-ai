@@ -19,9 +19,6 @@ Deno.serve(async (req) => {
     if (!stripeKey) {
       throw new Error('STRIPE_SECRET_KEY is not configured')
     }
-    if (!stripeKey.startsWith('sk_test_') && !stripeKey.startsWith('sk_live_')) {
-      throw new Error('Invalid Stripe secret key format')
-    }
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { email } = await req.json()
@@ -32,40 +29,58 @@ Deno.serve(async (req) => {
       throw new Error('Email is required')
     }
 
-    console.log('Initializing Stripe with key type:', stripeKey.substring(0, 8) + '...')
+    console.log('Initializing Stripe...')
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
     })
 
-    // Check if customer exists, create if not
+    // Check if customer exists in Stripe, create if not
     let customers = await stripe.customers.list({ email, limit: 1 })
     let customerId = customers.data[0]?.id
 
     if (!customerId) {
       console.log('Creating new Stripe customer...')
-      const customer = await stripe.customers.create({ email })
+      const customer = await stripe.customers.create({ 
+        email,
+        metadata: {
+          source: 'payment_app'
+        }
+      })
       customerId = customer.id
       console.log('Created customer:', customerId)
     } else {
       console.log('Found existing customer:', customerId)
     }
 
-    console.log('Creating SetupIntent...')
+    // Get user from Supabase to ensure they exist
+    const { data: authUser, error: authError } = await supabase.auth.admin.getUserByEmail(email)
+    if (authError || !authUser.user) {
+      console.error('Auth error:', authError)
+      throw new Error(`User not found: ${authError?.message || 'User lookup failed'}`)
+    }
+
+    console.log('Creating SetupIntent for user:', authUser.user.id)
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ['card'],
       usage: 'off_session',
+      metadata: {
+        user_id: authUser.user.id,
+        email: email
+      }
     })
 
     console.log('SetupIntent created successfully:', {
       id: setupIntent.id,
       client_secret: setupIntent.client_secret ? 'present' : 'missing',
-      status: setupIntent.status
+      status: setupIntent.status,
+      customer: customerId
     })
 
     return new Response(JSON.stringify({ 
       client_secret: setupIntent.client_secret,
-      setup_intent_id: setupIntent.id 
+      setup_intent_id: setupIntent.id,
+      customer_id: customerId
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

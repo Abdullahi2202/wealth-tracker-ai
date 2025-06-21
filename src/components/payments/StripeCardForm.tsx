@@ -59,7 +59,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       const user = await getAuthenticatedUser();
       console.log('User authenticated:', user.email);
       
-      // 1. Create SetupIntent using Supabase client
+      // 1. Create SetupIntent using Supabase edge function
       console.log('Creating setup intent...');
       const { data: setupData, error: setupError } = await supabase.functions.invoke('create-setup-intent', {
         body: { email: user.email }
@@ -75,8 +75,8 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
         throw new Error('Invalid response from setup intent creation');
       }
 
-      const { client_secret, setup_intent_id } = setupData;
-      console.log('Setup intent created:', setup_intent_id);
+      const { client_secret, setup_intent_id, customer_id } = setupData;
+      console.log('Setup intent created:', { setup_intent_id, customer_id });
 
       // 2. Confirm the SetupIntent with Stripe.js
       console.log('Confirming card setup...');
@@ -105,7 +105,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
 
       console.log('Card setup confirmed:', setupIntent.id);
       
-      // 3. Save the payment method to our database using Supabase client
+      // 3. Save the payment method to our database using Supabase edge function
       console.log('Saving card to database...');
       const { data: saveData, error: saveError } = await supabase.functions.invoke('add-stripe-card', {
         body: {
