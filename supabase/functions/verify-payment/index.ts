@@ -47,34 +47,24 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { user_id, topup_session_id } = session.metadata || {}
-
-    if (!user_id || !topup_session_id) {
-      console.error('Missing metadata:', session.metadata)
-      return new Response(JSON.stringify({ error: 'Invalid session metadata' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    console.log('Processing payment for user:', user_id, 'topup_session:', topup_session_id)
-
-    // Check if already processed
-    const { data: existingSession, error: fetchError } = await supabase
+    // Find the topup session using the stripe_session_id
+    const { data: topupSession, error: fetchError } = await supabase
       .from('topup_sessions')
-      .select('status')
-      .eq('id', topup_session_id)
+      .select('*')
+      .eq('stripe_session_id', session_id)
       .single()
 
-    if (fetchError) {
+    if (fetchError || !topupSession) {
       console.error('Error fetching topup session:', fetchError)
-      return new Response(JSON.stringify({ error: 'Session not found' }), {
+      return new Response(JSON.stringify({ error: 'Topup session not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    if (existingSession.status === 'completed') {
+    console.log('Found topup session:', topupSession.id, 'for user:', topupSession.user_id)
+
+    if (topupSession.status === 'completed') {
       console.log('Payment already processed')
       return new Response(JSON.stringify({ success: true, message: 'Already processed' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -88,7 +78,7 @@ Deno.serve(async (req) => {
         status: 'completed',
         updated_at: new Date().toISOString()
       })
-      .eq('id', topup_session_id)
+      .eq('id', topupSession.id)
 
     if (updateError) {
       console.error('Error updating topup session:', updateError)
@@ -99,7 +89,7 @@ Deno.serve(async (req) => {
 
     // Update wallet balance using the RPC function
     const { error: walletError } = await supabase.rpc('increment_wallet_balance', {
-      user_id_param: user_id,
+      user_id_param: topupSession.user_id,
       topup_amount_cents: session.amount_total
     })
 
@@ -114,7 +104,7 @@ Deno.serve(async (req) => {
     const { error: transactionError } = await supabase
       .from('transactions')
       .insert({
-        user_id: user_id,
+        user_id: topupSession.user_id,
         name: 'Wallet Top-up',
         amount: session.amount_total / 100,
         type: 'income',
