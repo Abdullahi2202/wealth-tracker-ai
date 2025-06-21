@@ -62,30 +62,6 @@ Deno.serve(async (req) => {
     console.log('Creating topup session for user:', user.id, 'amount:', amount)
     const amountInCents = Math.round(amount * 100)
 
-    // Create topup session record first
-    const { data: topupSession, error: dbError } = await supabase
-      .from('topup_sessions')
-      .insert({
-        user_id: user.id,
-        amount: amountInCents,
-        currency: currency,
-        status: 'pending'
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      console.error('Database error creating topup session:', dbError)
-      return new Response(JSON.stringify({ 
-        error: 'Failed to create topup session' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    console.log('Topup session created in DB:', topupSession.id)
-
     // Check if customer exists in Stripe
     let customerId
     try {
@@ -117,7 +93,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Create Stripe Checkout session
+    // Create Stripe Checkout session first
     try {
       const originHeader = req.headers.get('origin') || req.headers.get('referer') || 'http://localhost:3000'
       const baseUrl = originHeader.replace(/\/$/, '')
@@ -141,6 +117,37 @@ Deno.serve(async (req) => {
         mode: 'payment',
         success_url: `${baseUrl}/payments/topup?success=true&session_id={CHECKOUT_SESSION_ID}&amount=${amount}`,
         cancel_url: `${baseUrl}/payments/topup?canceled=true`,
+      })
+
+      console.log('Stripe session created successfully:', session.id)
+
+      // Now create topup session record with the stripe_session_id
+      const { data: topupSession, error: dbError } = await supabase
+        .from('topup_sessions')
+        .insert({
+          user_id: user.id,
+          stripe_session_id: session.id,
+          amount: amountInCents,
+          currency: currency,
+          status: 'pending'
+        })
+        .select()
+        .single()
+
+      if (dbError) {
+        console.error('Database error creating topup session:', dbError)
+        return new Response(JSON.stringify({ 
+          error: 'Failed to create topup session' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      console.log('Topup session created in DB:', topupSession.id)
+
+      // Update the Stripe session metadata with our topup session ID
+      await stripe.checkout.sessions.update(session.id, {
         metadata: {
           type: 'wallet_topup',
           user_id: user.id,
@@ -150,18 +157,6 @@ Deno.serve(async (req) => {
           amount_dollars: amount.toString()
         }
       })
-
-      console.log('Stripe session created successfully:', session.id)
-
-      // Update topup session with Stripe session ID
-      const { error: updateError } = await supabase
-        .from('topup_sessions')
-        .update({ stripe_session_id: session.id })
-        .eq('id', topupSession.id)
-
-      if (updateError) {
-        console.error('Error updating topup session with stripe_session_id:', updateError)
-      }
 
       console.log('=== SUCCESS: Returning checkout URL ===')
       return new Response(JSON.stringify({
