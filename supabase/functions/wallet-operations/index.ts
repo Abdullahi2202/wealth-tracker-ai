@@ -12,10 +12,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { method, url } = req
-    const urlObj = new URL(url)
-    const action = urlObj.searchParams.get('action')
-
+    
     // Get user from auth header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -27,6 +24,12 @@ Deno.serve(async (req) => {
     if (authError || !user) {
       throw new Error('Invalid authentication')
     }
+
+    // Parse request body to get action
+    const body = await req.json()
+    const { action } = body
+
+    console.log('Processing action:', action)
 
     switch (action) {
       case 'get-balance':
@@ -61,11 +64,13 @@ Deno.serve(async (req) => {
         })
 
       case 'add-funds':
-        const { amount, source, description } = await req.json()
+        const { amount, source, description } = body
         
         if (!amount || amount <= 0) {
           throw new Error('Invalid amount')
         }
+
+        console.log('Adding funds:', { amount, source, description, user_email: user.email })
 
         // Get current wallet
         const { data: currentWallet, error: getCurrentError } = await supabase
@@ -95,7 +100,7 @@ Deno.serve(async (req) => {
         const { error: transactionError } = await supabase
           .from('transactions')
           .insert({
-            email: user.email,
+            user_id: user.id,
             name: description || 'Wallet Top-Up',
             amount: Number(amount),
             type: 'income',
@@ -103,14 +108,19 @@ Deno.serve(async (req) => {
             date: new Date().toISOString().split('T')[0]
           })
 
-        if (transactionError) throw transactionError
+        if (transactionError) {
+          console.error('Transaction recording error:', transactionError)
+          // Don't throw here, the wallet update succeeded
+        }
+
+        console.log('Funds added successfully:', updatedWallet)
 
         return new Response(JSON.stringify(updatedWallet), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
 
       case 'send-payment':
-        const { recipient, sendAmount, note } = await req.json()
+        const { recipient, sendAmount, note } = body
         
         if (!sendAmount || sendAmount <= 0) {
           throw new Error('Invalid amount')
@@ -150,12 +160,12 @@ Deno.serve(async (req) => {
         const { error: senderTransactionError } = await supabase
           .from('transactions')
           .insert({
-            email: user.email,
+            user_id: user.id,
             name: 'Payment Sent',
             amount: Number(sendAmount),
             type: 'expense',
             category: 'Transfer',
-            recipient_email: recipient,
+            recipient_user_id: recipient,
             note: note || null,
             date: new Date().toISOString().split('T')[0]
           })
@@ -184,12 +194,12 @@ Deno.serve(async (req) => {
           await supabase
             .from('transactions')
             .insert({
-              email: recipient,
+              user_id: recipientWallet.user_id,
               name: 'Payment Received',
               amount: Number(sendAmount),
               type: 'income',
               category: 'Transfer',
-              sender_email: user.email,
+              sender_user_id: user.email,
               note: note || null,
               date: new Date().toISOString().split('T')[0]
             })
@@ -200,7 +210,7 @@ Deno.serve(async (req) => {
         })
 
       default:
-        throw new Error('Invalid action')
+        throw new Error(`Invalid action: ${action}`)
     }
 
   } catch (error) {

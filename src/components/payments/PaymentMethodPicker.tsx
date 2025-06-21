@@ -26,6 +26,45 @@ export default function PaymentMethodPicker({
     ? methods
     : methods.filter((m) => m.type === filterType);
 
+  const formatMethodLabel = (method: any) => {
+    let icon = "";
+    let displayName = "";
+    
+    switch (method.type) {
+      case "wallet":
+        icon = "💰";
+        displayName = "Wallet";
+        break;
+      case "bank":
+        icon = "🏦";
+        displayName = "Bank";
+        break;
+      case "card":
+        icon = "💳";
+        displayName = method.brand ? 
+          `${method.brand.charAt(0).toUpperCase() + method.brand.slice(1)}` : 
+          "Card";
+        // Add last 4 digits if available
+        if (method.last4) {
+          displayName += ` **** ${method.last4}`;
+        }
+        break;
+      case "apple_pay":
+        icon = "🍏";
+        displayName = "Apple Pay";
+        break;
+      case "google_pay":
+        icon = "🤖";
+        displayName = "Google Pay";
+        break;
+      default:
+        icon = "💳";
+        displayName = "Payment Method";
+    }
+
+    return `${icon} ${displayName}${method.label && method.type !== "card" ? ` — ${method.label}` : ""}`;
+  };
+
   return (
     <div className={className}>
       {label && (
@@ -40,12 +79,7 @@ export default function PaymentMethodPicker({
         <option value="">Select…</option>
         {displayed.map((method) => (
           <option value={method.id} key={method.id}>
-            {method.type === "wallet" && "💰 Wallet"}
-            {method.type === "bank" && "🏦 Bank"}
-            {method.type === "card" && "💳 Card"}
-            {method.type === "apple_pay" && "🍏 Apple Pay"}
-            {method.type === "google_pay" && "🤖 Google Pay"}
-            {method.label ? ` — ${method.label}` : ""}
+            {formatMethodLabel(method)}
           </option>
         ))}
       </select>
