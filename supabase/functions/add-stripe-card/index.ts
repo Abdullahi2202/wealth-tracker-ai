@@ -59,23 +59,19 @@ Deno.serve(async (req) => {
       last4: paymentMethod.card.last4
     })
 
-    // Get user from registration table
-    const { data: users, error: userError } = await supabase
-      .from('registration')
-      .select('id, email, full_name')
-      .eq('email', email)
-      .limit(1)
-
-    if (userError) {
-      throw new Error(`User lookup failed: ${userError.message}`)
+    // Get authenticated user from Supabase Auth
+    console.log('Getting authenticated user from Supabase Auth...')
+    const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers()
+    if (usersError) {
+      throw new Error(`Failed to get users: ${usersError.message}`)
     }
 
-    if (!users || users.length === 0) {
-      throw new Error('User not found')
+    const user = users.find(u => u.email === email)
+    if (!user) {
+      throw new Error('User not found in Supabase Auth')
     }
 
-    const user = users[0]
-    console.log('Found user:', user.id)
+    console.log('Found authenticated user:', user.id)
 
     // Check for existing payment method
     const { data: existingMethod } = await supabase
@@ -104,7 +100,7 @@ Deno.serve(async (req) => {
     const cardLabel = label || `${paymentMethod.card.brand?.toUpperCase()} **** ${paymentMethod.card.last4}`
     
     const cardData = {
-      user_id: user.id,
+      user_id: user.id,  // Use the actual Supabase Auth user ID
       stripe_payment_method_id: paymentMethod.id,
       stripe_customer_id: customerId,
       type: 'card',
