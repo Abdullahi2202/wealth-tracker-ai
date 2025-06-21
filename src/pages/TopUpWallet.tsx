@@ -1,4 +1,3 @@
-
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,7 +8,7 @@ import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, AlertCircle, RefreshCw } from "lucide-react";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
@@ -19,79 +18,42 @@ const TopUpWallet = () => {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
-  const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [processingPending, setProcessingPending] = useState(false);
 
   const { methods } = usePaymentMethods();
   const { wallet, refetch } = useWallet();
 
-  // Handle success/cancel URL parameters
+  // Check for success/cancel parameters on component mount
   useEffect(() => {
     const handleUrlParams = async () => {
       const success = searchParams.get('success');
       const canceled = searchParams.get('canceled');
-      const sessionId = searchParams.get('session_id');
       const topupAmount = searchParams.get('amount');
+      const sessionId = searchParams.get('session_id');
 
-      if (success === 'true' && sessionId) {
-        console.log('Payment success detected, verifying payment:', { sessionId, topupAmount });
-        setVerifyingPayment(true);
+      if (success === 'true') {
+        console.log('Top-up success detected:', { topupAmount, sessionId });
+        toast.success(
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <span>Successfully topped up ${topupAmount || 'your wallet'}!</span>
+          </div>
+        );
         
-        try {
-          // Verify payment with backend
-          const { data, error } = await supabase.functions.invoke('verify-payment', {
-            body: { session_id: sessionId }
-          });
-
-          if (error) {
-            console.error('Payment verification error:', error);
-            toast.error(
-              <div className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <span>Payment verification failed</span>
-              </div>
-            );
-          } else if (data.success) {
-            console.log('Payment verified successfully:', data);
-            toast.success(
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>Successfully topped up ${topupAmount || 'your wallet'}!</span>
-              </div>
-            );
-            
-            // Refresh wallet balance multiple times to ensure it's updated
-            setTimeout(() => refetch(), 1000);
-            setTimeout(() => refetch(), 3000);
-            setTimeout(() => refetch(), 5000);
-          } else {
-            console.error('Payment verification failed:', data);
-            toast.error(
-              <div className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <span>Payment verification failed</span>
-              </div>
-            );
-          }
-        } catch (error) {
-          console.error('Payment verification exception:', error);
-          toast.error(
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span>Failed to verify payment</span>
-            </div>
-          );
-        } finally {
-          setVerifyingPayment(false);
-        }
+        // Refresh wallet balance multiple times to ensure it's updated
+        setTimeout(() => refetch(), 1000);
+        setTimeout(() => refetch(), 3000);
+        setTimeout(() => refetch(), 5000);
+        setTimeout(() => refetch(), 10000);
         
         // Clean up URL parameters
         navigate('/payments/topup', { replace: true });
       } else if (canceled === 'true') {
-        console.log('Payment canceled detected');
+        console.log('Top-up canceled detected');
         toast.error(
           <div className="flex items-center gap-2">
             <XCircle className="h-4 w-4 text-red-600" />
-            <span>Payment was canceled</span>
+            <span>Top-up was canceled</span>
           </div>
         );
         // Clean up URL parameters
@@ -120,6 +82,50 @@ const TopUpWallet = () => {
 
     return () => clearInterval(interval);
   }, [refetch]);
+
+  // Manual webhook processing for pending transactions
+  const handleProcessPending = async () => {
+    setProcessingPending(true);
+    try {
+      console.log('Manually processing pending topup...');
+      
+      const { data, error } = await supabase.functions.invoke('test-webhook');
+      
+      if (error) {
+        console.error('Manual processing error:', error);
+        throw error;
+      }
+      
+      console.log('Manual processing response:', data);
+      
+      if (data.success) {
+        toast.success(
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <span>Pending top-up processed successfully!</span>
+          </div>
+        );
+        
+        // Refresh wallet balance multiple times
+        setTimeout(() => refetch(), 1000);
+        setTimeout(() => refetch(), 3000);
+        setTimeout(() => refetch(), 5000);
+      } else {
+        toast.error('No pending transactions found');
+      }
+      
+    } catch (error) {
+      console.error('Manual processing failed:', error);
+      toast.error(
+        <div className="flex items-center gap-2">
+          <XCircle className="h-4 w-4 text-red-600" />
+          <span>Failed to process pending transaction</span>
+        </div>
+      );
+    } finally {
+      setProcessingPending(false);
+    }
+  };
 
   const handleTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,14 +222,12 @@ const TopUpWallet = () => {
     }
   };
 
-  if (initializing || verifyingPayment) {
+  if (initializing) {
     return (
       <div className="min-h-screen bg-muted pt-3 px-2 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
-          <p className="text-gray-600">
-            {verifyingPayment ? 'Verifying payment...' : 'Loading top-up page...'}
-          </p>
+          <p className="text-gray-600">Loading top-up page...</p>
         </div>
       </div>
     );
@@ -267,6 +271,32 @@ const TopUpWallet = () => {
               </div>
             </div>
           )}
+          
+          {/* Manual processing button for pending transactions */}
+          <div className="mt-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="text-sm text-yellow-700 mb-2">
+              Having issues with a pending transaction?
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleProcessPending}
+              disabled={processingPending}
+              className="w-full"
+            >
+              {processingPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Process Pending Transaction
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleTopUp} className="space-y-4">
