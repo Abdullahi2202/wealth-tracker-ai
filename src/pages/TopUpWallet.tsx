@@ -38,19 +38,22 @@ const TopUpWallet = () => {
         
         try {
           // Verify payment with backend
+          console.log('Calling verify-payment function with session_id:', sessionId);
           const { data, error } = await supabase.functions.invoke('verify-payment', {
             body: { session_id: sessionId }
           });
+
+          console.log('Verify payment response:', { data, error });
 
           if (error) {
             console.error('Payment verification error:', error);
             toast.error(
               <div className="flex items-center gap-2">
                 <XCircle className="h-4 w-4 text-red-600" />
-                <span>Payment verification failed</span>
+                <span>Payment verification failed: {error.message || 'Unknown error'}</span>
               </div>
             );
-          } else if (data.success) {
+          } else if (data?.success) {
             console.log('Payment verified successfully:', data);
             toast.success(
               <div className="flex items-center gap-2">
@@ -60,8 +63,8 @@ const TopUpWallet = () => {
             );
             
             // Refresh wallet balance multiple times to ensure it's updated
-            setTimeout(() => refetch(), 1000);
-            setTimeout(() => refetch(), 3000);
+            setTimeout(() => refetch(), 500);
+            setTimeout(() => refetch(), 2000);
             setTimeout(() => refetch(), 5000);
           } else {
             console.error('Payment verification failed:', data);

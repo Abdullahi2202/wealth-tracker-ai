@@ -37,7 +37,11 @@ Deno.serve(async (req) => {
 
     // Retrieve Stripe session
     const session = await stripe.checkout.sessions.retrieve(session_id)
-    console.log('Stripe session retrieved:', { id: session.id, payment_status: session.payment_status })
+    console.log('Stripe session retrieved:', { 
+      id: session.id, 
+      payment_status: session.payment_status,
+      amount_total: session.amount_total 
+    })
 
     if (session.payment_status !== 'paid') {
       console.error('Payment not completed:', session.payment_status)
@@ -71,7 +75,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Update topup session status
+    // Update topup session status to completed
     const { error: updateError } = await supabase
       .from('topup_sessions')
       .update({ 
@@ -88,6 +92,7 @@ Deno.serve(async (req) => {
     console.log('Topup session updated to completed')
 
     // Update wallet balance using the RPC function
+    console.log('Updating wallet balance for user:', topupSession.user_id, 'amount:', session.amount_total)
     const { error: walletError } = await supabase.rpc('increment_wallet_balance', {
       user_id_param: topupSession.user_id,
       topup_amount_cents: session.amount_total
