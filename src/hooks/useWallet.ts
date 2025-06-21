@@ -34,7 +34,7 @@ export function useWallet() {
 
       console.log('Fetching wallet for user:', user.email);
 
-      // First try to get wallet from database directly
+      // Fetch wallet from database directly
       const { data: walletData, error: walletError } = await supabase
         .from('wallets')
         .select('*')
@@ -42,29 +42,31 @@ export function useWallet() {
         .maybeSingle();
 
       if (walletError) {
-        console.error("Direct wallet fetch error:", walletError);
-        // If direct fetch fails, try using the edge function
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data: functionData, error: functionError } = await supabase.functions.invoke('wallet-operations', {
-            body: JSON.stringify({ action: 'get-balance' }),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`
-            },
-          });
-
-          if (functionError) {
-            console.error("Edge function wallet fetch error:", functionError);
-            setWallet(null);
-          } else {
-            console.log('Wallet fetched via edge function:', functionData);
-            setWallet(functionData);
-          }
-        }
-      } else {
-        console.log('Wallet fetched directly:', walletData);
+        console.error("Wallet fetch error:", walletError);
+        setWallet(null);
+      } else if (walletData) {
+        console.log('Wallet fetched successfully:', walletData);
         setWallet(walletData);
+      } else {
+        console.log('No wallet found for user, creating one...');
+        // Create wallet if it doesn't exist
+        const { data: newWallet, error: createError } = await supabase
+          .from('wallets')
+          .insert({
+            user_id: user.id,
+            user_email: user.email,
+            balance: 0
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating wallet:', createError);
+          setWallet(null);
+        } else {
+          console.log('New wallet created:', newWallet);
+          setWallet(newWallet);
+        }
       }
     } catch (error) {
       console.error("Error in fetchWallet:", error);

@@ -9,6 +9,7 @@ import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
@@ -17,29 +18,41 @@ const TopUpWallet = () => {
   const [method, setMethod] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   const { methods } = usePaymentMethods();
   const { wallet, refetch } = useWallet();
 
-  // Check for success/cancel parameters
+  // Check for success/cancel parameters on component mount
   useEffect(() => {
-    const success = searchParams.get('success');
-    const canceled = searchParams.get('canceled');
-    const topupAmount = searchParams.get('amount');
-    const sessionId = searchParams.get('session_id');
+    const handleUrlParams = async () => {
+      const success = searchParams.get('success');
+      const canceled = searchParams.get('canceled');
+      const topupAmount = searchParams.get('amount');
+      const sessionId = searchParams.get('session_id');
 
-    if (success === 'true') {
-      console.log('Top-up success detected:', { topupAmount, sessionId });
-      toast.success(`Successfully topped up $${topupAmount || 'your wallet'}!`);
-      refetch(); // Refresh wallet balance
-      // Clean up URL parameters
-      navigate('/payments/topup', { replace: true });
-    } else if (canceled === 'true') {
-      console.log('Top-up canceled detected');
-      toast.error('Top-up was canceled');
-      // Clean up URL parameters
-      navigate('/payments/topup', { replace: true });
-    }
+      if (success === 'true') {
+        console.log('Top-up success detected:', { topupAmount, sessionId });
+        toast.success(`Successfully topped up $${topupAmount || 'your wallet'}!`);
+        
+        // Refresh wallet balance multiple times to ensure it's updated
+        setTimeout(() => refetch(), 1000);
+        setTimeout(() => refetch(), 3000);
+        setTimeout(() => refetch(), 5000);
+        
+        // Clean up URL parameters
+        navigate('/payments/topup', { replace: true });
+      } else if (canceled === 'true') {
+        console.log('Top-up canceled detected');
+        toast.error('Top-up was canceled');
+        // Clean up URL parameters
+        navigate('/payments/topup', { replace: true });
+      }
+
+      setInitializing(false);
+    };
+
+    handleUrlParams();
   }, [searchParams, navigate, refetch]);
 
   // Choose default payment method if available
@@ -107,6 +120,9 @@ const TopUpWallet = () => {
 
       console.log('Redirecting to Stripe checkout:', data.checkout_url);
       
+      // Show loading state with message
+      toast.info("Redirecting to Stripe checkout...");
+      
       // Use window.location.href for better compatibility
       window.location.href = data.checkout_url;
 
@@ -124,6 +140,17 @@ const TopUpWallet = () => {
     }
   };
 
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-muted pt-3 px-2 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+          <p className="text-gray-600">Loading top-up page...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-muted pt-3 px-2 animate-fade-in">
       <div className="flex items-center gap-2 mb-3">
@@ -135,8 +162,11 @@ const TopUpWallet = () => {
       
       <Card className="max-w-md mx-auto shadow-lg rounded-2xl animate-scale-in">
         <CardHeader>
-          <CardTitle>Top Up</CardTitle>
-          <CardDescription>Add funds to your wallet.</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            Top Up Your Wallet
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          </CardTitle>
+          <CardDescription>Add funds to your wallet securely via Stripe.</CardDescription>
           {wallet && (
             <div className="mt-2 p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-700">
@@ -156,14 +186,18 @@ const TopUpWallet = () => {
               <label className="block text-sm mb-1 font-medium">Amount ($)</label>
               <Input
                 type="number"
-                placeholder="0.00"
-                min="0.01"
+                placeholder="10.00"
+                min="1.00"
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
                 disabled={loading}
+                className="text-lg"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Minimum amount: $1.00
+              </p>
             </div>
             
             <PaymentMethodPicker 
@@ -179,23 +213,33 @@ const TopUpWallet = () => {
               <Input
                 type="text"
                 value={note}
-                placeholder="Optional note"
+                placeholder="Optional note for this top-up"
                 onChange={(e) => setNote(e.target.value)}
                 disabled={loading}
               />
             </div>
             
-            <Button 
-              type="submit" 
-              className="w-full mt-3" 
-              disabled={loading}
-            >
-              {loading ? "Processing..." : `Top Up $${amount || '0.00'}`}
-            </Button>
+            <div className="pt-2">
+              <Button 
+                type="submit" 
+                className="w-full h-12 text-lg font-semibold" 
+                disabled={loading || !amount || parseFloat(amount) <= 0}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  `Top Up $${amount || '0.00'}`
+                )}
+              </Button>
+            </div>
 
             {loading && (
-              <div className="text-center text-sm text-gray-600 mt-2">
-                You will be redirected to Stripe to complete the payment...
+              <div className="text-center text-sm text-gray-600 mt-3 p-3 bg-yellow-50 rounded-lg border">
+                <p className="font-medium">Processing your request...</p>
+                <p>You will be redirected to Stripe to complete the payment securely.</p>
               </div>
             )}
           </form>

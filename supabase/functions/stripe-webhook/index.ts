@@ -61,15 +61,17 @@ serve(async (req) => {
         
         const userId = session.metadata.user_id
         const userEmail = session.metadata.user_email
+        const topupSessionId = session.metadata.topup_session_id
         const amountInCents = parseInt(session.metadata.amount_cents || '0')
         
         console.log('Topup details:', {
           userId,
           userEmail,
+          topupSessionId,
           amountInCents
         })
         
-        if (userId && userEmail && amountInCents > 0) {
+        if (userId && userEmail && topupSessionId && amountInCents > 0) {
           // Update topup session status first
           console.log('Updating topup session status to completed')
           const { error: sessionError } = await supabase
@@ -78,7 +80,7 @@ serve(async (req) => {
               status: 'completed',
               updated_at: new Date().toISOString()
             })
-            .eq('stripe_session_id', session.id)
+            .eq('id', topupSessionId)
 
           if (sessionError) {
             console.error('Error updating topup session:', sessionError)
@@ -86,7 +88,7 @@ serve(async (req) => {
             console.log('Topup session updated successfully')
           }
 
-          // Update wallet balance using the new RPC function
+          // Update wallet balance using the RPC function
           console.log('Updating wallet balance using RPC function')
           const { error: walletError } = await supabase.rpc('increment_wallet_balance', {
             user_id_param: userId,
@@ -125,6 +127,7 @@ serve(async (req) => {
           console.error('Missing required data for wallet topup:', {
             userId: !!userId,
             userEmail: !!userEmail,
+            topupSessionId: !!topupSessionId,
             amountInCents
           })
         }
