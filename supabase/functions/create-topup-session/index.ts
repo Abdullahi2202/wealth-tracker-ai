@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import Stripe from 'https://esm.sh/stripe@14.21.0'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -170,19 +171,22 @@ Deno.serve(async (req) => {
         session_id: session.id,
         checkout_url: session.url,
         amount: amount,
-        currency: currency
+        currency: currency,
+        success: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
 
     } catch (dbError) {
       console.error('Database operation failed:', dbError)
+      // Still return success since Stripe session was created
       return new Response(JSON.stringify({
         session_id: session.id,
         checkout_url: session.url,
         amount: amount,
         currency: currency,
-        warning: 'Session created but database save failed'
+        warning: 'Session created but database save failed',
+        success: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -194,7 +198,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
       details: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      success: false
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
