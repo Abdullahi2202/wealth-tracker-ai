@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const corsHeaders = {
@@ -197,8 +196,8 @@ async function handleCreateUser(req: Request, supabase: any) {
       console.error('Profile error:', profileError)
     }
 
-    // Create wallet
-    const { error: walletError } = await supabase
+    // Create wallet with automatic wallet number assignment
+    const { data: walletData, error: walletError } = await supabase
       .from('wallets')
       .insert({
         user_id: userId,
@@ -206,14 +205,19 @@ async function handleCreateUser(req: Request, supabase: any) {
         balance: 0,
         currency: 'USD'
       })
+      .select('wallet_number')
+      .single()
 
     if (walletError) {
       console.error('Wallet error:', walletError)
+    } else {
+      console.log('Wallet created with number:', walletData?.wallet_number)
     }
 
     return new Response(JSON.stringify({ 
       user: regUser || { id: userId, email, full_name }, 
-      user_id: userId 
+      user_id: userId,
+      wallet_number: walletData?.wallet_number 
     }), {
       headers: corsHeaders
     })

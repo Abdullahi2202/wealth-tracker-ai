@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +17,7 @@ const RegistrationForm = () => {
   });
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [walletNumber, setWalletNumber] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +80,25 @@ const RegistrationForm = () => {
 
       console.log("Registration successful:", authData.user?.id);
 
+      // Fetch the wallet number for the newly created user
+      if (authData.user?.id) {
+        const { data: walletData, error: walletError } = await supabase
+          .from("wallets")
+          .select("wallet_number")
+          .eq("user_id", authData.user.id)
+          .single();
+
+        if (!walletError && walletData?.wallet_number) {
+          setWalletNumber(walletData.wallet_number.toString());
+        }
+      }
+
       toast.success(
         "Registration successful! Please check your email to verify. You can now log in.",
         { duration: 4200 }
       );
       
-      setTimeout(() => navigate("/login"), 1800);
+      setTimeout(() => navigate("/login"), 3000);
       
     } catch (err: any) {
       console.error("Registration exception:", err);
@@ -95,6 +108,31 @@ const RegistrationForm = () => {
       setLoading(false);
     }
   };
+
+  if (walletNumber) {
+    return (
+      <Card className="shadow-lg p-4">
+        <CardContent className="text-center space-y-4 mt-4">
+          <div className="text-green-600 text-lg font-semibold">
+            Registration Successful! 🎉
+          </div>
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2">Your Wallet Number:</p>
+            <p className="text-2xl font-bold text-blue-600">{walletNumber}</p>
+            <p className="text-xs text-gray-500 mt-2">
+              Please save this number for your records
+            </p>
+          </div>
+          <p className="text-sm text-gray-600">
+            Please check your email to verify your account, then you can log in.
+          </p>
+          <Button onClick={() => navigate("/login")} className="w-full">
+            Go to Login
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-lg p-4">
