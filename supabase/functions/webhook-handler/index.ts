@@ -50,10 +50,10 @@ Deno.serve(async (req) => {
         // Find the topup session by stripe_session_id
         console.log('Looking for topup session with stripe_session_id:', session.id)
         const { data: topupSession, error: sessionError } = await supabase
-              .from('topup_sessions')
-              .select('*')
-              .eq('stripe_session_id', session.id)
-              .single()
+          .from('topup_sessions')
+          .select('*')
+          .eq('stripe_session_id', session.id)
+          .single()
 
         if (sessionError || !topupSession) {
           console.error('Topup session not found:', sessionError)
@@ -88,63 +88,17 @@ Deno.serve(async (req) => {
         const userEmail = userData.user.email
         console.log('Processing topup for user:', userEmail)
 
-        // Get current wallet balance
-        console.log('Fetching current wallet balance for:', userEmail)
-        const { data: currentWallet, error: walletFetchError } = await supabase
-          .from('wallets')
-          .select('balance')
-          .eq('user_email', userEmail)
-          .single()
+        // Update wallet balance using the RPC function
+        console.log('Updating wallet balance using RPC function')
+        const { error: walletError } = await supabase.rpc('increment_wallet_balance', {
+          user_id_param: topupSession.user_id,
+          topup_amount_cents: topupSession.amount
+        })
 
-        if (walletFetchError) {
-          console.error('Error fetching wallet:', walletFetchError)
-          
-          // Create wallet if it doesn't exist
-          console.log('Creating new wallet for user:', userEmail)
-          const { error: createWalletError } = await supabase
-            .from('wallets')
-            .insert({
-              user_id: topupSession.user_id,
-              user_email: userEmail,
-              balance: topupSession.amount / 100,
-              currency: 'USD',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-          
-          if (createWalletError) {
-            console.error('Error creating wallet:', createWalletError)
-            break
-          }
-          
-          console.log('New wallet created with balance:', topupSession.amount / 100)
+        if (walletError) {
+          console.error('Error updating wallet balance:', walletError)
         } else {
-          // Update existing wallet balance
-          const currentBalance = Number(currentWallet.balance) || 0
-          const amountInDollars = topupSession.amount / 100
-          const newBalance = currentBalance + amountInDollars
-          
-          console.log('Balance update:', {
-            currentBalance,
-            amountInDollars,
-            newBalance
-          })
-
-          // Update wallet balance
-          console.log('Updating wallet balance')
-          const { error: walletError } = await supabase
-            .from('wallets')
-            .update({ 
-              balance: newBalance,
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_email', userEmail)
-
-          if (walletError) {
-            console.error('Error updating wallet:', walletError)
-          } else {
-            console.log('Wallet updated successfully from', currentBalance, 'to', newBalance)
-          }
+          console.log('Wallet balance updated successfully')
         }
 
         // Record transaction
