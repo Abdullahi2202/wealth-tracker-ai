@@ -185,82 +185,124 @@ Deno.serve(async (req) => {
 
       case 'PUT':
         const updateBody = await req.json()
-        console.log('Update request body:', updateBody)
+        console.log('Update request body:', JSON.stringify(updateBody, null, 2))
         
-        const { id, action, verification_status, ...updates } = updateBody
+        const { id, verification_status, email: userEmail, action } = updateBody
         
         if (!id) {
+          console.error('User ID is required but not provided')
           return new Response(JSON.stringify({ error: 'User ID is required' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
 
-        // Handle verification status updates
-        if (verification_status) {
+        console.log(`Processing verification status update: User ID: ${id}, Status: ${verification_status}, Action: ${action}`)
+
+        // Handle verification status updates specifically
+        if (verification_status && (action === 'update_verification' || !action)) {
+          console.log('Updating verification status in registration table...')
+          
           // Update verification status in registration table
-          const { error: regUpdateError } = await supabase
+          const { data: regUpdateData, error: regUpdateError } = await supabase
             .from('registration')
             .update({ 
               verification_status,
               updated_at: new Date().toISOString() 
             })
             .eq('id', id)
+            .select()
 
           if (regUpdateError) {
             console.error('Error updating registration verification status:', regUpdateError)
-          }
-
-          // Update related identity verification requests
-          const { error: verifyUpdateError } = await supabase
-            .from('identity_verification_requests')
-            .update({ 
-              status: verification_status,
-              reviewed_at: new Date().toISOString(),
-              reviewed_by: 'Admin'
+            return new Response(JSON.stringify({ 
+              error: 'Failed to update user verification status',
+              details: regUpdateError.message 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             })
-            .eq('user_email', updates.email || '')
-
-          if (verifyUpdateError) {
-            console.error('Error updating verification request:', verifyUpdateError)
           }
-        }
 
-        // Update other user details
-        const { data: updatedUser, error: updateError } = await supabase
-          .from('registration')
-          .update({ ...updates, updated_at: new Date().toISOString() })
-          .eq('id', id)
-          .select()
-          .single()
+          console.log('Registration update result:', regUpdateData)
 
-        if (updateError) {
-          console.error('Error updating user:', updateError)
-          return new Response(JSON.stringify({ error: 'Failed to update user' }), {
-            status: 500,
+          // Update related identity verification requests if user email is provided
+          if (userEmail) {
+            console.log('Updating verification requests for email:', userEmail)
+            
+            const { data: verifyUpdateData, error: verifyUpdateError } = await supabase
+              .from('identity_verification_requests')
+              .update({ 
+                status: verification_status,
+                reviewed_at: new Date().toISOString(),
+                reviewed_by: 'Admin'
+              })
+              .eq('user_email', userEmail)
+              .select()
+
+            if (verifyUpdateError) {
+              console.error('Error updating verification request:', verifyUpdateError)
+            } else {
+              console.log('Verification requests updated:', verifyUpdateData)
+            }
+          }
+
+          console.log('Verification status update completed successfully')
+          return new Response(JSON.stringify({ 
+            success: true, 
+            message: `User ${verification_status} successfully`,
+            data: regUpdateData 
+          }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
 
-        // Also update profiles table if relevant fields changed
-        if (updates.full_name || updates.phone || updates.email) {
-          const profileUpdates: any = {}
-          if (updates.full_name) profileUpdates.full_name = updates.full_name
-          if (updates.phone) profileUpdates.phone = updates.phone
-          if (updates.email) profileUpdates.email = updates.email
+        // Handle other user updates
+        const { verification_status: _, action: __, ...otherUpdates } = updateBody
+        
+        if (Object.keys(otherUpdates).length > 1) { // More than just 'id'
+          console.log('Updating other user details...')
           
-          const { error: profileUpdateError } = await supabase
-            .from('profiles')
-            .update(profileUpdates)
+          const { data: updatedUser, error: updateError } = await supabase
+            .from('registration')
+            .update({ ...otherUpdates, updated_at: new Date().toISOString() })
             .eq('id', id)
+            .select()
+            .single()
 
-          if (profileUpdateError) {
-            console.error('Error updating profile:', profileUpdateError)
+          if (updateError) {
+            console.error('Error updating user:', updateError)
+            return new Response(JSON.stringify({ error: 'Failed to update user' }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
           }
+
+          // Also update profiles table if relevant fields changed
+          if (otherUpdates.full_name || otherUpdates.phone || otherUpdates.email) {
+            const profileUpdates: any = {}
+            if (otherUpdates.full_name) profileUpdates.full_name = otherUpdates.full_name
+            if (otherUpdates.phone) profileUpdates.phone = otherUpdates.phone
+            if (otherUpdates.email) profileUpdates.email = otherUpdates.email
+            
+            const { error: profileUpdateError } = await supabase
+              .from('profiles')
+              .update(profileUpdates)
+              .eq('id', id)
+
+            if (profileUpdateError) {
+              console.error('Error updating profile:', profileUpdateError)
+            }
+          }
+
+          console.log('User updated successfully:', updatedUser)
+          return new Response(JSON.stringify(updatedUser), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
         }
 
-        console.log('User updated successfully:', updatedUser)
-        return new Response(JSON.stringify(updatedUser), {
+        return new Response(JSON.stringify({ error: 'No valid updates provided' }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
 
@@ -314,7 +356,10 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('User management error:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: error.message 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
