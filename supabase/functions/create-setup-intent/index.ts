@@ -80,7 +80,8 @@ Deno.serve(async (req) => {
       usage: 'off_session',
       metadata: {
         user_id: user.id,
-        email: email
+        email: email,
+        timestamp: new Date().toISOString()
       }
     })
 

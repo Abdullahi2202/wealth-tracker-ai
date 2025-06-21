@@ -38,9 +38,16 @@ Deno.serve(async (req) => {
     })
 
     console.log('Retrieving setup intent...', setupIntentId)
-    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId)
+    let setupIntent;
+    try {
+      setupIntent = await stripe.setupIntents.retrieve(setupIntentId)
+    } catch (stripeError) {
+      console.error('Stripe error retrieving setup intent:', stripeError)
+      throw new Error(`Setup intent not found: ${stripeError.message}`)
+    }
     
     if (setupIntent.status !== 'succeeded') {
+      console.error('Setup intent status:', setupIntent.status)
       throw new Error(`Setup intent status is ${setupIntent.status}, expected 'succeeded'`)
     }
 
