@@ -13,47 +13,53 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Creating setup intent...')
+    console.log('=== CREATE SETUP INTENT START ===')
     
-    // Validate environment variables
     if (!stripeKey) {
-      throw new Error('STRIPE_SECRET_KEY is not configured')
+      console.error('STRIPE_SECRET_KEY is not configured')
+      throw new Error('Payment system not configured')
     }
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { email } = await req.json()
 
-    console.log('Request data:', { email })
+    console.log('Creating setup intent for email:', email)
 
     if (!email) {
       throw new Error('Email is required')
     }
 
-    console.log('Initializing Stripe...')
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
+      timeout: 10000, // 10 second timeout
     })
 
-    // Check if customer exists in Stripe, create if not
-    let customers = await stripe.customers.list({ email, limit: 1 })
+    // Find or create Stripe customer
+    console.log('Looking for existing Stripe customer...')
+    const customers = await stripe.customers.list({ 
+      email, 
+      limit: 1 
+    })
+    
     let customerId = customers.data[0]?.id
 
     if (!customerId) {
-      console.log('Creating new Stripe customer...')
+      console.log('Creating new Stripe customer for:', email)
       const customer = await stripe.customers.create({ 
         email,
         metadata: {
-          source: 'payment_app'
+          source: 'payment_app',
+          created_at: new Date().toISOString()
         }
       })
       customerId = customer.id
-      console.log('Created customer:', customerId)
+      console.log('Created new customer:', customerId)
     } else {
       console.log('Found existing customer:', customerId)
     }
 
-    // Get user from Supabase using the correct method
-    console.log('Getting user from Supabase...')
+    // Get user from registration table
+    console.log('Fetching user from registration table...')
     const { data: users, error: userError } = await supabase
       .from('registration')
       .select('id, email, full_name')
@@ -61,50 +67,73 @@ Deno.serve(async (req) => {
       .limit(1)
 
     if (userError) {
-      console.error('Error fetching user:', userError)
+      console.error('Error fetching user from registration:', userError)
       throw new Error(`User lookup failed: ${userError.message}`)
     }
 
     if (!users || users.length === 0) {
-      console.error('User not found in registration table')
+      console.error('User not found in registration table for email:', email)
       throw new Error('User not found. Please ensure you are registered.')
     }
 
     const user = users[0]
-    console.log('Found user:', user.id)
+    console.log('Found user in registration:', user.id)
 
-    console.log('Creating SetupIntent for user:', user.id)
+    // Create SetupIntent with proper configuration
+    console.log('Creating SetupIntent...')
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ['card'],
       usage: 'off_session',
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: 'never'
+      },
       metadata: {
         user_id: user.id,
-        email: email,
+        user_email: email,
+        created_by: 'payment_app',
         timestamp: new Date().toISOString()
       }
     })
 
     console.log('SetupIntent created successfully:', {
       id: setupIntent.id,
-      client_secret: setupIntent.client_secret ? 'present' : 'missing',
       status: setupIntent.status,
-      customer: customerId
+      customer: customerId,
+      client_secret_present: !!setupIntent.client_secret
     })
+
+    // Verify the SetupIntent was created properly
+    if (!setupIntent.client_secret) {
+      console.error('SetupIntent created without client_secret')
+      throw new Error('Setup intent creation failed - no client secret')
+    }
+
+    console.log('=== CREATE SETUP INTENT SUCCESS ===')
 
     return new Response(JSON.stringify({ 
       client_secret: setupIntent.client_secret,
       setup_intent_id: setupIntent.id,
-      customer_id: customerId
+      customer_id: customerId,
+      status: setupIntent.status
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error) {
-    console.error('Error creating setup intent:', error)
+    console.error('=== CREATE SETUP INTENT ERROR ===')
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      type: error.type
+    })
+    
     return new Response(JSON.stringify({ 
       error: error.message,
-      details: error.code ? `Stripe error code: ${error.code}` : 'Server error'
+      code: error.code || 'SETUP_INTENT_ERROR',
+      details: 'Failed to create payment setup'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -554,6 +554,57 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_test_cards: {
+        Row: {
+          card_brand: string | null
+          card_exp_month: number | null
+          card_exp_year: number | null
+          card_last4: string | null
+          created_at: string | null
+          id: string
+          is_test: boolean | null
+          label: string | null
+          status: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          stripe_setup_intent_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_last4?: string | null
+          created_at?: string | null
+          id?: string
+          is_test?: boolean | null
+          label?: string | null
+          status?: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          stripe_setup_intent_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_last4?: string | null
+          created_at?: string | null
+          id?: string
+          is_test?: boolean | null
+          label?: string | null
+          status?: string | null
+          stripe_customer_id?: string
+          stripe_payment_method_id?: string
+          stripe_setup_intent_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       support_tickets: {
         Row: {
           assigned_to: string | null

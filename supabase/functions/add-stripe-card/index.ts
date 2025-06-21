@@ -13,56 +13,93 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Starting add card process...')
+    console.log('=== ADD STRIPE CARD START ===')
     
-    // Validate environment variables
-    if (!stripeKey) {
-      throw new Error('STRIPE_SECRET_KEY is not configured')
-    }
-    if (!supabaseServiceKey) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+    if (!stripeKey || !supabaseServiceKey) {
+      console.error('Required environment variables not configured')
+      throw new Error('Payment system not properly configured')
     }
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { email, label, setupIntentId } = await req.json()
 
-    console.log('Request data:', { email, label, setupIntentId })
+    console.log('Processing card addition:', { 
+      email, 
+      label, 
+      setupIntentId,
+      timestamp: new Date().toISOString()
+    })
 
     if (!email || !setupIntentId) {
       throw new Error('Email and setup intent ID are required')
     }
 
-    console.log('Initializing Stripe...')
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
+      timeout: 10000, // 10 second timeout
     })
 
-    console.log('Retrieving setup intent...', setupIntentId)
+    // Retrieve and validate setup intent
+    console.log('Retrieving setup intent from Stripe:', setupIntentId)
     let setupIntent;
+    
     try {
-      setupIntent = await stripe.setupIntents.retrieve(setupIntentId)
+      setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
+        expand: ['payment_method']
+      })
+      console.log('Setup intent retrieved:', {
+        id: setupIntent.id,
+        status: setupIntent.status,
+        customer: setupIntent.customer,
+        payment_method_id: setupIntent.payment_method?.id || 'none'
+      })
     } catch (stripeError) {
-      console.error('Stripe error retrieving setup intent:', stripeError)
-      throw new Error(`Setup intent not found: ${stripeError.message}`)
+      console.error('Stripe API error retrieving setup intent:', {
+        message: stripeError.message,
+        code: stripeError.code,
+        type: stripeError.type,
+        setup_intent_id: setupIntentId
+      })
+      throw new Error(`Setup intent retrieval failed: ${stripeError.message}`)
     }
     
     if (setupIntent.status !== 'succeeded') {
-      console.error('Setup intent status:', setupIntent.status)
-      throw new Error(`Setup intent status is ${setupIntent.status}, expected 'succeeded'`)
+      console.error('Setup intent not in succeeded status:', {
+        status: setupIntent.status,
+        id: setupIntentId
+      })
+      throw new Error(`Setup intent status is '${setupIntent.status}', expected 'succeeded'. Please try adding your card again.`)
     }
 
     if (!setupIntent.payment_method) {
-      throw new Error('No payment method attached to setup intent')
+      console.error('No payment method attached to setup intent')
+      throw new Error('No payment method found on setup intent')
     }
 
-    console.log('Retrieving payment method...', setupIntent.payment_method)
-    const paymentMethod = await stripe.paymentMethods.retrieve(setupIntent.payment_method as string)
+    // Get payment method details
+    console.log('Retrieving payment method details...')
+    const paymentMethodId = typeof setupIntent.payment_method === 'string' 
+      ? setupIntent.payment_method 
+      : setupIntent.payment_method.id
 
+    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
+    
     if (!paymentMethod.card) {
-      throw new Error('Invalid card payment method')
+      console.error('Payment method is not a card:', paymentMethod.type)
+      throw new Error('Only card payment methods are supported')
     }
 
-    console.log('Getting user from registration table...')
+    console.log('Payment method details:', {
+      id: paymentMethod.id,
+      type: paymentMethod.type,
+      brand: paymentMethod.card.brand,
+      last4: paymentMethod.card.last4,
+      exp_month: paymentMethod.card.exp_month,
+      exp_year: paymentMethod.card.exp_year
+    })
+
+    // Get user from registration table
+    console.log('Fetching user from registration table...')
     const { data: users, error: userError } = await supabase
       .from('registration')
       .select('id, email, full_name')
@@ -70,42 +107,47 @@ Deno.serve(async (req) => {
       .limit(1)
 
     if (userError) {
-      console.error('Error fetching user:', userError)
+      console.error('Error fetching user from registration:', userError)
       throw new Error(`User lookup failed: ${userError.message}`)
     }
 
     if (!users || users.length === 0) {
-      console.error('User not found in registration table')
+      console.error('User not found in registration table for email:', email)
       throw new Error('User not found. Please ensure you are registered.')
     }
 
     const user = users[0]
     console.log('Found user:', user.id)
 
-    // Check if this payment method already exists
+    // Check for existing payment method
     const { data: existingMethod } = await supabase
       .from('payment_methods')
-      .select('id')
+      .select('id, label')
       .eq('stripe_payment_method_id', paymentMethod.id)
       .eq('user_id', user.id)
       .maybeSingle()
     
     if (existingMethod) {
-      console.log('Payment method already exists, returning existing record')
+      console.log('Payment method already exists:', existingMethod.id)
       return new Response(JSON.stringify({ 
         success: true, 
         paymentMethod: existingMethod,
-        message: 'Card already exists in your account'
+        message: 'This card is already saved to your account'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // Get the customer ID from the setup intent
-    const customerId = typeof setupIntent.customer === 'string' ? setupIntent.customer : setupIntent.customer?.id
+    // Get customer ID from setup intent
+    const customerId = typeof setupIntent.customer === 'string' 
+      ? setupIntent.customer 
+      : setupIntent.customer?.id
 
-    console.log('Storing payment method in database...')
-    const { data, error } = await supabase
+    // Save to main payment_methods table
+    console.log('Saving payment method to database...')
+    const cardLabel = label || `${paymentMethod.card.brand?.toUpperCase()} **** ${paymentMethod.card.last4}`
+    
+    const { data: savedMethod, error: saveError } = await supabase
       .from('payment_methods')
       .insert({
         user_id: user.id,
@@ -115,7 +157,7 @@ Deno.serve(async (req) => {
         brand: paymentMethod.card.brand,
         exp_month: paymentMethod.card.exp_month,
         exp_year: paymentMethod.card.exp_year,
-        label: label || `${paymentMethod.card.brand?.toUpperCase()} **** ${paymentMethod.card.last4}`,
+        label: cardLabel,
         last4: paymentMethod.card.last4,
         is_active: true,
         is_default: false
@@ -123,25 +165,64 @@ Deno.serve(async (req) => {
       .select()
       .single()
 
-    if (error) {
-      console.error('Database error:', error)
-      throw new Error(`Database error: ${error.message}`)
+    if (saveError) {
+      console.error('Error saving to payment_methods:', saveError)
+      throw new Error(`Failed to save payment method: ${saveError.message}`)
     }
 
-    console.log('Card added successfully!', data)
+    // Also save to stripe_test_cards table for testing purposes
+    console.log('Saving to stripe_test_cards table...')
+    const { error: testCardError } = await supabase
+      .from('stripe_test_cards')
+      .insert({
+        user_id: user.id,
+        stripe_customer_id: customerId,
+        stripe_payment_method_id: paymentMethod.id,
+        stripe_setup_intent_id: setupIntent.id,
+        card_brand: paymentMethod.card.brand,
+        card_last4: paymentMethod.card.last4,
+        card_exp_month: paymentMethod.card.exp_month,
+        card_exp_year: paymentMethod.card.exp_year,
+        label: cardLabel,
+        is_test: true,
+        status: 'active'
+      })
+
+    if (testCardError) {
+      console.warn('Warning: Failed to save to test cards table:', testCardError)
+      // Don't fail the whole operation for this
+    }
+
+    console.log('=== ADD STRIPE CARD SUCCESS ===')
+    console.log('Card saved successfully:', {
+      id: savedMethod.id,
+      label: savedMethod.label,
+      brand: savedMethod.brand,
+      last4: savedMethod.last4
+    })
+
     return new Response(JSON.stringify({ 
       success: true, 
-      paymentMethod: data,
-      message: 'Card added successfully'
+      paymentMethod: savedMethod,
+      message: 'Card added successfully!'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error) {
-    console.error('Error adding card:', error)
+    console.error('=== ADD STRIPE CARD ERROR ===')
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      type: error.type,
+      timestamp: new Date().toISOString()
+    })
+    
     return new Response(JSON.stringify({ 
       error: error.message,
-      details: error.code ? `Stripe error: ${error.code}` : 'Server error'
+      code: error.code || 'CARD_SAVE_ERROR',
+      details: 'Failed to save payment method'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
