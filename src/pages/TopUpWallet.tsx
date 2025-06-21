@@ -83,7 +83,7 @@ const TopUpWallet = () => {
 
       if (data?.checkout_url) {
         console.log('Redirecting to Stripe checkout:', data.checkout_url);
-        // Redirect to Stripe checkout
+        // Redirect to Stripe checkout in the same window to avoid blank screen issues
         window.location.href = data.checkout_url;
       } else {
         console.error('No checkout URL received:', data);
@@ -92,8 +92,7 @@ const TopUpWallet = () => {
     } catch (error) {
       console.error("Top-up error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to process top-up. Please try again.");
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only reset loading on error, since success will redirect
     }
   };
 
@@ -135,6 +134,7 @@ const TopUpWallet = () => {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             
@@ -142,7 +142,8 @@ const TopUpWallet = () => {
               value={method} 
               onChange={setMethod} 
               label="Payment Method" 
-              filterType="card" 
+              filterType="card"
+              disabled={loading}
             />
             
             <div>
@@ -152,6 +153,7 @@ const TopUpWallet = () => {
                 value={note}
                 placeholder="Optional note"
                 onChange={(e) => setNote(e.target.value)}
+                disabled={loading}
               />
             </div>
             
