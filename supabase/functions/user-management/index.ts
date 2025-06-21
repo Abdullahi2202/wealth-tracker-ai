@@ -184,7 +184,17 @@ Deno.serve(async (req) => {
         })
 
       case 'PUT':
-        const updateBody = await req.json()
+        let updateBody
+        try {
+          updateBody = await req.json()
+        } catch (parseError) {
+          console.error('Error parsing request body:', parseError)
+          return new Response(JSON.stringify({ error: 'Invalid request body' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
         console.log('Update request body:', JSON.stringify(updateBody, null, 2))
         
         const { id, verification_status, email: userEmail, action } = updateBody
