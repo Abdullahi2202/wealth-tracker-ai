@@ -28,29 +28,29 @@ const TopUpWallet = () => {
   useEffect(() => {
     const handleUrlParams = async () => {
       try {
+        console.log('TopUpWallet: Handling URL params...');
         const success = searchParams.get('success');
         const canceled = searchParams.get('canceled');
         const sessionId = searchParams.get('session_id');
         const topupAmount = searchParams.get('amount');
 
-        console.log('URL params:', { success, canceled, sessionId, topupAmount });
+        console.log('TopUpWallet: URL params:', { success, canceled, sessionId, topupAmount });
 
         if (success === 'true' && sessionId) {
-          console.log('Payment success detected, verifying payment:', { sessionId, topupAmount });
+          console.log('TopUpWallet: Payment success detected, verifying payment:', { sessionId, topupAmount });
           setVerifyingPayment(true);
           
           try {
-            // Verify payment with backend
-            console.log('Calling verify-payment function with session_id:', sessionId);
+            console.log('TopUpWallet: Calling verify-payment function with session_id:', sessionId);
             
             const { data, error } = await supabase.functions.invoke('verify-payment', {
               body: { session_id: sessionId }
             });
 
-            console.log('Verify payment response:', { data, error });
+            console.log('TopUpWallet: Verify payment response:', { data, error });
 
             if (error) {
-              console.error('Payment verification error:', error);
+              console.error('TopUpWallet: Payment verification error:', error);
               toast.error(
                 <div className="flex items-center gap-2">
                   <XCircle className="h-4 w-4 text-red-600" />
@@ -58,11 +58,11 @@ const TopUpWallet = () => {
                 </div>
               );
             } else if (data?.success) {
-              console.log('Payment verified successfully:', data);
+              console.log('TopUpWallet: Payment verified successfully:', data);
               toast.success(
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span>Successfully topped up ${topupAmount || 'your wallet'}!</span>
+                  <span>Successfully topped up ${topupAmount || data.amount || 'your wallet'}!</span>
                 </div>
               );
               
@@ -71,7 +71,7 @@ const TopUpWallet = () => {
               setTimeout(() => refetch(), 2000);
               setTimeout(() => refetch(), 5000);
             } else {
-              console.error('Payment verification failed:', data);
+              console.error('TopUpWallet: Payment verification failed:', data);
               toast.error(
                 <div className="flex items-center gap-2">
                   <XCircle className="h-4 w-4 text-red-600" />
@@ -80,7 +80,7 @@ const TopUpWallet = () => {
               );
             }
           } catch (verificationError) {
-            console.error('Payment verification exception:', verificationError);
+            console.error('TopUpWallet: Payment verification exception:', verificationError);
             toast.error(
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-red-600" />
@@ -94,7 +94,7 @@ const TopUpWallet = () => {
           // Clean up URL parameters
           navigate('/payments/topup', { replace: true });
         } else if (canceled === 'true') {
-          console.log('Payment canceled detected');
+          console.log('TopUpWallet: Payment canceled detected');
           toast.error(
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-600" />
@@ -105,14 +105,20 @@ const TopUpWallet = () => {
           navigate('/payments/topup', { replace: true });
         }
       } catch (error) {
-        console.error('Error handling URL params:', error);
+        console.error('TopUpWallet: Error handling URL params:', error);
         toast.error('An error occurred processing the payment result');
       } finally {
+        console.log('TopUpWallet: Finished handling URL params');
         setInitializing(false);
       }
     };
 
-    handleUrlParams();
+    // Add a small delay to ensure the component is mounted
+    const timer = setTimeout(() => {
+      handleUrlParams();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [searchParams, navigate, refetch]);
 
   // Choose default payment method if available
@@ -149,23 +155,23 @@ const TopUpWallet = () => {
     setLoading(true);
 
     try {
-      console.log('=== STARTING TOP-UP PROCESS ===');
-      console.log('Amount:', amountValue);
+      console.log('TopUpWallet: === STARTING TOP-UP PROCESS ===');
+      console.log('TopUpWallet: Amount:', amountValue);
 
       // Get current session to ensure we're authenticated
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
-        console.error('Session error:', sessionError);
+        console.error('TopUpWallet: Session error:', sessionError);
         throw new Error('Authentication error. Please log in again.');
       }
 
       if (!session) {
-        console.error('No session found');
+        console.error('TopUpWallet: No session found');
         throw new Error('Please log in to continue.');
       }
 
-      console.log('User authenticated, calling create-topup-session...');
+      console.log('TopUpWallet: User authenticated, calling create-topup-session...');
 
       // Call the create-topup-session function
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
@@ -175,10 +181,10 @@ const TopUpWallet = () => {
         }
       });
 
-      console.log('Function response:', { data, error });
+      console.log('TopUpWallet: Function response:', { data, error });
 
       if (error) {
-        console.error('Function invocation error:', error);
+        console.error('TopUpWallet: Function invocation error:', error);
         
         // Show more specific error message
         let errorMessage = 'Failed to create payment session';
@@ -191,11 +197,11 @@ const TopUpWallet = () => {
       }
 
       if (!data || !data.checkout_url) {
-        console.error('No checkout URL in response:', data);
+        console.error('TopUpWallet: No checkout URL in response:', data);
         throw new Error('No checkout URL received from payment processor');
       }
 
-      console.log('Redirecting to Stripe checkout:', data.checkout_url);
+      console.log('TopUpWallet: Redirecting to Stripe checkout:', data.checkout_url);
       
       // Show loading state with message
       toast.info("Redirecting to Stripe checkout...");
@@ -204,8 +210,8 @@ const TopUpWallet = () => {
       window.location.href = data.checkout_url;
 
     } catch (error) {
-      console.error("=== TOP-UP ERROR ===");
-      console.error("Error details:", error);
+      console.error("TopUpWallet: === TOP-UP ERROR ===");
+      console.error("TopUpWallet: Error details:", error);
       
       setLoading(false);
       
