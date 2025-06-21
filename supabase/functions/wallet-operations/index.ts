@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     const body = await req.json()
     const { action } = body
 
-    console.log('Processing action:', action)
+    console.log('Processing action:', action, 'for user:', user.email)
 
     switch (action) {
       case 'get-balance':
@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
           const { data: newWallet, error: createError } = await supabase
             .from('wallets')
             .insert({
+              user_id: user.id,
               user_email: user.email,
               balance: 0
             })
@@ -77,11 +78,28 @@ Deno.serve(async (req) => {
           .from('wallets')
           .select('*')
           .eq('user_email', user.email)
-          .single()
+          .maybeSingle()
 
         if (getCurrentError) throw getCurrentError
 
-        const newBalance = Number(currentWallet.balance) + Number(amount)
+        let walletToUpdate = currentWallet
+        if (!walletToUpdate) {
+          // Create wallet if it doesn't exist
+          const { data: newWallet, error: createWalletError } = await supabase
+            .from('wallets')
+            .insert({
+              user_id: user.id,
+              user_email: user.email,
+              balance: 0
+            })
+            .select()
+            .single()
+
+          if (createWalletError) throw createWalletError
+          walletToUpdate = newWallet
+        }
+
+        const newBalance = Number(walletToUpdate.balance) + Number(amount)
 
         // Update wallet balance
         const { data: updatedWallet, error: updateError } = await supabase
@@ -100,7 +118,7 @@ Deno.serve(async (req) => {
         const { error: transactionError } = await supabase
           .from('transactions')
           .insert({
-            user_id: user.id,
+            user_id: user.email,
             name: description || 'Wallet Top-Up',
             amount: Number(amount),
             type: 'income',
@@ -160,7 +178,7 @@ Deno.serve(async (req) => {
         const { error: senderTransactionError } = await supabase
           .from('transactions')
           .insert({
-            user_id: user.id,
+            user_id: user.email,
             name: 'Payment Sent',
             amount: Number(sendAmount),
             type: 'expense',
@@ -194,7 +212,7 @@ Deno.serve(async (req) => {
           await supabase
             .from('transactions')
             .insert({
-              user_id: recipientWallet.user_id,
+              user_id: recipient,
               name: 'Payment Received',
               amount: Number(sendAmount),
               type: 'income',

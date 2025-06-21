@@ -1,5 +1,5 @@
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("");
   const [note, setNote] = useState("");
@@ -20,9 +21,30 @@ const TopUpWallet = () => {
   const { methods } = usePaymentMethods();
   const { wallet, refetch } = useWallet();
 
+  // Check for success/cancel parameters
+  useEffect(() => {
+    const success = searchParams.get('success');
+    const canceled = searchParams.get('canceled');
+    const topupAmount = searchParams.get('amount');
+
+    if (success === 'true') {
+      toast.success(`Successfully topped up $${topupAmount || 'your wallet'}!`);
+      refetch(); // Refresh wallet balance
+      // Clean up URL parameters
+      navigate('/payments/topup', { replace: true });
+    } else if (canceled === 'true') {
+      toast.error('Top-up was canceled');
+      // Clean up URL parameters
+      navigate('/payments/topup', { replace: true });
+    }
+  }, [searchParams, navigate, refetch]);
+
   // Choose default payment method if available
   useEffect(() => {
-    if (!method && methods.length > 0) setMethod(methods[0].id);
+    if (!method && methods.length > 0) {
+      const cardMethod = methods.find(m => m.type === 'card');
+      setMethod(cardMethod?.id || methods[0].id);
+    }
   }, [methods, method]);
 
   const handleTopUp = async (e: React.FormEvent) => {
@@ -90,7 +112,12 @@ const TopUpWallet = () => {
           {wallet && (
             <div className="mt-2 p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-700">
-                Current Balance: <span className="font-semibold">${wallet.balance.toFixed(2)}</span>
+                Current Balance: <span className="font-semibold">
+                  ${wallet.balance.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
               </p>
             </div>
           )}

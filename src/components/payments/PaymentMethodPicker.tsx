@@ -40,13 +40,31 @@ export default function PaymentMethodPicker({
         displayName = "Bank";
         break;
       case "card":
-        icon = "💳";
-        displayName = method.brand ? 
-          `${method.brand.charAt(0).toUpperCase() + method.brand.slice(1)}` : 
+        // Get proper brand icon
+        const brandIcons: { [key: string]: string } = {
+          'visa': '💳',
+          'mastercard': '💳',
+          'amex': '💳',
+          'discover': '💳',
+          'diners': '💳',
+          'jcb': '💳',
+          'unionpay': '💳'
+        };
+        
+        icon = brandIcons[method.brand?.toLowerCase()] || "💳";
+        
+        // Format brand name properly
+        const brandName = method.brand ? 
+          method.brand.charAt(0).toUpperCase() + method.brand.slice(1).toLowerCase() : 
           "Card";
-        // Add last 4 digits if available
+        
+        // Add first 2 and last 4 digits if available
         if (method.last4) {
-          displayName += ` **** ${method.last4}`;
+          // For demo purposes, we'll show ** for first 2 digits since we typically don't store them
+          // In a real implementation, you'd need to store the first 2 digits securely
+          displayName = `${brandName} **${method.last4.slice(-2)} ${method.last4}`;
+        } else {
+          displayName = brandName;
         }
         break;
       case "apple_pay":

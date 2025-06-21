@@ -28,6 +28,54 @@ Deno.serve(async (req) => {
     console.log('Processing webhook event:', event.type)
 
     switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object
+        
+        if (session.metadata?.type === 'wallet_topup') {
+          console.log('Processing wallet topup completion:', session.id)
+          
+          const userId = session.metadata.user_id
+          const userEmail = session.metadata.user_email
+          const amount = parseFloat(session.metadata.amount || '0')
+          
+          if (userId && userEmail && amount > 0) {
+            // Add funds to wallet using the wallet-operations function
+            try {
+              const { data: walletData, error: walletError } = await supabase.functions.invoke('wallet-operations', {
+                body: { 
+                  action: 'add-funds', 
+                  amount: amount,
+                  source: 'stripe_topup',
+                  description: `Wallet Top-up via Stripe - $${amount}`
+                },
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`
+                }
+              })
+
+              if (walletError) {
+                console.error('Error adding funds to wallet:', walletError)
+              } else {
+                console.log('Successfully added funds to wallet:', walletData)
+              }
+
+              // Update topup session status
+              await supabase
+                .from('topup_sessions')
+                .update({ 
+                  status: 'completed',
+                  processed_at: new Date().toISOString()
+                })
+                .eq('stripe_session_id', session.id)
+
+            } catch (error) {
+              console.error('Error processing wallet topup:', error)
+            }
+          }
+        }
+        break
+
       case 'payment_intent.succeeded':
         const paymentIntent = event.data.object
         

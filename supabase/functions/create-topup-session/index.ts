@@ -31,7 +31,20 @@ Deno.serve(async (req) => {
       throw new Error('Invalid authentication')
     }
 
-    const { amount, currency = 'usd' } = await req.json()
+    // Parse request body with error handling
+    let body
+    try {
+      const requestText = await req.text()
+      if (!requestText.trim()) {
+        throw new Error('Empty request body')
+      }
+      body = JSON.parse(requestText)
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      throw new Error('Invalid JSON in request body')
+    }
+
+    const { amount, currency = 'usd' } = body
 
     if (!amount || amount <= 0) {
       throw new Error('Invalid amount')
@@ -79,11 +92,13 @@ Deno.serve(async (req) => {
         },
       ],
       mode: 'payment',
-      success_url: `${req.headers.get('origin')}/payments?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${req.headers.get('origin')}/payments?success=true&session_id={CHECKOUT_SESSION_ID}&amount=${amount}`,
       cancel_url: `${req.headers.get('origin')}/payments?canceled=true`,
       metadata: {
         user_id: user.id,
-        type: 'wallet_topup'
+        user_email: user.email,
+        type: 'wallet_topup',
+        amount: amount.toString()
       }
     })
 
