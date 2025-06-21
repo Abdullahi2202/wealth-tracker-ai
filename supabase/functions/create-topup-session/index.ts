@@ -117,6 +117,13 @@ Deno.serve(async (req) => {
         mode: 'payment',
         success_url: `${baseUrl}/payments/topup?success=true&session_id={CHECKOUT_SESSION_ID}&amount=${amount}`,
         cancel_url: `${baseUrl}/payments/topup?canceled=true`,
+        metadata: {
+          type: 'wallet_topup',
+          user_id: user.id,
+          user_email: user.email,
+          amount_cents: amountInCents.toString(),
+          amount_dollars: amount.toString()
+        }
       })
 
       console.log('Stripe session created successfully:', session.id)
@@ -145,18 +152,6 @@ Deno.serve(async (req) => {
       }
 
       console.log('Topup session created in DB:', topupSession.id)
-
-      // Update the Stripe session metadata with our topup session ID
-      await stripe.checkout.sessions.update(session.id, {
-        metadata: {
-          type: 'wallet_topup',
-          user_id: user.id,
-          user_email: user.email,
-          topup_session_id: topupSession.id,
-          amount_cents: amountInCents.toString(),
-          amount_dollars: amount.toString()
-        }
-      })
 
       console.log('=== SUCCESS: Returning checkout URL ===')
       return new Response(JSON.stringify({
