@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import Stripe from 'https://esm.sh/stripe@14.21.0'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -49,51 +48,8 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', user.email)
 
-    // Parse request body with detailed logging
-    console.log('Reading request body...')
-    let requestText = ''
-    try {
-      requestText = await req.text()
-      console.log('Raw request body received:', requestText)
-      console.log('Request body length:', requestText.length)
-    } catch (readError) {
-      console.error('Error reading request body:', readError)
-      return new Response(JSON.stringify({ 
-        error: 'Failed to read request body',
-        details: readError.message 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-    
-    if (!requestText || requestText.trim() === '') {
-      console.error('Request body is empty')
-      return new Response(JSON.stringify({ 
-        error: 'Request body is required. Please provide amount and currency.' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-    
-    let body
-    try {
-      body = JSON.parse(requestText)
-      console.log('Successfully parsed request body:', body)
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError)
-      console.error('Failed to parse:', requestText)
-      return new Response(JSON.stringify({ 
-        error: 'Invalid JSON format in request body',
-        details: parseError.message,
-        receivedBody: requestText 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
+    // Parse request body
+    const body = await req.json()
     const { amount, currency = 'usd' } = body
 
     if (!amount || typeof amount !== 'number' || amount <= 0) {
@@ -122,7 +78,6 @@ Deno.serve(async (req) => {
         customerId = customers.data[0].id
         console.log('Found existing customer:', customerId)
       } else {
-        // Create new customer
         const customer = await stripe.customers.create({
           email: user.email,
           metadata: {
@@ -147,7 +102,7 @@ Deno.serve(async (req) => {
     let session
     try {
       const originHeader = req.headers.get('origin') || req.headers.get('referer') || 'http://localhost:3000'
-      const baseUrl = originHeader.replace(/\/$/, '') // Remove trailing slash
+      const baseUrl = originHeader.replace(/\/$/, '')
       
       session = await stripe.checkout.sessions.create({
         customer: customerId,
@@ -205,7 +160,6 @@ Deno.serve(async (req) => {
 
       if (dbError) {
         console.error('Database error:', dbError)
-        // Don't fail the request if DB save fails, but log it
         console.log('Continuing despite DB error - session created successfully')
       } else {
         console.log('Topup session saved to database:', dbSession.id)
@@ -223,7 +177,6 @@ Deno.serve(async (req) => {
 
     } catch (dbError) {
       console.error('Database operation failed:', dbError)
-      // Still return success since Stripe session was created
       return new Response(JSON.stringify({
         session_id: session.id,
         checkout_url: session.url,

@@ -39,38 +39,69 @@ Deno.serve(async (req) => {
           const amount = parseFloat(session.metadata.amount || '0')
           
           if (userId && userEmail && amount > 0) {
-            // Add funds to wallet using the wallet-operations function
-            try {
-              const { data: walletData, error: walletError } = await supabase.functions.invoke('wallet-operations', {
-                body: { 
-                  action: 'add-funds', 
-                  amount: amount,
-                  source: 'stripe_topup',
-                  description: `Wallet Top-up via Stripe - $${amount}`
-                },
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseServiceKey}`
-                }
+            console.log('Updating wallet for user:', userEmail, 'amount:', amount)
+            
+            // Get current wallet balance
+            const { data: currentWallet, error: walletFetchError } = await supabase
+              .from('wallets')
+              .select('balance')
+              .eq('user_email', userEmail)
+              .single()
+
+            if (walletFetchError) {
+              console.error('Error fetching wallet:', walletFetchError)
+              break
+            }
+
+            const newBalance = Number(currentWallet.balance) + Number(amount)
+            console.log('Updating balance from', currentWallet.balance, 'to', newBalance)
+
+            // Update wallet balance
+            const { error: walletError } = await supabase
+              .from('wallets')
+              .update({ 
+                balance: newBalance,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_email', userEmail)
+
+            if (walletError) {
+              console.error('Error updating wallet:', walletError)
+            } else {
+              console.log('Wallet updated successfully')
+            }
+
+            // Record transaction
+            const { error: transactionError } = await supabase
+              .from('transactions')
+              .insert({
+                user_id: userEmail,
+                name: 'Wallet Top-up',
+                amount: Number(amount),
+                type: 'income',
+                category: 'Top-up',
+                date: new Date().toISOString().split('T')[0]
               })
 
-              if (walletError) {
-                console.error('Error adding funds to wallet:', walletError)
-              } else {
-                console.log('Successfully added funds to wallet:', walletData)
-              }
+            if (transactionError) {
+              console.error('Error recording transaction:', transactionError)
+            } else {
+              console.log('Transaction recorded successfully')
+            }
 
-              // Update topup session status
-              await supabase
-                .from('topup_sessions')
-                .update({ 
-                  status: 'completed',
-                  processed_at: new Date().toISOString()
-                })
-                .eq('stripe_session_id', session.id)
+            // Update topup session status
+            const { error: sessionError } = await supabase
+              .from('topup_sessions')
+              .update({ 
+                status: 'completed',
+                updated_at: new Date().toISOString()
+              })
+              .eq('stripe_session_id', session.id)
 
-            } catch (error) {
-              console.error('Error processing wallet topup:', error)
+            if (sessionError) {
+              console.error('Error updating topup session:', sessionError)
+            } else {
+              console.log('Topup session updated successfully')
             }
           }
         }
@@ -78,6 +109,7 @@ Deno.serve(async (req) => {
 
       case 'payment_intent.succeeded':
         const paymentIntent = event.data.object
+        console.log('Payment intent succeeded:', paymentIntent.id)
         
         // Update payment transaction status
         const { error: updateError } = await supabase
@@ -95,8 +127,8 @@ Deno.serve(async (req) => {
 
       case 'payment_intent.payment_failed':
         const failedPayment = event.data.object
+        console.log('Payment intent failed:', failedPayment.id)
         
-        // Update payment transaction status
         const { error: failError } = await supabase
           .from('payment_transactions')
           .update({ 
@@ -108,11 +140,6 @@ Deno.serve(async (req) => {
         if (failError) {
           console.error('Error updating failed payment:', failError)
         }
-        break
-
-      case 'payment_method.attached':
-        // Handle when a payment method is successfully attached to a customer
-        console.log('Payment method attached:', event.data.object.id)
         break
 
       default:
