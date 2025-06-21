@@ -9,7 +9,7 @@ import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
@@ -120,7 +120,15 @@ const TopUpWallet = () => {
 
       if (error) {
         console.error('Function invocation error:', error);
-        throw new Error(error.message || 'Failed to create payment session');
+        
+        // Show more specific error message
+        let errorMessage = 'Failed to create payment session';
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+        throw new Error(errorMessage);
       }
 
       if (!data || !data.checkout_url) {
@@ -150,7 +158,12 @@ const TopUpWallet = () => {
           </div>
         );
       } else {
-        toast.error("Failed to process top-up. Please try again.");
+        toast.error(
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <span>Failed to process top-up. Please try again.</span>
+          </div>
+        );
       }
     }
   };
