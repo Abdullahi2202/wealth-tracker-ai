@@ -8,6 +8,7 @@ export interface Wallet {
   user_email: string;
   balance: number;
   updated_at: string;
+  user_id?: string;
 }
 
 /**
@@ -21,34 +22,45 @@ export function useWallet() {
   const fetchWallet = useCallback(async () => {
     setLoading(true);
     try {
-      const storedUser = localStorage.getItem("walletmaster_user");
-      let email = "";
-      if (storedUser) {
-        try {
-          const userObj = JSON.parse(storedUser);
-          email = userObj.email || "";
-        } catch {}
-      }
+      // Get authenticated user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (!email) {
+      if (userError || !user) {
+        console.log('No authenticated user found');
         setWallet(null);
         setLoading(false);
         return;
       }
 
-      // Use the wallet-operations edge function to get balance
-      const { data, error } = await supabase.functions.invoke('wallet-operations', {
-        body: { action: 'get-balance' },
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      console.log('Fetching wallet for user:', user.email);
 
-      if (error) {
-        console.error("Error fetching wallet:", error);
-        setWallet(null);
+      // First try to get wallet from database directly
+      const { data: walletData, error: walletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_email', user.email)
+        .maybeSingle();
+
+      if (walletError) {
+        console.error("Direct wallet fetch error:", walletError);
+        // If direct fetch fails, try using the edge function
+        const { data: functionData, error: functionError } = await supabase.functions.invoke('wallet-operations', {
+          body: { action: 'get-balance' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (functionError) {
+          console.error("Edge function wallet fetch error:", functionError);
+          setWallet(null);
+        } else {
+          console.log('Wallet fetched via edge function:', functionData);
+          setWallet(functionData);
+        }
       } else {
-        setWallet(data);
+        console.log('Wallet fetched directly:', walletData);
+        setWallet(walletData);
       }
     } catch (error) {
       console.error("Error in fetchWallet:", error);
@@ -61,36 +73,30 @@ export function useWallet() {
   useEffect(() => {
     fetchWallet(); // initial load
     
-    const storedUser = localStorage.getItem("walletmaster_user");
-    let email = "";
-    if (storedUser) {
-      try {
-        const userObj = JSON.parse(storedUser);
-        email = userObj.email || "";
-      } catch {}
-    }
-    
-    if (!email) return;
-    
-    const channel = supabase
-      .channel("wallet-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "wallets",
-          filter: `user_email=eq.${email}`,
-        },
-        (payload) => {
-          if (payload.new) setWallet(payload.new as Wallet);
-        }
-      )
-      .subscribe();
+    const { data: { user } } = supabase.auth.getUser().then(({ data }) => {
+      if (!data.user?.email) return;
       
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      const channel = supabase
+        .channel("wallet-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "wallets",
+            filter: `user_email=eq.${data.user.email}`,
+          },
+          (payload) => {
+            console.log('Real-time wallet update:', payload.new);
+            if (payload.new) setWallet(payload.new as Wallet);
+          }
+        )
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    });
   }, [fetchWallet]);
 
   // Add funds to wallet using edge function

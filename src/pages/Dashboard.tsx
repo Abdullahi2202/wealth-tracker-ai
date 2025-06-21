@@ -1,9 +1,12 @@
+
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
 import BalanceCard from "@/components/dashboard/BalanceCard";
+import WalletBalanceCard from "@/components/dashboard/WalletBalanceCard";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionDrawer from "@/components/transactions/TransactionDrawer";
 import { Button } from "@/components/ui/button";
+import { useWallet } from "@/hooks/useWallet";
 
 type Transaction = {
   id: string;
@@ -24,6 +27,8 @@ const Dashboard = () => {
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpenses, setMonthExpenses] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const { wallet } = useWallet();
 
   useEffect(() => {
     // Get user from localStorage (set by Login)
@@ -135,6 +140,14 @@ const Dashboard = () => {
             Manage your finances with insights, analytics, and fast payments.
           </p>
         </div>
+
+        {/* Wallet Balance Card */}
+        <div className="w-full flex justify-center px-3 pb-3">
+          <div className="w-full max-w-[420px]">
+            <WalletBalanceCard className="mb-3" />
+          </div>
+        </div>
+
         {/* Main balance card */}
         <div className="w-full flex justify-center px-0 pb-3">
           <div className="w-full max-w-[420px] flex flex-col gap-2">

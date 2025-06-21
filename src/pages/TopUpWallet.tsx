@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useWallet } from "@/hooks/useWallet";
+import { supabase } from "@/integrations/supabase/client";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ const TopUpWallet = () => {
   const [loading, setLoading] = useState(false);
 
   const { methods } = usePaymentMethods();
-  const { addFunds, refetch } = useWallet();
+  const { wallet, refetch } = useWallet();
 
   // Choose default payment method if available
   useEffect(() => {
@@ -30,24 +31,44 @@ const TopUpWallet = () => {
       toast.error("Enter a valid amount.");
       return;
     }
+
+    if (!method) {
+      toast.error("Please select a payment method.");
+      return;
+    }
     
     setLoading(true);
     const amountValue = parseFloat(amount);
 
     try {
-      const success = await addFunds(amountValue, method, note || "Wallet Top-Up");
-      
-      if (success) {
-        toast.success(`$${amountValue.toFixed(2)} added to your wallet.`);
-        setAmount("");
-        setNote("");
-        await refetch(); // Refresh wallet balance
+      console.log('Starting top-up process...', { amount: amountValue, method, note });
+
+      // Create Stripe checkout session for top-up
+      const { data, error } = await supabase.functions.invoke('create-topup-session', {
+        body: { 
+          amount: amountValue,
+          currency: 'usd'
+        },
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (error) {
+        console.error('Top-up session error:', error);
+        throw new Error(error.message || 'Failed to create payment session');
+      }
+
+      if (data?.checkout_url) {
+        console.log('Redirecting to Stripe checkout:', data.checkout_url);
+        // Redirect to Stripe checkout
+        window.location.href = data.checkout_url;
       } else {
-        toast.error("Failed to add funds. Please try again.");
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
       console.error("Top-up error:", error);
-      toast.error("Failed to add funds. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to process top-up. Please try again.");
     }
     
     setLoading(false);
@@ -61,19 +82,27 @@ const TopUpWallet = () => {
         </Button>
         <h2 className="text-xl font-bold text-orange-600">Top-Up Wallet</h2>
       </div>
+      
       <Card className="max-w-md mx-auto shadow-lg rounded-2xl animate-scale-in">
         <CardHeader>
           <CardTitle>Top Up</CardTitle>
           <CardDescription>Add funds to your wallet.</CardDescription>
+          {wallet && (
+            <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700">
+                Current Balance: <span className="font-semibold">${wallet.balance.toFixed(2)}</span>
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleTopUp} className="space-y-4">
             <div>
-              <label className="block text-sm mb-1">Amount</label>
+              <label className="block text-sm mb-1 font-medium">Amount</label>
               <Input
                 type="number"
                 placeholder="0.00"
-                min={0}
+                min={0.01}
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -85,11 +114,11 @@ const TopUpWallet = () => {
               value={method} 
               onChange={setMethod} 
               label="Payment Method" 
-              filterType="all" 
+              filterType="card" 
             />
             
             <div>
-              <label className="block text-xs">Note (Optional)</label>
+              <label className="block text-xs mb-1">Note (Optional)</label>
               <Input
                 type="text"
                 value={note}
@@ -99,7 +128,7 @@ const TopUpWallet = () => {
             </div>
             
             <Button type="submit" className="w-full mt-3" disabled={loading}>
-              {loading ? "Processing..." : "Top Up"}
+              {loading ? "Processing..." : `Top Up $${amount || '0.00'}`}
             </Button>
           </form>
         </CardContent>
