@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
-      timeout: 10000, // 10 second timeout
+      timeout: 15000, // 15 second timeout
     })
 
     // Find or create Stripe customer
@@ -79,11 +79,11 @@ Deno.serve(async (req) => {
     const user = users[0]
     console.log('Found user in registration:', user.id)
 
-    // Create SetupIntent with FIXED configuration - use only payment_method_types, not automatic_payment_methods
+    // Create SetupIntent with simplified configuration
     console.log('Creating SetupIntent...')
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
-      payment_method_types: ['card'], // Only specify this, not automatic_payment_methods
+      payment_method_types: ['card'],
       usage: 'off_session',
       metadata: {
         user_id: user.id,
@@ -104,6 +104,16 @@ Deno.serve(async (req) => {
     if (!setupIntent.client_secret) {
       console.error('SetupIntent created without client_secret')
       throw new Error('Setup intent creation failed - no client secret')
+    }
+
+    // Wait a moment and verify we can retrieve the setup intent
+    console.log('Verifying setup intent can be retrieved...')
+    try {
+      const retrievedSetupIntent = await stripe.setupIntents.retrieve(setupIntent.id)
+      console.log('Setup intent verification successful:', retrievedSetupIntent.id)
+    } catch (verifyError) {
+      console.error('Setup intent verification failed:', verifyError)
+      throw new Error('Setup intent created but cannot be retrieved')
     }
 
     console.log('=== CREATE SETUP INTENT SUCCESS ===')

@@ -36,31 +36,46 @@ Deno.serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
-      timeout: 10000, // 10 second timeout
+      timeout: 15000, // 15 second timeout
     })
 
-    // Retrieve and validate setup intent
+    // Add delay before retrieving setup intent to ensure it's available
+    console.log('Waiting before retrieving setup intent...')
+    await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second delay
+
+    // Retrieve and validate setup intent with retries
     console.log('Retrieving setup intent from Stripe:', setupIntentId)
     let setupIntent;
+    let retries = 3;
     
-    try {
-      setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
-        expand: ['payment_method']
-      })
-      console.log('Setup intent retrieved:', {
-        id: setupIntent.id,
-        status: setupIntent.status,
-        customer: setupIntent.customer,
-        payment_method_id: setupIntent.payment_method?.id || 'none'
-      })
-    } catch (stripeError) {
-      console.error('Stripe API error retrieving setup intent:', {
-        message: stripeError.message,
-        code: stripeError.code,
-        type: stripeError.type,
-        setup_intent_id: setupIntentId
-      })
-      throw new Error(`Setup intent retrieval failed: ${stripeError.message}`)
+    while (retries > 0) {
+      try {
+        setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
+          expand: ['payment_method']
+        })
+        console.log('Setup intent retrieved:', {
+          id: setupIntent.id,
+          status: setupIntent.status,
+          customer: setupIntent.customer,
+          payment_method_id: setupIntent.payment_method?.id || 'none'
+        })
+        break
+      } catch (stripeError) {
+        retries--
+        console.error(`Stripe API error (${3 - retries} attempts):`, {
+          message: stripeError.message,
+          code: stripeError.code,
+          type: stripeError.type,
+          setup_intent_id: setupIntentId
+        })
+        
+        if (retries === 0) {
+          throw new Error(`Setup intent retrieval failed after 3 attempts: ${stripeError.message}`)
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
     }
     
     if (setupIntent.status !== 'succeeded') {
@@ -95,7 +110,9 @@ Deno.serve(async (req) => {
       brand: paymentMethod.card.brand,
       last4: paymentMethod.card.last4,
       exp_month: paymentMethod.card.exp_month,
-      exp_year: paymentMethod.card.exp_year
+      exp_year: paymentMethod.card.exp_year,
+      country: paymentMethod.card.country,
+      funding: paymentMethod.card.funding
     })
 
     // Get user from registration table
@@ -143,25 +160,28 @@ Deno.serve(async (req) => {
       ? setupIntent.customer 
       : setupIntent.customer?.id
 
-    // Save to main payment_methods table
-    console.log('Saving payment method to database...')
+    // Prepare card data
     const cardLabel = label || `${paymentMethod.card.brand?.toUpperCase()} **** ${paymentMethod.card.last4}`
     
+    const cardData = {
+      user_id: user.id,
+      stripe_payment_method_id: paymentMethod.id,
+      stripe_customer_id: customerId,
+      type: 'card',
+      brand: paymentMethod.card.brand,
+      exp_month: paymentMethod.card.exp_month,
+      exp_year: paymentMethod.card.exp_year,
+      label: cardLabel,
+      last4: paymentMethod.card.last4,
+      is_active: true,
+      is_default: false
+    }
+
+    // Save to main payment_methods table
+    console.log('Saving payment method to database...')
     const { data: savedMethod, error: saveError } = await supabase
       .from('payment_methods')
-      .insert({
-        user_id: user.id,
-        stripe_payment_method_id: paymentMethod.id,
-        stripe_customer_id: customerId,
-        type: 'card',
-        brand: paymentMethod.card.brand,
-        exp_month: paymentMethod.card.exp_month,
-        exp_year: paymentMethod.card.exp_year,
-        label: cardLabel,
-        last4: paymentMethod.card.last4,
-        is_active: true,
-        is_default: false
-      })
+      .insert(cardData)
       .select()
       .single()
 
@@ -170,32 +190,39 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to save payment method: ${saveError.message}`)
     }
 
-    // Also save to stripe_test_cards table for testing purposes
+    // Also save to stripe_test_cards table for testing/retrieval purposes
     console.log('Saving to stripe_test_cards table...')
-    const { error: testCardError } = await supabase
+    const testCardData = {
+      user_id: user.id,
+      stripe_customer_id: customerId,
+      stripe_payment_method_id: paymentMethod.id,
+      stripe_setup_intent_id: setupIntent.id,
+      card_brand: paymentMethod.card.brand,
+      card_last4: paymentMethod.card.last4,
+      card_exp_month: paymentMethod.card.exp_month,
+      card_exp_year: paymentMethod.card.exp_year,
+      label: cardLabel,
+      is_test: true,
+      status: 'active'
+    }
+
+    const { data: testCard, error: testCardError } = await supabase
       .from('stripe_test_cards')
-      .insert({
-        user_id: user.id,
-        stripe_customer_id: customerId,
-        stripe_payment_method_id: paymentMethod.id,
-        stripe_setup_intent_id: setupIntent.id,
-        card_brand: paymentMethod.card.brand,
-        card_last4: paymentMethod.card.last4,
-        card_exp_month: paymentMethod.card.exp_month,
-        card_exp_year: paymentMethod.card.exp_year,
-        label: cardLabel,
-        is_test: true,
-        status: 'active'
-      })
+      .insert(testCardData)
+      .select()
+      .single()
 
     if (testCardError) {
       console.warn('Warning: Failed to save to test cards table:', testCardError)
       // Don't fail the whole operation for this
+    } else {
+      console.log('Test card saved successfully:', testCard.id)
     }
 
     console.log('=== ADD STRIPE CARD SUCCESS ===')
     console.log('Card saved successfully:', {
-      id: savedMethod.id,
+      payment_method_id: savedMethod.id,
+      test_card_id: testCard?.id,
       label: savedMethod.label,
       brand: savedMethod.brand,
       last4: savedMethod.last4
@@ -204,6 +231,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       paymentMethod: savedMethod,
+      testCard: testCard,
       message: 'Card added successfully!'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CreditCard, MoreVertical, Trash2, Edit } from "lucide-react";
+import { Plus, CreditCard, MoreVertical, Trash2, Edit, RefreshCw } from "lucide-react";
 import AddCardDrawer from "@/components/payments/AddCardDrawer";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -26,8 +26,24 @@ interface PaymentMethod {
   is_default: boolean;
   is_active: boolean;
   label?: string;
+  stripe_payment_method_id?: string;
+  stripe_customer_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+interface TestCard {
+  id: string;
+  stripe_customer_id: string;
+  stripe_payment_method_id: string;
+  stripe_setup_intent_id?: string;
+  card_brand?: string;
+  card_last4?: string;
+  card_exp_month?: number;
+  card_exp_year?: number;
+  label?: string;
+  status: string;
+  created_at: string;
 }
 
 const CardsList = () => {
@@ -109,7 +125,7 @@ const CardsList = () => {
         // Fetch payment methods with proper type safety
         const { data, error } = await supabase
           .from('payment_methods')
-          .select('id, type, brand, last4, exp_month, exp_year, is_default, is_active, label, created_at, updated_at')
+          .select('id, type, brand, last4, exp_month, exp_year, is_default, is_active, label, stripe_payment_method_id, stripe_customer_id, created_at, updated_at')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .order('created_at', { ascending: false });
@@ -123,6 +139,34 @@ const CardsList = () => {
         return data || [];
       } catch (error) {
         console.error('Error in fetchMethods:', error);
+        return [];
+      }
+    },
+  });
+
+  // Fetch test cards for additional data
+  const { data: testCards } = useQuery({
+    queryKey: ['test-cards'],
+    queryFn: async (): Promise<TestCard[]> => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
+
+        const { data, error } = await supabase
+          .from('stripe_test_cards')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching test cards:', error);
+          return [];
+        }
+
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching test cards:', error);
         return [];
       }
     },
@@ -262,6 +306,7 @@ const CardsList = () => {
         <div className="text-center py-8">
           <p className="text-red-600">Error loading payment methods. Please try again.</p>
           <Button onClick={() => refetch()} className="mt-4">
+            <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
         </div>
@@ -273,11 +318,36 @@ const CardsList = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Payment Methods</h1>
-        <Button onClick={() => setIsAddCardOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Card
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => refetch()} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={() => setIsAddCardOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Card
+          </Button>
+        </div>
       </div>
+
+      {/* Show Test Cards Debug Info */}
+      {testCards && testCards.length > 0 && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader>
+            <CardTitle className="text-sm text-blue-800">Test Cards Data</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xs text-blue-700 space-y-1">
+              {testCards.map((card) => (
+                <div key={card.id} className="flex justify-between">
+                  <span>{card.card_brand} **** {card.card_last4}</span>
+                  <span>{card.stripe_payment_method_id?.substring(0, 20)}...</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {paymentMethods && paymentMethods.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -330,6 +400,11 @@ const CardsList = () => {
                     <p className="text-sm text-muted-foreground">
                       Added {new Date(method.created_at).toLocaleDateString()}
                     </p>
+                    {method.stripe_payment_method_id && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        ID: {method.stripe_payment_method_id.substring(0, 15)}...
+                      </p>
+                    )}
                   </div>
                   {method.is_default && (
                     <Badge variant="default">Default</Badge>

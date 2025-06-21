@@ -105,6 +105,10 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
 
       console.log('Card setup confirmed:', setupIntent.id);
       
+      // Add delay before calling backend to ensure setup intent is available
+      console.log('Waiting before saving card...');
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+      
       // 3. Save the payment method to our database using Supabase edge function
       console.log('Saving card to database...');
       const { data: saveData, error: saveError } = await supabase.functions.invoke('add-stripe-card', {
