@@ -1,6 +1,5 @@
 
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
-import { Wallet, Banknote, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PaymentMethodPickerProps {
@@ -40,7 +39,7 @@ export default function PaymentMethodPicker({
         displayName = "Bank";
         break;
       case "card":
-        // Get proper brand icon
+        // Get proper brand icon and name
         const brandIcons: { [key: string]: string } = {
           'visa': '💳',
           'mastercard': '💳',
@@ -54,15 +53,41 @@ export default function PaymentMethodPicker({
         icon = brandIcons[method.brand?.toLowerCase()] || "💳";
         
         // Format brand name properly
-        const brandName = method.brand ? 
-          method.brand.charAt(0).toUpperCase() + method.brand.slice(1).toLowerCase() : 
-          "Card";
+        let brandName = "Card";
+        if (method.brand) {
+          switch (method.brand.toLowerCase()) {
+            case 'visa':
+              brandName = "Visa";
+              break;
+            case 'mastercard':
+              brandName = "Mastercard";
+              break;
+            case 'amex':
+              brandName = "American Express";
+              break;
+            case 'discover':
+              brandName = "Discover";
+              break;
+            case 'diners':
+              brandName = "Diners Club";
+              break;
+            case 'jcb':
+              brandName = "JCB";
+              break;
+            case 'unionpay':
+              brandName = "UnionPay";
+              break;
+            default:
+              brandName = method.brand.charAt(0).toUpperCase() + method.brand.slice(1).toLowerCase();
+          }
+        }
         
         // Add first 2 and last 4 digits if available
         if (method.last4) {
-          // For demo purposes, we'll show ** for first 2 digits since we typically don't store them
-          // In a real implementation, you'd need to store the first 2 digits securely
-          displayName = `${brandName} **${method.last4.slice(-2)} ${method.last4}`;
+          // Show **44 4444 format (first 2 + last 4)
+          const first2 = method.last4.slice(0, 2) || "**";
+          const last4 = method.last4;
+          displayName = `${brandName} **${first2} ${last4}`;
         } else {
           displayName = brandName;
         }

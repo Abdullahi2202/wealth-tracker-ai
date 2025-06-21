@@ -65,16 +65,25 @@ const TopUpWallet = () => {
     try {
       console.log('Starting top-up process...', { amount: amountValue, method, note });
 
+      // Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error('You must be logged in to top up your wallet');
+      }
+
       // Create Stripe checkout session for top-up
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: { 
+        body: JSON.stringify({ 
           amount: amountValue,
           currency: 'usd'
-        },
+        }),
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
       });
+
+      console.log('Function response:', { data, error });
 
       if (error) {
         console.error('Top-up session error:', error);

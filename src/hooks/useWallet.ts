@@ -44,19 +44,23 @@ export function useWallet() {
       if (walletError) {
         console.error("Direct wallet fetch error:", walletError);
         // If direct fetch fails, try using the edge function
-        const { data: functionData, error: functionError } = await supabase.functions.invoke('wallet-operations', {
-          body: { action: 'get-balance' },
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: functionData, error: functionError } = await supabase.functions.invoke('wallet-operations', {
+            body: JSON.stringify({ action: 'get-balance' }),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+          });
 
-        if (functionError) {
-          console.error("Edge function wallet fetch error:", functionError);
-          setWallet(null);
-        } else {
-          console.log('Wallet fetched via edge function:', functionData);
-          setWallet(functionData);
+          if (functionError) {
+            console.error("Edge function wallet fetch error:", functionError);
+            setWallet(null);
+          } else {
+            console.log('Wallet fetched via edge function:', functionData);
+            setWallet(functionData);
+          }
         }
       } else {
         console.log('Wallet fetched directly:', walletData);
@@ -106,9 +110,15 @@ export function useWallet() {
   const addFunds = useCallback(
     async (amount: number, source?: string, description?: string) => {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
         const { data, error } = await supabase.functions.invoke('wallet-operations', {
-          body: { action: 'add-funds', amount, source, description },
-          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add-funds', amount, source, description }),
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
         });
 
         if (error) throw error;
@@ -127,9 +137,15 @@ export function useWallet() {
   const sendPayment = useCallback(
     async (recipient: string, amount: number, note?: string) => {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
         const { data, error } = await supabase.functions.invoke('wallet-operations', {
-          body: { action: 'send-payment', recipient, sendAmount: amount, note },
-          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'send-payment', recipient, sendAmount: amount, note }),
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
         });
 
         if (error) throw error;

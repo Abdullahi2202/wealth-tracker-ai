@@ -31,23 +31,36 @@ Deno.serve(async (req) => {
       throw new Error('Invalid authentication')
     }
 
-    // Parse request body with error handling
+    // Parse request body with improved error handling
     let body
     try {
       const requestText = await req.text()
-      if (!requestText.trim()) {
-        throw new Error('Empty request body')
+      console.log('Raw request body:', requestText)
+      
+      if (!requestText || requestText.trim() === '') {
+        throw new Error('Request body is empty')
       }
+      
       body = JSON.parse(requestText)
+      console.log('Parsed body:', body)
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
-      throw new Error('Invalid JSON in request body')
+      return new Response(JSON.stringify({ 
+        error: 'Invalid JSON in request body',
+        details: parseError.message 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     const { amount, currency = 'usd' } = body
 
     if (!amount || amount <= 0) {
-      throw new Error('Invalid amount')
+      return new Response(JSON.stringify({ error: 'Invalid amount' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     console.log('Creating topup session for user:', user.id, 'amount:', amount)
@@ -63,6 +76,7 @@ Deno.serve(async (req) => {
     let customerId
     if (customers.data.length > 0) {
       customerId = customers.data[0].id
+      console.log('Found existing customer:', customerId)
     } else {
       // Create new customer
       const customer = await stripe.customers.create({
@@ -72,6 +86,7 @@ Deno.serve(async (req) => {
         }
       })
       customerId = customer.id
+      console.log('Created new customer:', customerId)
     }
 
     // Create Checkout session
@@ -92,8 +107,8 @@ Deno.serve(async (req) => {
         },
       ],
       mode: 'payment',
-      success_url: `${req.headers.get('origin')}/payments?success=true&session_id={CHECKOUT_SESSION_ID}&amount=${amount}`,
-      cancel_url: `${req.headers.get('origin')}/payments?canceled=true`,
+      success_url: `${req.headers.get('origin')}/payments/topup?success=true&session_id={CHECKOUT_SESSION_ID}&amount=${amount}`,
+      cancel_url: `${req.headers.get('origin')}/payments/topup?canceled=true`,
       metadata: {
         user_id: user.id,
         user_email: user.email,
@@ -122,7 +137,7 @@ Deno.serve(async (req) => {
       throw new Error('Failed to save session to database')
     }
 
-    console.log('Topup session saved to database')
+    console.log('Topup session saved to database:', dbSession)
 
     return new Response(JSON.stringify({
       session_id: session.id,
@@ -134,7 +149,10 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Create topup session error:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
