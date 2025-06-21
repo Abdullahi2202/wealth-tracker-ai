@@ -51,42 +51,23 @@ const TopUpWallet = () => {
 
             if (error) {
               console.error('TopUpWallet: Payment verification error:', error);
-              toast.error(
-                <div className="flex items-center gap-2">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  <span>Payment verification failed: {error.message || 'Unknown error'}</span>
-                </div>
-              );
+              toast.error(`Payment verification failed: ${error.message || 'Unknown error'}`);
             } else if (data?.success) {
               console.log('TopUpWallet: Payment verified successfully:', data);
-              toast.success(
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span>Successfully topped up ${topupAmount || data.amount || 'your wallet'}!</span>
-                </div>
-              );
+              const displayAmount = topupAmount || data.amount || 'your wallet';
+              toast.success(`Successfully topped up $${displayAmount}!`);
               
-              // Refresh wallet balance multiple times to ensure it's updated
-              setTimeout(() => refetch(), 500);
-              setTimeout(() => refetch(), 2000);
-              setTimeout(() => refetch(), 5000);
+              // Refresh wallet balance immediately and with retries
+              await refetch();
+              setTimeout(() => refetch(), 1000);
+              setTimeout(() => refetch(), 3000);
             } else {
               console.error('TopUpWallet: Payment verification failed:', data);
-              toast.error(
-                <div className="flex items-center gap-2">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  <span>Payment verification failed</span>
-                </div>
-              );
+              toast.error('Payment verification failed. Please contact support if amount was charged.');
             }
           } catch (verificationError) {
             console.error('TopUpWallet: Payment verification exception:', verificationError);
-            toast.error(
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <span>Failed to verify payment</span>
-              </div>
-            );
+            toast.error('Failed to verify payment. Please contact support if amount was charged.');
           } finally {
             setVerifyingPayment(false);
           }
@@ -95,12 +76,7 @@ const TopUpWallet = () => {
           navigate('/payments/topup', { replace: true });
         } else if (canceled === 'true') {
           console.log('TopUpWallet: Payment canceled detected');
-          toast.error(
-            <div className="flex items-center gap-2">
-              <XCircle className="h-4 w-4 text-red-600" />
-              <span>Payment was canceled</span>
-            </div>
-          );
+          toast.error('Payment was canceled');
           // Clean up URL parameters
           navigate('/payments/topup', { replace: true });
         }
@@ -185,13 +161,9 @@ const TopUpWallet = () => {
 
       if (error) {
         console.error('TopUpWallet: Function invocation error:', error);
-        
-        // Show more specific error message
         let errorMessage = 'Failed to create payment session';
         if (error.message) {
           errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
         }
         throw new Error(errorMessage);
       }
@@ -216,19 +188,9 @@ const TopUpWallet = () => {
       setLoading(false);
       
       if (error instanceof Error) {
-        toast.error(
-          <div className="flex items-center gap-2">
-            <XCircle className="h-4 w-4 text-red-600" />
-            <span>{error.message}</span>
-          </div>
-        );
+        toast.error(error.message);
       } else {
-        toast.error(
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <span>Failed to process top-up. Please try again.</span>
-          </div>
-        );
+        toast.error('Failed to process top-up. Please try again.');
       }
     }
   };
