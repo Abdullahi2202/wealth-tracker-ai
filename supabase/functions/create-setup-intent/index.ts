@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
-      timeout: 15000, // 15 second timeout
+      timeout: 20000, // 20 second timeout
     })
 
     // Find or create Stripe customer
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     const user = users[0]
     console.log('Found user in registration:', user.id)
 
-    // Create SetupIntent with simplified configuration
+    // Create SetupIntent with proper configuration
     console.log('Creating SetupIntent...')
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
@@ -97,7 +97,9 @@ Deno.serve(async (req) => {
       id: setupIntent.id,
       status: setupIntent.status,
       customer: customerId,
-      client_secret_present: !!setupIntent.client_secret
+      client_secret_present: !!setupIntent.client_secret,
+      client_secret_format: setupIntent.client_secret ? 
+        `${setupIntent.client_secret.substring(0, 20)}...` : 'none'
     })
 
     // Verify the SetupIntent was created properly
@@ -106,11 +108,22 @@ Deno.serve(async (req) => {
       throw new Error('Setup intent creation failed - no client secret')
     }
 
+    // Validate client_secret format
+    if (!setupIntent.client_secret.startsWith('seti_') || !setupIntent.client_secret.includes('_secret_')) {
+      console.error('Invalid client_secret format:', setupIntent.client_secret)
+      throw new Error('Invalid setup intent client secret format')
+    }
+
     // Wait a moment and verify we can retrieve the setup intent
     console.log('Verifying setup intent can be retrieved...')
     try {
+      await new Promise(resolve => setTimeout(resolve, 1000)) // 1 second delay
       const retrievedSetupIntent = await stripe.setupIntents.retrieve(setupIntent.id)
-      console.log('Setup intent verification successful:', retrievedSetupIntent.id)
+      console.log('Setup intent verification successful:', {
+        id: retrievedSetupIntent.id,
+        status: retrievedSetupIntent.status,
+        matches_original: retrievedSetupIntent.id === setupIntent.id
+      })
     } catch (verifyError) {
       console.error('Setup intent verification failed:', verifyError)
       throw new Error('Setup intent created but cannot be retrieved')
@@ -133,7 +146,8 @@ Deno.serve(async (req) => {
       message: error.message,
       stack: error.stack,
       code: error.code,
-      type: error.type
+      type: error.type,
+      timestamp: new Date().toISOString()
     })
     
     return new Response(JSON.stringify({ 

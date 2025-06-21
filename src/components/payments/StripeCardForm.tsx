@@ -53,7 +53,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
     }
 
     try {
-      console.log('Starting card addition process...');
+      console.log('=== STARTING CARD ADDITION PROCESS ===');
       
       // Get authenticated user
       const user = await getAuthenticatedUser();
@@ -76,38 +76,56 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       }
 
       const { client_secret, setup_intent_id, customer_id } = setupData;
-      console.log('Setup intent created:', { setup_intent_id, customer_id });
+      console.log('Setup intent created successfully:', { 
+        setup_intent_id, 
+        customer_id, 
+        client_secret_length: client_secret.length 
+      });
+
+      // Validate client_secret format
+      if (!client_secret.startsWith('seti_') || !client_secret.includes('_secret_')) {
+        console.error('Invalid client_secret format:', client_secret);
+        throw new Error('Invalid setup intent client secret format');
+      }
 
       // 2. Confirm the SetupIntent with Stripe.js
-      console.log('Confirming card setup...');
-      const { error, setupIntent } = await stripe.confirmCardSetup(client_secret, {
+      console.log('Confirming card setup with client_secret...');
+      const confirmResult = await stripe.confirmCardSetup(client_secret, {
         payment_method: {
           card: numberElement,
           billing_details: { 
-            email: user.email 
+            email: user.email,
+            name: label || `${cardType.toUpperCase()} Card`
           }
         }
       });
 
-      if (error) {
-        console.error('Card setup error:', error);
-        toast.error(error.message || "Card setup failed");
-        setLoading(false);
-        return;
+      if (confirmResult.error) {
+        console.error('Card setup confirmation error:', confirmResult.error);
+        throw new Error(confirmResult.error.message || "Card setup confirmation failed");
+      }
+
+      const { setupIntent } = confirmResult;
+      
+      if (!setupIntent) {
+        console.error('No setup intent returned from confirmation');
+        throw new Error("Setup intent confirmation failed - no result");
       }
 
       if (setupIntent.status !== 'succeeded') {
         console.error('Setup intent not succeeded:', setupIntent.status);
-        toast.error("Card setup was not completed successfully");
-        setLoading(false);
-        return;
+        throw new Error(`Card setup failed with status: ${setupIntent.status}`);
       }
 
-      console.log('Card setup confirmed:', setupIntent.id);
+      console.log('Card setup confirmed successfully:', {
+        id: setupIntent.id,
+        status: setupIntent.status,
+        payment_method: setupIntent.payment_method
+      });
       
-      // Add delay before calling backend to ensure setup intent is available
-      console.log('Waiting before saving card...');
-      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+      // Add delay before calling backend to ensure consistency
+      console.log('Waiting before saving card to database...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
       
       // 3. Save the payment method to our database using Supabase edge function
       console.log('Saving card to database...');
@@ -120,19 +138,21 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       });
       
       if (saveError) {
-        console.error('Save failed:', saveError);
+        console.error('Card save failed:', saveError);
         toast.error(saveError.message || "Failed to save card");
       } else if (!saveData?.success) {
-        console.error('Save failed:', saveData);
+        console.error('Card save failed:', saveData);
         toast.error(saveData?.error || "Failed to save card");
       } else {
         console.log('Card saved successfully:', saveData);
         toast.success(saveData.message || "Card added successfully!");
+        console.log('=== CARD ADDITION PROCESS COMPLETED ===');
         onSuccess();
       }
       
     } catch (error) {
-      console.error("Error adding card:", error);
+      console.error("=== CARD ADDITION PROCESS FAILED ===");
+      console.error("Error details:", error);
       toast.error(error instanceof Error ? error.message : "Failed to add card. Please try again.");
     } finally {
       setLoading(false);
