@@ -26,13 +26,16 @@ const TopUpWallet = () => {
     const success = searchParams.get('success');
     const canceled = searchParams.get('canceled');
     const topupAmount = searchParams.get('amount');
+    const sessionId = searchParams.get('session_id');
 
     if (success === 'true') {
+      console.log('Top-up success detected:', { topupAmount, sessionId });
       toast.success(`Successfully topped up $${topupAmount || 'your wallet'}!`);
       refetch(); // Refresh wallet balance
       // Clean up URL parameters
       navigate('/payments/topup', { replace: true });
     } else if (canceled === 'true') {
+      console.log('Top-up canceled detected');
       toast.error('Top-up was canceled');
       // Clean up URL parameters
       navigate('/payments/topup', { replace: true });
@@ -66,8 +69,6 @@ const TopUpWallet = () => {
     try {
       console.log('=== STARTING TOP-UP PROCESS ===');
       console.log('Amount:', amountValue);
-      console.log('Method:', method);
-      console.log('Note:', note);
 
       // Get current session to ensure we're authenticated
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -82,10 +83,9 @@ const TopUpWallet = () => {
         throw new Error('Please log in to continue.');
       }
 
-      console.log('User authenticated:', session.user.email);
+      console.log('User authenticated, calling create-topup-session...');
 
       // Call the create-topup-session function
-      console.log('Calling create-topup-session function...');
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
         body: { 
           amount: amountValue,
@@ -93,39 +93,27 @@ const TopUpWallet = () => {
         }
       });
 
-      console.log('=== FUNCTION RESPONSE ===');
-      console.log('Data:', data);
-      console.log('Error:', error);
+      console.log('Function response:', { data, error });
 
       if (error) {
         console.error('Function invocation error:', error);
         throw new Error(error.message || 'Failed to create payment session');
       }
 
-      if (!data) {
-        console.error('No data received from function');
-        throw new Error('No response received from payment processor');
-      }
-
-      if (!data.checkout_url) {
+      if (!data || !data.checkout_url) {
         console.error('No checkout URL in response:', data);
         throw new Error('No checkout URL received from payment processor');
       }
 
-      console.log('=== REDIRECTING TO STRIPE ===');
-      console.log('Checkout URL:', data.checkout_url);
+      console.log('Redirecting to Stripe checkout:', data.checkout_url);
       
-      // Add a small delay to ensure state is updated
-      setTimeout(() => {
-        // Use window.location.assign for better browser compatibility
-        window.location.assign(data.checkout_url);
-      }, 100);
+      // Use window.location.href for better compatibility
+      window.location.href = data.checkout_url;
 
     } catch (error) {
       console.error("=== TOP-UP ERROR ===");
       console.error("Error details:", error);
       
-      // Reset loading state on error
       setLoading(false);
       
       if (error instanceof Error) {
@@ -202,12 +190,12 @@ const TopUpWallet = () => {
               className="w-full mt-3" 
               disabled={loading}
             >
-              {loading ? "Redirecting to Stripe..." : `Top Up $${amount || '0.00'}`}
+              {loading ? "Processing..." : `Top Up $${amount || '0.00'}`}
             </Button>
 
             {loading && (
               <div className="text-center text-sm text-gray-600 mt-2">
-                Please wait while we redirect you to Stripe...
+                You will be redirected to Stripe to complete the payment...
               </div>
             )}
           </form>

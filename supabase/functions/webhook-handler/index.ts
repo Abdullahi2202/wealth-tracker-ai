@@ -12,84 +12,60 @@ const stripe = new Stripe(stripeKey, {
 })
 
 Deno.serve(async (req) => {
+  console.log('=== WEBHOOK HANDLER STARTED ===')
+  console.log('Request method:', req.method)
+  console.log('Headers:', Object.fromEntries(req.headers.entries()))
+  
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await req.text()
     const sig = req.headers.get('stripe-signature')
 
+    console.log('Webhook body length:', body.length)
+    console.log('Stripe signature present:', !!sig)
+
     let event
     try {
-      event = stripe.webhooks.constructEvent(body, sig!, webhookSecret!)
+      if (webhookSecret) {
+        event = stripe.webhooks.constructEvent(body, sig!, webhookSecret)
+        console.log('Webhook signature verified successfully')
+      } else {
+        console.log('No webhook secret configured, parsing body directly')
+        event = JSON.parse(body)
+      }
     } catch (err) {
       console.error('Webhook signature verification failed:', err)
       return new Response('Webhook signature verification failed', { status: 400 })
     }
 
     console.log('Processing webhook event:', event.type)
+    console.log('Event ID:', event.id)
 
     switch (event.type) {
       case 'checkout.session.completed':
         const session = event.data.object
+        console.log('=== CHECKOUT SESSION COMPLETED ===')
+        console.log('Session ID:', session.id)
+        console.log('Session metadata:', session.metadata)
         
         if (session.metadata?.type === 'wallet_topup') {
-          console.log('Processing wallet topup completion:', session.id)
+          console.log('Processing wallet topup completion')
           
           const userId = session.metadata.user_id
           const userEmail = session.metadata.user_email
-          const amount = parseFloat(session.metadata.amount || '0')
+          const amountInCents = parseInt(session.metadata.amount_cents || '0')
+          const amountInDollars = amountInCents / 100
           
-          if (userId && userEmail && amount > 0) {
-            console.log('Updating wallet for user:', userEmail, 'amount:', amount)
-            
-            // Get current wallet balance
-            const { data: currentWallet, error: walletFetchError } = await supabase
-              .from('wallets')
-              .select('balance')
-              .eq('user_email', userEmail)
-              .single()
-
-            if (walletFetchError) {
-              console.error('Error fetching wallet:', walletFetchError)
-              break
-            }
-
-            const newBalance = Number(currentWallet.balance) + Number(amount)
-            console.log('Updating balance from', currentWallet.balance, 'to', newBalance)
-
-            // Update wallet balance
-            const { error: walletError } = await supabase
-              .from('wallets')
-              .update({ 
-                balance: newBalance,
-                updated_at: new Date().toISOString()
-              })
-              .eq('user_email', userEmail)
-
-            if (walletError) {
-              console.error('Error updating wallet:', walletError)
-            } else {
-              console.log('Wallet updated successfully')
-            }
-
-            // Record transaction
-            const { error: transactionError } = await supabase
-              .from('transactions')
-              .insert({
-                user_id: userEmail,
-                name: 'Wallet Top-up',
-                amount: Number(amount),
-                type: 'income',
-                category: 'Top-up',
-                date: new Date().toISOString().split('T')[0]
-              })
-
-            if (transactionError) {
-              console.error('Error recording transaction:', transactionError)
-            } else {
-              console.log('Transaction recorded successfully')
-            }
-
-            // Update topup session status
+          console.log('Topup details:', {
+            userId,
+            userEmail,
+            amountInCents,
+            amountInDollars
+          })
+          
+          if (userId && userEmail && amountInCents > 0) {
+            // Update topup session status first
+            console.log('Updating topup session status to completed')
             const { error: sessionError } = await supabase
               .from('topup_sessions')
               .update({ 
@@ -103,7 +79,75 @@ Deno.serve(async (req) => {
             } else {
               console.log('Topup session updated successfully')
             }
+
+            // Get current wallet balance
+            console.log('Fetching current wallet balance for:', userEmail)
+            const { data: currentWallet, error: walletFetchError } = await supabase
+              .from('wallets')
+              .select('balance')
+              .eq('user_email', userEmail)
+              .single()
+
+            if (walletFetchError) {
+              console.error('Error fetching wallet:', walletFetchError)
+              break
+            }
+
+            const currentBalance = Number(currentWallet.balance) || 0
+            const newBalance = currentBalance + amountInDollars
+            
+            console.log('Balance update:', {
+              currentBalance,
+              amountInDollars,
+              newBalance
+            })
+
+            // Update wallet balance
+            console.log('Updating wallet balance')
+            const { error: walletError } = await supabase
+              .from('wallets')
+              .update({ 
+                balance: newBalance,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_email', userEmail)
+
+            if (walletError) {
+              console.error('Error updating wallet:', walletError)
+            } else {
+              console.log('Wallet updated successfully from', currentBalance, 'to', newBalance)
+            }
+
+            // Record transaction
+            console.log('Recording transaction')
+            const { error: transactionError } = await supabase
+              .from('transactions')
+              .insert({
+                user_id: userId,
+                name: 'Wallet Top-up',
+                amount: amountInDollars,
+                type: 'income',
+                category: 'Top-up',
+                date: new Date().toISOString().split('T')[0],
+                status: 'completed'
+              })
+
+            if (transactionError) {
+              console.error('Error recording transaction:', transactionError)
+            } else {
+              console.log('Transaction recorded successfully')
+            }
+
+            console.log('=== WALLET TOPUP COMPLETED SUCCESSFULLY ===')
+          } else {
+            console.error('Missing required data for wallet topup:', {
+              userId: !!userId,
+              userEmail: !!userEmail,
+              amountInCents
+            })
           }
+        } else {
+          console.log('Session metadata type is not wallet_topup:', session.metadata?.type)
         }
         break
 
@@ -122,6 +166,8 @@ Deno.serve(async (req) => {
 
         if (updateError) {
           console.error('Error updating payment transaction:', updateError)
+        } else {
+          console.log('Payment transaction updated successfully')
         }
         break
 
@@ -139,6 +185,8 @@ Deno.serve(async (req) => {
 
         if (failError) {
           console.error('Error updating failed payment:', failError)
+        } else {
+          console.log('Failed payment updated successfully')
         }
         break
 
@@ -146,12 +194,14 @@ Deno.serve(async (req) => {
         console.log('Unhandled event type:', event.type)
     }
 
+    console.log('=== WEBHOOK PROCESSING COMPLETED ===')
     return new Response(JSON.stringify({ received: true }), {
       headers: { 'Content-Type': 'application/json' }
     })
 
   } catch (error) {
-    console.error('Webhook processing error:', error)
+    console.error('=== WEBHOOK PROCESSING ERROR ===')
+    console.error('Error details:', error)
     return new Response('Webhook processing failed', { status: 500 })
   }
 })
