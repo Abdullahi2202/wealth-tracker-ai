@@ -55,21 +55,32 @@ Deno.serve(async (req) => {
       throw new Error('Invalid card payment method')
     }
 
-    console.log('Getting user from auth...')
-    const { data: authUser, error: authError } = await supabase.auth.admin.getUserByEmail(email)
-    if (authError || !authUser.user) {
-      console.error('Auth error:', authError)
-      throw new Error(`User not found: ${authError?.message || 'User lookup failed'}`)
+    console.log('Getting user from registration table...')
+    const { data: users, error: userError } = await supabase
+      .from('registration')
+      .select('id, email, full_name')
+      .eq('email', email)
+      .limit(1)
+
+    if (userError) {
+      console.error('Error fetching user:', userError)
+      throw new Error(`User lookup failed: ${userError.message}`)
     }
 
-    console.log('Found user:', authUser.user.id)
+    if (!users || users.length === 0) {
+      console.error('User not found in registration table')
+      throw new Error('User not found. Please ensure you are registered.')
+    }
+
+    const user = users[0]
+    console.log('Found user:', user.id)
 
     // Check if this payment method already exists
     const { data: existingMethod } = await supabase
       .from('payment_methods')
       .select('id')
       .eq('stripe_payment_method_id', paymentMethod.id)
-      .eq('user_id', authUser.user.id)
+      .eq('user_id', user.id)
       .maybeSingle()
     
     if (existingMethod) {
@@ -90,7 +101,7 @@ Deno.serve(async (req) => {
     const { data, error } = await supabase
       .from('payment_methods')
       .insert({
-        user_id: authUser.user.id,
+        user_id: user.id,
         stripe_payment_method_id: paymentMethod.id,
         stripe_customer_id: customerId,
         type: 'card',

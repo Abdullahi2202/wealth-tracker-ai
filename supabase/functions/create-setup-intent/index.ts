@@ -52,20 +52,34 @@ Deno.serve(async (req) => {
       console.log('Found existing customer:', customerId)
     }
 
-    // Get user from Supabase to ensure they exist
-    const { data: authUser, error: authError } = await supabase.auth.admin.getUserByEmail(email)
-    if (authError || !authUser.user) {
-      console.error('Auth error:', authError)
-      throw new Error(`User not found: ${authError?.message || 'User lookup failed'}`)
+    // Get user from Supabase using the correct method
+    console.log('Getting user from Supabase...')
+    const { data: users, error: userError } = await supabase
+      .from('registration')
+      .select('id, email, full_name')
+      .eq('email', email)
+      .limit(1)
+
+    if (userError) {
+      console.error('Error fetching user:', userError)
+      throw new Error(`User lookup failed: ${userError.message}`)
     }
 
-    console.log('Creating SetupIntent for user:', authUser.user.id)
+    if (!users || users.length === 0) {
+      console.error('User not found in registration table')
+      throw new Error('User not found. Please ensure you are registered.')
+    }
+
+    const user = users[0]
+    console.log('Found user:', user.id)
+
+    console.log('Creating SetupIntent for user:', user.id)
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ['card'],
       usage: 'off_session',
       metadata: {
-        user_id: authUser.user.id,
+        user_id: user.id,
         email: email
       }
     })
