@@ -15,15 +15,10 @@ Deno.serve(async (req) => {
   try {
     console.log('=== CREATE SETUP INTENT START ===')
     
-    if (!stripeKey) {
-      console.error('STRIPE_SECRET_KEY is not configured')
-      throw new Error('Payment system not configured')
-    }
-    
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { email } = await req.json()
 
-    console.log('Creating setup intent for email:', email)
+    console.log('Processing request for email:', email)
 
     if (!email) {
       throw new Error('Email is required')
@@ -31,7 +26,6 @@ Deno.serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
-      timeout: 20000, // 20 second timeout
     })
 
     // Find or create Stripe customer
@@ -44,22 +38,20 @@ Deno.serve(async (req) => {
     let customerId = customers.data[0]?.id
 
     if (!customerId) {
-      console.log('Creating new Stripe customer for:', email)
+      console.log('Creating new Stripe customer')
       const customer = await stripe.customers.create({ 
         email,
         metadata: {
-          source: 'payment_app',
-          created_at: new Date().toISOString()
+          source: 'wallet_app'
         }
       })
       customerId = customer.id
-      console.log('Created new customer:', customerId)
+      console.log('Created customer:', customerId)
     } else {
       console.log('Found existing customer:', customerId)
     }
 
     // Get user from registration table
-    console.log('Fetching user from registration table...')
     const { data: users, error: userError } = await supabase
       .from('registration')
       .select('id, email, full_name')
@@ -67,19 +59,18 @@ Deno.serve(async (req) => {
       .limit(1)
 
     if (userError) {
-      console.error('Error fetching user from registration:', userError)
+      console.error('User lookup error:', userError)
       throw new Error(`User lookup failed: ${userError.message}`)
     }
 
     if (!users || users.length === 0) {
-      console.error('User not found in registration table for email:', email)
       throw new Error('User not found. Please ensure you are registered.')
     }
 
     const user = users[0]
-    console.log('Found user in registration:', user.id)
+    console.log('Found user:', user.id)
 
-    // Create SetupIntent with proper configuration
+    // Create SetupIntent
     console.log('Creating SetupIntent...')
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
@@ -88,45 +79,18 @@ Deno.serve(async (req) => {
       metadata: {
         user_id: user.id,
         user_email: email,
-        created_by: 'payment_app',
-        timestamp: new Date().toISOString()
+        created_by: 'wallet_app'
       }
     })
 
-    console.log('SetupIntent created successfully:', {
+    console.log('SetupIntent created:', {
       id: setupIntent.id,
       status: setupIntent.status,
-      customer: customerId,
-      client_secret_present: !!setupIntent.client_secret,
-      client_secret_format: setupIntent.client_secret ? 
-        `${setupIntent.client_secret.substring(0, 20)}...` : 'none'
+      customer: customerId
     })
 
-    // Verify the SetupIntent was created properly
     if (!setupIntent.client_secret) {
-      console.error('SetupIntent created without client_secret')
-      throw new Error('Setup intent creation failed - no client secret')
-    }
-
-    // Validate client_secret format
-    if (!setupIntent.client_secret.startsWith('seti_') || !setupIntent.client_secret.includes('_secret_')) {
-      console.error('Invalid client_secret format:', setupIntent.client_secret)
-      throw new Error('Invalid setup intent client secret format')
-    }
-
-    // Wait a moment and verify we can retrieve the setup intent
-    console.log('Verifying setup intent can be retrieved...')
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000)) // 1 second delay
-      const retrievedSetupIntent = await stripe.setupIntents.retrieve(setupIntent.id)
-      console.log('Setup intent verification successful:', {
-        id: retrievedSetupIntent.id,
-        status: retrievedSetupIntent.status,
-        matches_original: retrievedSetupIntent.id === setupIntent.id
-      })
-    } catch (verifyError) {
-      console.error('Setup intent verification failed:', verifyError)
-      throw new Error('Setup intent created but cannot be retrieved')
+      throw new Error('SetupIntent created without client_secret')
     }
 
     console.log('=== CREATE SETUP INTENT SUCCESS ===')
@@ -142,18 +106,11 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('=== CREATE SETUP INTENT ERROR ===')
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      type: error.type,
-      timestamp: new Date().toISOString()
-    })
+    console.error('Error:', error.message)
     
     return new Response(JSON.stringify({ 
       error: error.message,
-      code: error.code || 'SETUP_INTENT_ERROR',
-      details: 'Failed to create payment setup'
+      code: 'SETUP_INTENT_ERROR'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -17,7 +17,6 @@ import { CardTypeSelect, CardType } from "./CardTypeSelect";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 
-// Use the test publishable key that matches your test secret key
 const STRIPE_PUBLISHABLE_KEY = "pk_test_51RXgVBRhotlUiiXdPUuoNpTNFEyH8HNLK9jFVg4lcrobEoNKtwH1QFUI4pWLCsMUFurVQEfrFxPahW8lDilmrp2j00iibXBiw8";
 
 export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
@@ -27,11 +26,10 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
   const [loading, setLoading] = useState(false);
   const [cardType, setCardType] = useState<CardType>("visa");
 
-  // Get logged in user's email from Supabase auth
   const getAuthenticatedUser = async () => {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user?.email) {
-      throw new Error('User not authenticated or email not available');
+      throw new Error('User not authenticated');
     }
     return user;
   };
@@ -39,7 +37,7 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) {
-      toast.error("Stripe is not loaded. Please check your Stripe configuration.");
+      toast.error("Stripe is not loaded");
       return;
     }
 
@@ -47,19 +45,18 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
 
     const numberElement = elements.getElement(CardNumberElement);
     if (!numberElement) {
-      toast.error("Card form not loaded.");
+      toast.error("Card form not loaded");
       setLoading(false);
       return;
     }
 
     try {
-      console.log('=== STARTING CARD ADDITION PROCESS ===');
+      console.log('=== STARTING CARD ADDITION ===');
       
-      // Get authenticated user
       const user = await getAuthenticatedUser();
       console.log('User authenticated:', user.email);
       
-      // 1. Create SetupIntent using Supabase edge function
+      // 1. Create SetupIntent
       console.log('Creating setup intent...');
       const { data: setupData, error: setupError } = await supabase.functions.invoke('create-setup-intent', {
         body: { email: user.email }
@@ -71,25 +68,14 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
       }
 
       if (!setupData?.client_secret || !setupData?.setup_intent_id) {
-        console.error('Invalid setup intent response:', setupData);
         throw new Error('Invalid response from setup intent creation');
       }
 
       const { client_secret, setup_intent_id, customer_id } = setupData;
-      console.log('Setup intent created successfully:', { 
-        setup_intent_id, 
-        customer_id, 
-        client_secret_length: client_secret.length 
-      });
+      console.log('Setup intent created:', { setup_intent_id, customer_id });
 
-      // Validate client_secret format
-      if (!client_secret.startsWith('seti_') || !client_secret.includes('_secret_')) {
-        console.error('Invalid client_secret format:', client_secret);
-        throw new Error('Invalid setup intent client secret format');
-      }
-
-      // 2. Confirm the SetupIntent with Stripe.js
-      console.log('Confirming card setup with client_secret...');
+      // 2. Confirm the SetupIntent
+      console.log('Confirming card setup...');
       const confirmResult = await stripe.confirmCardSetup(client_secret, {
         payment_method: {
           card: numberElement,
@@ -102,32 +88,18 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
 
       if (confirmResult.error) {
         console.error('Card setup confirmation error:', confirmResult.error);
-        throw new Error(confirmResult.error.message || "Card setup confirmation failed");
+        throw new Error(confirmResult.error.message || "Card setup failed");
       }
 
       const { setupIntent } = confirmResult;
       
-      if (!setupIntent) {
-        console.error('No setup intent returned from confirmation');
-        throw new Error("Setup intent confirmation failed - no result");
+      if (!setupIntent || setupIntent.status !== 'succeeded') {
+        throw new Error(`Card setup failed with status: ${setupIntent?.status || 'unknown'}`);
       }
 
-      if (setupIntent.status !== 'succeeded') {
-        console.error('Setup intent not succeeded:', setupIntent.status);
-        throw new Error(`Card setup failed with status: ${setupIntent.status}`);
-      }
-
-      console.log('Card setup confirmed successfully:', {
-        id: setupIntent.id,
-        status: setupIntent.status,
-        payment_method: setupIntent.payment_method
-      });
+      console.log('Card setup confirmed successfully');
       
-      // Add delay before calling backend to ensure consistency
-      console.log('Waiting before saving card to database...');
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-      
-      // 3. Save the payment method to our database using Supabase edge function
+      // 3. Save the payment method
       console.log('Saving card to database...');
       const { data: saveData, error: saveError } = await supabase.functions.invoke('add-stripe-card', {
         body: {
@@ -144,16 +116,16 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
         console.error('Card save failed:', saveData);
         toast.error(saveData?.error || "Failed to save card");
       } else {
-        console.log('Card saved successfully:', saveData);
-        toast.success(saveData.message || "Card added successfully!");
-        console.log('=== CARD ADDITION PROCESS COMPLETED ===');
+        console.log('Card saved successfully');
+        toast.success("Card added successfully!");
+        console.log('=== CARD ADDITION COMPLETED ===');
         onSuccess();
       }
       
     } catch (error) {
-      console.error("=== CARD ADDITION PROCESS FAILED ===");
-      console.error("Error details:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to add card. Please try again.");
+      console.error("=== CARD ADDITION FAILED ===");
+      console.error("Error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to add card");
     } finally {
       setLoading(false);
     }
@@ -167,22 +139,19 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
         style={{
           fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif"
         }}
-        aria-label="Credit Card Information"
       >
         <h2 className="text-2xl font-bold text-finance-purple flex items-center gap-2 mb-1">
           <CreditCard className="text-finance-purple" size={28} />
           Add your card details
         </h2>
         <p className="text-gray-500 text-base mb-3">
-          For your convenience, we've separated the fields into clear sections.
+          Enter your card information securely below.
         </p>
         
-        {/* Card Type Selector */}
         <div>
           <CardTypeSelect value={cardType} onChange={setCardType} />
         </div>
         
-        {/* Card Label */}
         <div>
           <label htmlFor="card-label" className="block font-medium text-gray-700 mb-2">
             Card display name <span className="text-gray-400 font-normal">(optional)</span>
@@ -196,62 +165,64 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
           />
         </div>
 
-        {/* Card Number */}
         <div className="relative flex flex-col gap-2">
           <label htmlFor="card-number" className="block font-medium text-gray-700 mb-2">
             Card Number
           </label>
           <div className="flex items-center border border-gray-200 rounded-lg bg-gray-50/90 shadow-inner focus-within:ring-2 ring-finance-blue/40 px-3 py-3">
             <CreditCard className="text-finance-blue mr-2" size={20} />
-            <CardNumberElement id="card-number" options={{
-              style: { base: { fontSize: "18px", fontFamily: "inherit", color: "#2d2d2d", "::placeholder": { color: "#b7b7b7" } } }
-            }} className="flex-1 text-lg bg-gray-50 outline-none border-none"
-              aria-label="Card Number"
+            <CardNumberElement 
+              id="card-number" 
+              options={{
+                style: { base: { fontSize: "18px", fontFamily: "inherit", color: "#2d2d2d" } }
+              }} 
+              className="flex-1 text-lg bg-gray-50 outline-none border-none"
             />
           </div>
         </div>
 
-        {/* Expiry Date */}
         <div className="relative flex flex-col gap-2">
           <label htmlFor="card-expiry" className="block font-medium text-gray-700 mb-2">
             Expiry Date <span className="text-gray-400 font-normal">(MM/YY)</span>
           </label>
           <div className="flex items-center border border-gray-200 rounded-lg bg-gray-50/90 shadow-inner focus-within:ring-2 ring-finance-blue/40 px-3 py-3">
             <Calendar className="text-finance-blue mr-2" size={20} />
-            <CardExpiryElement id="card-expiry" options={{
-              style: { base: { fontSize: "18px", fontFamily: "inherit", color: "#2d2d2d", "::placeholder": { color: "#b7b7b7" } } }
-            }} className="flex-1 text-lg bg-gray-50 outline-none border-none"
-              aria-label="Expiry Date"
+            <CardExpiryElement 
+              id="card-expiry" 
+              options={{
+                style: { base: { fontSize: "18px", fontFamily: "inherit", color: "#2d2d2d" } }
+              }} 
+              className="flex-1 text-lg bg-gray-50 outline-none border-none"
             />
           </div>
         </div>
 
-        {/* CVC */}
         <div className="relative flex flex-col gap-2">
           <label htmlFor="card-cvc" className="block font-medium text-gray-700 mb-2 flex items-center gap-1">
             CVC (Security Code)
             <TooltipProvider>
               <Tooltip delayDuration={200}>
                 <TooltipTrigger asChild>
-                  <Lock className="ml-1 text-gray-400 hover:text-finance-purple cursor-pointer" size={18} tabIndex={0} aria-label="More info" />
+                  <Lock className="ml-1 text-gray-400 hover:text-finance-purple cursor-pointer" size={18} />
                 </TooltipTrigger>
                 <TooltipContent className="bg-white border shadow-md text-sm font-normal max-w-xs">
-                  The 3-digit code on the back of your card. For American Express, it's the 4-digit code on the front.
+                  The 3-digit code on the back of your card
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </label>
           <div className="flex items-center border border-gray-200 rounded-lg bg-gray-50/90 shadow-inner focus-within:ring-2 ring-finance-blue/40 px-3 py-3">
             <Lock className="text-finance-blue mr-2" size={20} />
-            <CardCvcElement id="card-cvc" options={{
-              style: { base: { fontSize: "18px", fontFamily: "inherit", color: "#2d2d2d", "::placeholder": { color: "#b7b7b7" } } }
-            }} className="flex-1 text-lg bg-gray-50 outline-none border-none"
-              aria-label="CVC"
+            <CardCvcElement 
+              id="card-cvc" 
+              options={{
+                style: { base: { fontSize: "18px", fontFamily: "inherit", color: "#2d2d2d" } }
+              }} 
+              className="flex-1 text-lg bg-gray-50 outline-none border-none"
             />
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-3 mt-4 w-full">
           <Button
             type="button"
@@ -275,7 +246,6 @@ export function StripeCardForm({ onSuccess, onCancel }: { onSuccess: () => void;
   );
 }
 
-// Wrapper for loading Stripe.js before using the Card form.
 export default function StripeCardFormWrapper(props: { onSuccess: () => void; onCancel: () => void }) {
   const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
   return (

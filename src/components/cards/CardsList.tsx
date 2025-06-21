@@ -32,27 +32,13 @@ interface PaymentMethod {
   updated_at: string;
 }
 
-interface TestCard {
-  id: string;
-  stripe_customer_id: string;
-  stripe_payment_method_id: string;
-  stripe_setup_intent_id?: string;
-  card_brand?: string;
-  card_last4?: string;
-  card_exp_month?: number;
-  card_exp_year?: number;
-  label?: string;
-  status: string;
-  created_at: string;
-}
-
 const CardsList = () => {
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
   const [checkingVerification, setCheckingVerification] = useState(true);
   const navigate = useNavigate();
 
-  // Fetch verification status
+  // Check verification status
   useEffect(() => {
     async function fetchVerification() {
       setCheckingVerification(true);
@@ -86,7 +72,6 @@ const CardsList = () => {
       console.log('Fetching payment methods...');
       
       try {
-        // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           console.log('No authenticated user found');
@@ -95,7 +80,7 @@ const CardsList = () => {
 
         console.log('Current user:', user.id);
 
-        // Check in registration table for existence
+        // Check registration table
         const { data: userData, error: userError } = await supabase
           .from('registration')
           .select('id, email, full_name')
@@ -108,13 +93,12 @@ const CardsList = () => {
 
         if (!userData && user.email) {
           console.log('User not found in registration table, creating...');
-          // Create registration record if it doesn't exist
           const { error: insertError } = await supabase
             .from('registration')
             .insert({
               email: user.email,
               full_name: user.user_metadata?.full_name || user.email,
-              password: 'temp', // Temporary password for existing users
+              password: 'temp',
             });
 
           if (insertError) {
@@ -122,10 +106,10 @@ const CardsList = () => {
           }
         }
 
-        // Fetch payment methods with proper type safety
+        // Fetch payment methods
         const { data, error } = await supabase
           .from('payment_methods')
-          .select('id, type, brand, last4, exp_month, exp_year, is_default, is_active, label, stripe_payment_method_id, stripe_customer_id, created_at, updated_at')
+          .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .order('created_at', { ascending: false });
@@ -139,34 +123,6 @@ const CardsList = () => {
         return data || [];
       } catch (error) {
         console.error('Error in fetchMethods:', error);
-        return [];
-      }
-    },
-  });
-
-  // Fetch test cards for additional data
-  const { data: testCards } = useQuery({
-    queryKey: ['test-cards'],
-    queryFn: async (): Promise<TestCard[]> => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
-
-        const { data, error } = await supabase
-          .from('stripe_test_cards')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('Error fetching test cards:', error);
-          return [];
-        }
-
-        return data || [];
-      } catch (error) {
-        console.error('Error fetching test cards:', error);
         return [];
       }
     },
@@ -191,11 +147,10 @@ const CardsList = () => {
 
   const setDefaultPaymentMethod = async (paymentMethodId: string) => {
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
-      // First, unset all other default payment methods for this user
+      // Unset all other defaults
       const { error: unsetError } = await supabase
         .from('payment_methods')
         .update({ is_default: false })
@@ -203,7 +158,7 @@ const CardsList = () => {
 
       if (unsetError) throw unsetError;
 
-      // Then set the selected one as default
+      // Set selected as default
       const { error: setError } = await supabase
         .from('payment_methods')
         .update({ is_default: true })
@@ -246,13 +201,12 @@ const CardsList = () => {
         </div>
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Checking identity verification status...</p>
+          <p className="text-slate-600">Checking verification status...</p>
         </div>
       </div>
     );
   }
 
-  // Restrict adding cards if not verified
   const canAddCard = verificationStatus === "approved" || verificationStatus === "verified";
   if (!canAddCard) {
     return (
@@ -272,7 +226,7 @@ const CardsList = () => {
             <CreditCard className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-medium mb-2">Verification Required</h3>
             <p className="text-muted-foreground mb-4">
-              You must verify your identity before adding or managing payment methods.
+              You must verify your identity before adding payment methods.
             </p>
             <Button onClick={() => navigate("/verify-identity")}>
               Go to Identity Verification
@@ -291,7 +245,7 @@ const CardsList = () => {
         </div>
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading your payment methods...</p>
+          <p className="text-slate-600">Loading payment methods...</p>
         </div>
       </div>
     );
@@ -304,7 +258,7 @@ const CardsList = () => {
           <h1 className="text-2xl font-bold">Payment Methods</h1>
         </div>
         <div className="text-center py-8">
-          <p className="text-red-600">Error loading payment methods. Please try again.</p>
+          <p className="text-red-600">Error loading payment methods</p>
           <Button onClick={() => refetch()} className="mt-4">
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
@@ -329,25 +283,6 @@ const CardsList = () => {
           </Button>
         </div>
       </div>
-
-      {/* Show Test Cards Debug Info */}
-      {testCards && testCards.length > 0 && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardHeader>
-            <CardTitle className="text-sm text-blue-800">Test Cards Data</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs text-blue-700 space-y-1">
-              {testCards.map((card) => (
-                <div key={card.id} className="flex justify-between">
-                  <span>{card.card_brand} **** {card.card_last4}</span>
-                  <span>{card.stripe_payment_method_id?.substring(0, 20)}...</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {paymentMethods && paymentMethods.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -400,11 +335,6 @@ const CardsList = () => {
                     <p className="text-sm text-muted-foreground">
                       Added {new Date(method.created_at).toLocaleDateString()}
                     </p>
-                    {method.stripe_payment_method_id && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        ID: {method.stripe_payment_method_id.substring(0, 15)}...
-                      </p>
-                    )}
                   </div>
                   {method.is_default && (
                     <Badge variant="default">Default</Badge>
