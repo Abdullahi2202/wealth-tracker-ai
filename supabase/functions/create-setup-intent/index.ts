@@ -79,16 +79,12 @@ Deno.serve(async (req) => {
     const user = users[0]
     console.log('Found user in registration:', user.id)
 
-    // Create SetupIntent with proper configuration
+    // Create SetupIntent with FIXED configuration - use only payment_method_types, not automatic_payment_methods
     console.log('Creating SetupIntent...')
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
-      payment_method_types: ['card'],
+      payment_method_types: ['card'], // Only specify this, not automatic_payment_methods
       usage: 'off_session',
-      automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: 'never'
-      },
       metadata: {
         user_id: user.id,
         user_email: email,
