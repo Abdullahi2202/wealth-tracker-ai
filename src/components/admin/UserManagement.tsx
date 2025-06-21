@@ -6,13 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, Download, Eye, Edit, Trash2, CheckCircle, XCircle, Clock, RefreshCw, Plus, UserCheck, UserX } from "lucide-react";
+import { Search, Filter, Download, Eye, Edit, Trash2, CheckCircle, XCircle, Clock, RefreshCw, Plus, UserCheck, UserX, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+
+interface VerificationRequest {
+  id: string;
+  document_type: string;
+  document_number: string;
+  image_url: string;
+  status: string;
+  created_at: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+}
 
 interface User {
   id: string;
@@ -26,6 +36,7 @@ interface User {
   created_at: string;
   is_active?: boolean;
   updated_at?: string;
+  identity_verification_requests?: VerificationRequest[];
 }
 
 interface CreateUserData {
@@ -45,6 +56,7 @@ const UserManagement = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showViewDialog, setShowViewDialog] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
   const [createUserData, setCreateUserData] = useState<CreateUserData>({
     email: "",
     full_name: "",
@@ -146,7 +158,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (user: User) => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       return;
     }
@@ -154,7 +166,7 @@ const UserManagement = () => {
     try {
       const { data, error } = await supabase.functions.invoke('user-management', {
         method: 'DELETE',
-        body: { id: userId }
+        body: { id: user.id, email: user.email }
       });
 
       if (error) {
@@ -171,13 +183,13 @@ const UserManagement = () => {
     }
   };
 
-  const handleVerificationStatus = async (userId: string, status: 'verified' | 'pending' | 'rejected') => {
+  const handleVerificationStatus = async (user: User, status: 'verified' | 'pending' | 'rejected') => {
     try {
       const { data, error } = await supabase.functions.invoke('user-management', {
         method: 'PUT',
         body: {
-          id: userId,
-          action: 'update',
+          id: user.id,
+          email: user.email,
           verification_status: status
         }
       });
@@ -203,6 +215,16 @@ const UserManagement = () => {
       return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
     }
     return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+  };
+
+  const getLatestVerificationRequest = (user: User): VerificationRequest | null => {
+    if (!user.identity_verification_requests || user.identity_verification_requests.length === 0) {
+      return null;
+    }
+    
+    return user.identity_verification_requests.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0];
   };
 
   const filteredUsers = users.filter(user => {
@@ -292,8 +314,7 @@ const UserManagement = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="passport">Passport</SelectItem>
-                      <SelectItem value="id_card">ID Card</SelectItem>
-                      <SelectItem value="driver_license">Driver License</SelectItem>
+                      <SelectItem value="license">Driver License</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -387,165 +408,218 @@ const UserManagement = () => {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead>Document</TableHead>
+                <TableHead>Verification Document</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                        <span className="text-sm font-medium text-blue-700">
-                          {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="font-medium">{user.full_name || 'N/A'}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      {user.phone && (
-                        <div className="text-sm">{user.phone}</div>
-                      )}
-                      {user.passport_number && (
-                        <div className="text-sm text-muted-foreground">ID: {user.passport_number}</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="capitalize">{user.document_type || 'passport'}</div>
-                      {user.passport_number && <div className="text-muted-foreground">ID: {user.passport_number}</div>}
-                      {user.image_url && (
-                        <div className="pt-1">
-                          <img
-                            src={user.image_url}
-                            alt="Document"
-                            className="max-h-14 max-w-28 rounded border border-gray-200"
-                          />
+              {filteredUsers.map((user) => {
+                const latestRequest = getLatestVerificationRequest(user);
+                
+                return (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-700">
+                            {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(user)}</TableCell>
-                  <TableCell>
-                    {format(new Date(user.created_at), 'MMM dd, yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1 flex-wrap">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>User Details</DialogTitle>
-                          </DialogHeader>
-                          <div className="grid gap-4 py-4">
-                            <div><strong>Name:</strong> {user.full_name}</div>
-                            <div><strong>Email:</strong> {user.email}</div>
-                            <div><strong>Phone:</strong> {user.phone || 'N/A'}</div>
-                            <div><strong>Document:</strong> {user.passport_number || 'N/A'}</div>
-                            <div><strong>Type:</strong> {user.document_type || 'passport'}</div>
-                            <div><strong>Status:</strong> {user.verification_status}</div>
-                            <div><strong>Created:</strong> {format(new Date(user.created_at), 'PPP')}</div>
+                        <div>
+                          <div className="font-medium">{user.full_name || 'N/A'}</div>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        {user.phone && (
+                          <div className="text-sm">{user.phone}</div>
+                        )}
+                        {(user.passport_number || latestRequest?.document_number) && (
+                          <div className="text-sm text-muted-foreground">
+                            ID: {user.passport_number || latestRequest?.document_number}
                           </div>
-                        </DialogContent>
-                      </Dialog>
-                      
-                      {user.verification_status === 'pending' && (
-                        <>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleVerificationStatus(user.id, 'verified')}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            <UserCheck className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleVerificationStatus(user.id, 'rejected')}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <UserX className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                      
-                      <Dialog open={showEditDialog && selectedUser?.id === user.id} onOpenChange={(open) => {
-                        setShowEditDialog(open);
-                        if (!open) setSelectedUser(null);
-                      }}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit User</DialogTitle>
-                          </DialogHeader>
-                          {selectedUser && (
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {latestRequest ? (
+                          <>
+                            <div className="capitalize">{latestRequest.document_type}</div>
+                            <div className="text-muted-foreground">
+                              Submitted: {format(new Date(latestRequest.created_at), 'MMM dd, yyyy')}
+                            </div>
+                            {latestRequest.image_url && (
+                              <div className="pt-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedDocument(latestRequest.image_url)}
+                                  className="h-6 text-xs"
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  View Document
+                                </Button>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-muted-foreground">No document submitted</div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(user)}</TableCell>
+                    <TableCell>
+                      {format(new Date(user.created_at), 'MMM dd, yyyy')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>User Details - {user.full_name}</DialogTitle>
+                            </DialogHeader>
                             <div className="grid gap-4 py-4">
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit_email" className="text-right">Email</Label>
-                                <Input
-                                  id="edit_email"
-                                  value={selectedUser.email}
-                                  onChange={(e) => setSelectedUser(prev => prev ? { ...prev, email: e.target.value } : null)}
-                                  className="col-span-3"
-                                />
-                              </div>
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit_name" className="text-right">Full Name</Label>
-                                <Input
-                                  id="edit_name"
-                                  value={selectedUser.full_name}
-                                  onChange={(e) => setSelectedUser(prev => prev ? { ...prev, full_name: e.target.value } : null)}
-                                  className="col-span-3"
-                                />
-                              </div>
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit_phone" className="text-right">Phone</Label>
-                                <Input
-                                  id="edit_phone"
-                                  value={selectedUser.phone || ''}
-                                  onChange={(e) => setSelectedUser(prev => prev ? { ...prev, phone: e.target.value } : null)}
-                                  className="col-span-3"
-                                />
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <h4 className="font-medium">Personal Information</h4>
+                                  <div className="text-sm space-y-1 mt-2">
+                                    <div><strong>Name:</strong> {user.full_name}</div>
+                                    <div><strong>Email:</strong> {user.email}</div>
+                                    <div><strong>Phone:</strong> {user.phone || 'N/A'}</div>
+                                    <div><strong>Status:</strong> {user.verification_status}</div>
+                                    <div><strong>Created:</strong> {format(new Date(user.created_at), 'PPP')}</div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <h4 className="font-medium">Verification Requests</h4>
+                                  <div className="text-sm space-y-2 mt-2">
+                                    {user.identity_verification_requests?.length ? (
+                                      user.identity_verification_requests.map((request, index) => (
+                                        <div key={request.id} className="border rounded p-2">
+                                          <div><strong>Type:</strong> {request.document_type}</div>
+                                          <div><strong>Number:</strong> {request.document_number}</div>
+                                          <div><strong>Status:</strong> {request.status}</div>
+                                          <div><strong>Submitted:</strong> {format(new Date(request.created_at), 'PPp')}</div>
+                                          {request.reviewed_at && (
+                                            <div><strong>Reviewed:</strong> {format(new Date(request.reviewed_at), 'PPp')}</div>
+                                          )}
+                                          {request.image_url && (
+                                            <Button
+                                              variant="link"
+                                              size="sm"
+                                              onClick={() => setSelectedDocument(request.image_url)}
+                                              className="h-6 p-0 text-xs"
+                                            >
+                                              View Document
+                                            </Button>
+                                          )}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="text-muted-foreground">No verification requests</div>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          )}
-                          <DialogFooter>
-                            <Button variant="outline" onClick={() => {setShowEditDialog(false); setSelectedUser(null);}}>Cancel</Button>
-                            <Button onClick={handleUpdateUser}>Update User</Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          </DialogContent>
+                        </Dialog>
+                        
+                        {user.verification_status === 'pending' && (
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleVerificationStatus(user, 'verified')}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <UserCheck className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleVerificationStatus(user, 'rejected')}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <UserX className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        
+                        <Dialog open={showEditDialog && selectedUser?.id === user.id} onOpenChange={(open) => {
+                          setShowEditDialog(open);
+                          if (!open) setSelectedUser(null);
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Edit User</DialogTitle>
+                            </DialogHeader>
+                            {selectedUser && (
+                              <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="edit_email" className="text-right">Email</Label>
+                                  <Input
+                                    id="edit_email"
+                                    value={selectedUser.email}
+                                    onChange={(e) => setSelectedUser(prev => prev ? { ...prev, email: e.target.value } : null)}
+                                    className="col-span-3"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="edit_name" className="text-right">Full Name</Label>
+                                  <Input
+                                    id="edit_name"
+                                    value={selectedUser.full_name}
+                                    onChange={(e) => setSelectedUser(prev => prev ? { ...prev, full_name: e.target.value } : null)}
+                                    className="col-span-3"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="edit_phone" className="text-right">Phone</Label>
+                                  <Input
+                                    id="edit_phone"
+                                    value={selectedUser.phone || ''}
+                                    onChange={(e) => setSelectedUser(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                                    className="col-span-3"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => {setShowEditDialog(false); setSelectedUser(null);}}>Cancel</Button>
+                              <Button onClick={handleUpdateUser}>Update User</Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteUser(user)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           
@@ -560,6 +634,37 @@ const UserManagement = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Document Viewer Dialog */}
+      <Dialog open={!!selectedDocument} onOpenChange={() => setSelectedDocument(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Identity Document</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center p-4">
+            {selectedDocument && (
+              <img
+                src={selectedDocument}
+                alt="Identity Document"
+                className="max-w-full max-h-96 object-contain border rounded"
+                onError={(e) => {
+                  console.error('Error loading image:', selectedDocument);
+                  toast.error('Failed to load document image');
+                }}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedDocument(null)}>Close</Button>
+            {selectedDocument && (
+              <Button onClick={() => window.open(selectedDocument, '_blank')}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open in New Tab
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

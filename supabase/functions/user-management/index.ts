@@ -18,53 +18,63 @@ Deno.serve(async (req) => {
 
     switch (method) {
       case 'GET':
-        console.log('Fetching all users...')
+        console.log('Fetching all users with verification data...')
         
-        // Try to fetch from multiple sources and combine the data
-        const sources = [
-          // Fetch from registration table
-          supabase
-            .from('registration')
-            .select('*')
-            .order('created_at', { ascending: false }),
-          
-          // Fetch from users table if it exists
-          supabase
-            .from('users')
-            .select('*')
-            .order('created_at', { ascending: false }),
-            
-          // Fetch from profiles table
-          supabase
-            .from('profiles')
-            .select('*')
-            .order('created_at', { ascending: false })
-        ]
+        // Fetch users from registration table with their verification requests
+        const { data: users, error: usersError } = await supabase
+          .from('registration')
+          .select(`
+            *,
+            identity_verification_requests (
+              id,
+              document_type,
+              document_number,
+              image_url,
+              status,
+              created_at,
+              reviewed_by,
+              reviewed_at
+            )
+          `)
+          .order('created_at', { ascending: false })
 
-        const results = await Promise.allSettled(sources)
-        let allUsers: any[] = []
+        if (usersError) {
+          console.error('Error fetching users:', usersError)
+          return new Response(JSON.stringify({ error: usersError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
 
-        // Combine data from all sources
-        results.forEach((result, index) => {
-          if (result.status === 'fulfilled' && result.value.data) {
-            console.log(`Source ${index} returned ${result.value.data.length} users`)
-            allUsers = [...allUsers, ...result.value.data]
-          } else if (result.status === 'rejected') {
-            console.log(`Source ${index} failed:`, result.reason)
-          }
-        })
+        // Also try to fetch from profiles table to get additional user data
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false })
 
-        // Remove duplicates by email
-        const uniqueUsers = allUsers.reduce((acc, user) => {
-          const existing = acc.find((u: any) => u.email === user.email)
-          if (!existing) {
-            acc.push(user)
-          }
-          return acc
-        }, [])
+        let allUsers = users || []
 
-        console.log('Total unique users found:', uniqueUsers.length)
-        return new Response(JSON.stringify(uniqueUsers), {
+        // Merge profile data if available
+        if (profiles && !profilesError) {
+          profiles.forEach(profile => {
+            const existingUser = allUsers.find(user => user.email === profile.email)
+            if (!existingUser && profile.email) {
+              // Add profile as a user if not already in registration
+              allUsers.push({
+                id: profile.id,
+                email: profile.email,
+                full_name: profile.full_name,
+                phone: profile.phone,
+                created_at: profile.created_at,
+                verification_status: 'pending',
+                identity_verification_requests: []
+              })
+            }
+          })
+        }
+
+        console.log('Total users found:', allUsers.length)
+        return new Response(JSON.stringify(allUsers), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
 
@@ -110,7 +120,7 @@ Deno.serve(async (req) => {
             passport_number: passport_number || null,
             document_type: document_type || 'passport',
             verification_status: 'pending',
-            password: 'temp_password' // Required field
+            password: 'temp_password'
           })
           .select()
           .single()
@@ -159,7 +169,7 @@ Deno.serve(async (req) => {
         const updateBody = await req.json()
         console.log('Update request body:', updateBody)
         
-        const { id, action, ...updates } = updateBody
+        const { id, action, verification_status, ...updates } = updateBody
         
         if (!id) {
           return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -168,7 +178,37 @@ Deno.serve(async (req) => {
           })
         }
 
-        // Update in registration table
+        // Handle verification status updates
+        if (verification_status) {
+          // Update verification status in registration table
+          const { error: regUpdateError } = await supabase
+            .from('registration')
+            .update({ 
+              verification_status,
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', id)
+
+          if (regUpdateError) {
+            console.error('Error updating registration verification status:', regUpdateError)
+          }
+
+          // Update related identity verification requests
+          const { error: verifyUpdateError } = await supabase
+            .from('identity_verification_requests')
+            .update({ 
+              status: verification_status,
+              reviewed_at: new Date().toISOString(),
+              reviewed_by: 'Admin'
+            })
+            .eq('user_email', updates.email || '')
+
+          if (verifyUpdateError) {
+            console.error('Error updating verification request:', verifyUpdateError)
+          }
+        }
+
+        // Update other user details
         const { data: updatedUser, error: updateError } = await supabase
           .from('registration')
           .update({ ...updates, updated_at: new Date().toISOString() })
@@ -177,31 +217,14 @@ Deno.serve(async (req) => {
           .single()
 
         if (updateError) {
-          console.error('Error updating user in registration:', updateError)
-          
-          // Try updating in users table if registration update fails
-          const { data: userUpdate, error: userError } = await supabase
-            .from('users')
-            .update({ ...updates, updated_at: new Date().toISOString() })
-            .eq('id', id)
-            .select()
-            .single()
-
-          if (userError) {
-            console.error('Error updating user in users table:', userError)
-            return new Response(JSON.stringify({ error: 'Failed to update user' }), {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
-          }
-
-          console.log('User updated in users table:', userUpdate)
-          return new Response(JSON.stringify(userUpdate), {
+          console.error('Error updating user:', updateError)
+          return new Response(JSON.stringify({ error: 'Failed to update user' }), {
+            status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
 
-        // Also update profiles table if full_name, phone, or email changed
+        // Also update profiles table if relevant fields changed
         if (updates.full_name || updates.phone || updates.email) {
           const profileUpdates: any = {}
           if (updates.full_name) profileUpdates.full_name = updates.full_name
@@ -242,11 +265,11 @@ Deno.serve(async (req) => {
           .delete()
           .eq('id', deleteId)
 
-        // Delete from users table
-        const { error: userDeleteError } = await supabase
-          .from('users')
+        // Delete identity verification requests
+        const { error: verifyDeleteError } = await supabase
+          .from('identity_verification_requests')
           .delete()
-          .eq('id', deleteId)
+          .eq('user_email', deleteBody.email || '')
 
         // Delete from auth (this will cascade to profiles due to foreign key)
         const { error: authDeleteError } = await supabase.auth.admin.deleteUser(deleteId)
