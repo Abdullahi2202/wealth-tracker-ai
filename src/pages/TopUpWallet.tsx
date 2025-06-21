@@ -83,13 +83,13 @@ const TopUpWallet = () => {
 
       console.log('Request body to send:', requestBody);
 
-      // Create Stripe checkout session for top-up using direct fetch
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/create-topup-session`, {
+      // Create Stripe checkout session for top-up using direct fetch with hardcoded URL and key
+      const response = await fetch(`https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/create-topup-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': supabase.supabaseKey
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiaHRpZnFtbGtkb2V2eG1iam1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcyOTY3MjYsImV4cCI6MjA2Mjg3MjcyNn0.USk2Wi_HbcfFni8TTyZMqAjdbGC3eVIvqZvWm5dq_i8'
         },
         body: requestBody
       });
