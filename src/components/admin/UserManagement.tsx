@@ -213,40 +213,6 @@ const UserManagement = () => {
     }
   };
 
-  const handleCreateUser = async () => {
-    try {
-      if (!createUserData.email || !createUserData.full_name) {
-        toast.error('Email and full name are required');
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'POST',
-        body: createUserData
-      });
-
-      if (error) {
-        console.error('Error creating user:', error);
-        toast.error('Failed to create user: ' + error.message);
-        return;
-      }
-
-      toast.success('User created successfully');
-      setShowCreateDialog(false);
-      setCreateUserData({
-        email: "",
-        full_name: "",
-        phone: "",
-        passport_number: "",
-        document_type: "passport"
-      });
-      fetchUsers();
-    } catch (error: any) {
-      console.error('Error creating user:', error);
-      toast.error('Failed to create user: ' + error.message);
-    }
-  };
-
   const getStatusBadge = (user: User) => {
     const status = user.verification_status || 'pending';
     if (status === 'verified') {
@@ -727,43 +693,43 @@ const UserManagement = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">Email</Label>
+              <Label htmlFor="create_email" className="text-right">Email</Label>
               <Input
-                id="email"
+                id="create_email"
                 value={createUserData.email}
                 onChange={(e) => setCreateUserData(prev => ({ ...prev, email: e.target.value }))}
                 className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="full_name" className="text-right">Full Name</Label>
+              <Label htmlFor="create_full_name" className="text-right">Full Name</Label>
               <Input
-                id="full_name"
+                id="create_full_name"
                 value={createUserData.full_name}
                 onChange={(e) => setCreateUserData(prev => ({ ...prev, full_name: e.target.value }))}
                 className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">Phone</Label>
+              <Label htmlFor="create_phone" className="text-right">Phone</Label>
               <Input
-                id="phone"
+                id="create_phone"
                 value={createUserData.phone}
                 onChange={(e) => setCreateUserData(prev => ({ ...prev, phone: e.target.value }))}
                 className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="passport_number" className="text-right">Document ID</Label>
+              <Label htmlFor="create_passport_number" className="text-right">Document ID</Label>
               <Input
-                id="passport_number"
+                id="create_passport_number"
                 value={createUserData.passport_number}
                 onChange={(e) => setCreateUserData(prev => ({ ...prev, passport_number: e.target.value }))}
                 className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="document_type" className="text-right">Document Type</Label>
+              <Label htmlFor="create_document_type" className="text-right">Document Type</Label>
               <Select value={createUserData.document_type} onValueChange={(value) => setCreateUserData(prev => ({ ...prev, document_type: value }))}>
                 <SelectTrigger className="col-span-3">
                   <SelectValue />
