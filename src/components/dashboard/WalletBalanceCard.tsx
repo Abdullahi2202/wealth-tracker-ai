@@ -31,7 +31,7 @@ const WalletBalanceCard = ({ className = "" }: WalletBalanceCardProps) => {
               ) : (
                 <h3 className="text-2xl font-bold text-gray-900">
                   ${balance.toLocaleString("en-US", {
-                    minimimFractionDigits: 2,
+                    minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
                 </h3>

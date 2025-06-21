@@ -73,8 +73,9 @@ export function useWallet() {
   useEffect(() => {
     fetchWallet(); // initial load
     
-    const { data: { user } } = supabase.auth.getUser().then(({ data }) => {
-      if (!data.user?.email) return;
+    const setupRealtime = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) return;
       
       const channel = supabase
         .channel("wallet-changes")
@@ -84,7 +85,7 @@ export function useWallet() {
             event: "UPDATE",
             schema: "public",
             table: "wallets",
-            filter: `user_email=eq.${data.user.email}`,
+            filter: `user_email=eq.${user.email}`,
           },
           (payload) => {
             console.log('Real-time wallet update:', payload.new);
@@ -96,7 +97,9 @@ export function useWallet() {
       return () => {
         supabase.removeChannel(channel);
       };
-    });
+    };
+
+    setupRealtime();
   }, [fetchWallet]);
 
   // Add funds to wallet using edge function
