@@ -64,9 +64,29 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // 🌱 Use the lovely pre-parsed body that Supabase gives us! 💌
-    const requestBody = req.body
-    console.log('Request body received (pre-parsed by Supabase):', requestBody)
+    // 🔍 ROBUST BODY PARSING WITH FALLBACK 🔍
+    let requestBody
+    try {
+      // First try req.body (pre-parsed by Supabase)
+      requestBody = req.body
+      console.log('BODY RECEIVED (req.body):', requestBody)
+      
+      // If req.body is empty/undefined, try manual parsing
+      if (!requestBody || Object.keys(requestBody).length === 0) {
+        console.log('req.body was empty, trying manual parsing...')
+        requestBody = await req.json()
+        console.log('BODY RECEIVED (await req.json()):', requestBody)
+      }
+    } catch (parseError) {
+      console.error('Body parsing error:', parseError)
+      return new Response(JSON.stringify({ 
+        error: 'Invalid request body format',
+        success: false 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // Validate the request body with gentle error handling
     if (!requestBody || typeof requestBody !== 'object') {
