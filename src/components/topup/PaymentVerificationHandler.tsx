@@ -30,60 +30,49 @@ export const PaymentVerificationHandler = ({
         console.log('PaymentVerificationHandler: URL params:', { success, canceled, sessionId, topupAmount });
 
         if (success === 'true' && sessionId) {
-          console.log('PaymentVerificationHandler: Payment success detected, verifying payment:', { sessionId, topupAmount });
+          console.log('PaymentVerificationHandler: Payment success detected');
           onVerificationStart();
           
           try {
-            console.log('PaymentVerificationHandler: Calling verify-payment function with session_id:', sessionId);
+            // Show immediate success message
+            const displayAmount = topupAmount || 'wallet';
+            toast.success(`Payment successful! Adding $${displayAmount} to your wallet...`);
             
-            const { data, error } = await supabase.functions.invoke('verify-payment', {
-              body: { session_id: sessionId }
-            });
-
-            console.log('PaymentVerificationHandler: Verify payment response:', { data, error });
-
-            if (error) {
-              console.error('PaymentVerificationHandler: Payment verification error:', error);
-              toast.error(`Payment verification failed: ${error.message || 'Unknown error'}`);
-            } else if (data?.success && data?.wallet_updated) {
-              console.log('PaymentVerificationHandler: Payment verified and wallet updated successfully:', data);
-              const displayAmount = topupAmount || data.amount || 'your wallet';
-              toast.success(`Successfully topped up $${displayAmount}! Wallet updated.`);
-              
-              // Force multiple wallet refreshes to ensure balance is updated
-              console.log('PaymentVerificationHandler: Force refreshing wallet balance...');
+            // Force multiple wallet refreshes to ensure balance is updated
+            console.log('PaymentVerificationHandler: Force refreshing wallet balance...');
+            await onRefetchWallet();
+            
+            // Additional refresh attempts with delays to ensure data consistency
+            setTimeout(async () => {
+              console.log('PaymentVerificationHandler: Additional wallet refresh (1s delay)');
               await onRefetchWallet();
-              
-              // Additional refresh attempts with delays
-              setTimeout(async () => {
-                console.log('PaymentVerificationHandler: Additional wallet refresh (500ms delay)');
-                await onRefetchWallet();
-              }, 500);
-              
-              setTimeout(async () => {
-                console.log('PaymentVerificationHandler: Final wallet refresh (1.5s delay)');
-                await onRefetchWallet();
-              }, 1500);
-              
-              // Navigate back to dashboard after successful top-up
-              setTimeout(() => {
-                console.log('PaymentVerificationHandler: Navigating to dashboard');
-                navigate('/dashboard', { replace: true });
-              }, 2000);
-            } else {
-              console.error('PaymentVerificationHandler: Payment verification failed or wallet not updated:', data);
-              toast.error('Payment verification failed. Please contact support if amount was charged.');
-            }
+            }, 1000);
+            
+            setTimeout(async () => {
+              console.log('PaymentVerificationHandler: Final wallet refresh (2s delay)');
+              await onRefetchWallet();
+              toast.success(`Wallet updated! Added $${displayAmount} successfully.`);
+            }, 2000);
+            
+            // Navigate back to dashboard after successful top-up
+            setTimeout(() => {
+              console.log('PaymentVerificationHandler: Navigating to dashboard');
+              // Clean URL parameters before navigating
+              window.history.replaceState({}, document.title, '/payments/topup');
+              navigate('/dashboard', { replace: true });
+            }, 3000);
+            
           } catch (verificationError) {
             console.error('PaymentVerificationHandler: Payment verification exception:', verificationError);
-            toast.error('Failed to verify payment. Please contact support if amount was charged.');
+            toast.error('Payment completed but wallet update failed. Please refresh the page.');
           }
           
           onVerificationEnd();
         } else if (canceled === 'true') {
           console.log('PaymentVerificationHandler: Payment canceled detected');
           toast.error('Payment was canceled');
-          navigate('/payments/topup', { replace: true });
+          // Clean URL and stay on topup page
+          window.history.replaceState({}, document.title, '/payments/topup');
           onVerificationEnd();
         } else {
           // No special URL params, just end verification

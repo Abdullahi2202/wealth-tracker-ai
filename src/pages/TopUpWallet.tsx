@@ -20,12 +20,12 @@ const TopUpWallet = () => {
   const { methods } = usePaymentMethods();
   const { wallet, refetch } = useWallet();
 
-  // Auto-refresh wallet balance more frequently
+  // Auto-refresh wallet balance more frequently during topup process
   useEffect(() => {
     const interval = setInterval(() => {
       console.log('TopUpWallet: Auto-refreshing wallet balance...');
       refetch();
-    }, 10000); // Refresh every 10 seconds for faster updates
+    }, 5000); // Refresh every 5 seconds for faster updates
 
     return () => clearInterval(interval);
   }, [refetch]);
@@ -41,7 +41,10 @@ const TopUpWallet = () => {
       } catch (error) {
         console.error('TopUpWallet: Error during initialization:', error);
       } finally {
-        setInitializing(false);
+        // Reduce initialization time to show page faster
+        setTimeout(() => {
+          setInitializing(false);
+        }, 500);
       }
     };
 
@@ -56,20 +59,24 @@ const TopUpWallet = () => {
   const handleVerificationEnd = () => {
     console.log('TopUpWallet: Payment verification ended');
     setVerifyingPayment(false);
-    setInitializing(false);
   };
 
   const handleRefetchWallet = async () => {
     console.log('TopUpWallet: Manual wallet refetch triggered');
-    await refetch();
+    try {
+      await refetch();
+      console.log('TopUpWallet: Wallet refetch completed successfully');
+    } catch (error) {
+      console.error('TopUpWallet: Error during wallet refetch:', error);
+    }
     return Promise.resolve();
   };
 
-  // Show loading screen while initializing or verifying payment
-  if (initializing || verifyingPayment) {
+  // Show loading screen only during payment verification, not initialization
+  if (verifyingPayment) {
     return (
       <LoadingScreen 
-        message={verifyingPayment ? 'Verifying payment and updating wallet...' : 'Loading top-up page...'} 
+        message="Processing payment and updating wallet..." 
       />
     );
   }
@@ -93,7 +100,7 @@ const TopUpWallet = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Top Up Your Wallet
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {(loading || initializing) && <Loader2 className="h-4 w-4 animate-spin" />}
           </CardTitle>
           <CardDescription>Add funds to your wallet securely via Stripe.</CardDescription>
           <WalletBalanceDisplay wallet={wallet} onRefresh={handleRefetchWallet} />

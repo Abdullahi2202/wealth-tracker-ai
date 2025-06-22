@@ -20,21 +20,22 @@ export function useWallet() {
   const [loading, setLoading] = useState(true);
 
   const fetchWallet = useCallback(async () => {
-    setLoading(true);
     try {
+      console.log('useWallet: Starting wallet fetch...');
+      
       // Get authenticated user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
-        console.log('No authenticated user found');
+        console.log('useWallet: No authenticated user found');
         setWallet(null);
         setLoading(false);
         return;
       }
 
-      console.log('Fetching wallet for user:', user.email);
+      console.log('useWallet: Fetching wallet for user:', user.email);
 
-      // Fetch wallet from database directly
+      // Fetch wallet from database directly with fresh data
       const { data: walletData, error: walletError } = await supabase
         .from('wallets')
         .select('*')
@@ -42,13 +43,16 @@ export function useWallet() {
         .maybeSingle();
 
       if (walletError) {
-        console.error("Wallet fetch error:", walletError);
+        console.error("useWallet: Wallet fetch error:", walletError);
         setWallet(null);
       } else if (walletData) {
-        console.log('Wallet fetched successfully:', walletData);
+        console.log('useWallet: Wallet fetched successfully:', {
+          balance: walletData.balance,
+          updated_at: walletData.updated_at
+        });
         setWallet(walletData);
       } else {
-        console.log('No wallet found for user, creating one...');
+        console.log('useWallet: No wallet found for user, creating one...');
         // Create wallet if it doesn't exist
         const { data: newWallet, error: createError } = await supabase
           .from('wallets')
@@ -61,18 +65,19 @@ export function useWallet() {
           .single();
 
         if (createError) {
-          console.error('Error creating wallet:', createError);
+          console.error('useWallet: Error creating wallet:', createError);
           setWallet(null);
         } else {
-          console.log('New wallet created:', newWallet);
+          console.log('useWallet: New wallet created:', newWallet);
           setWallet(newWallet);
         }
       }
     } catch (error) {
-      console.error("Error in fetchWallet:", error);
+      console.error("useWallet: Error in fetchWallet:", error);
       setWallet(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   // Subscribe to real-time wallet balance changes
@@ -83,24 +88,32 @@ export function useWallet() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) return;
       
+      console.log('useWallet: Setting up realtime subscription for:', user.email);
+      
       const channel = supabase
         .channel("wallet-changes")
         .on(
           "postgres_changes",
           {
-            event: "UPDATE",
+            event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
             schema: "public",
             table: "wallets",
             filter: `user_email=eq.${user.email}`,
           },
           (payload) => {
-            console.log('Real-time wallet update:', payload.new);
-            if (payload.new) setWallet(payload.new as Wallet);
+            console.log('useWallet: Real-time wallet update received:', payload);
+            if (payload.new) {
+              console.log('useWallet: Updating wallet state with new data:', payload.new);
+              setWallet(payload.new as Wallet);
+            }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('useWallet: Realtime subscription status:', status);
+        });
         
       return () => {
+        console.log('useWallet: Cleaning up realtime subscription');
         supabase.removeChannel(channel);
       };
     };
