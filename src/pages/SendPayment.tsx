@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
-import { Loader2 } from "lucide-react";
+import { Loader2, Phone, Mail, ArrowLeft } from "lucide-react";
 
 const CATEGORY_OPTIONS = [
-  "Transfer", "Food", "Bills", "Shopping", "Transport", "Misc"
+  "Transfer", "Food", "Bills", "Shopping", "Transport", "Entertainment", "Utilities", "Other"
 ];
 
 const SendPayment = () => {
@@ -49,17 +49,26 @@ const SendPayment = () => {
     setLoading(true);
 
     try {
-      console.log('Sending payment:', { recipient, amount: amountValue, note });
+      console.log('Sending payment:', { recipient, amount: amountValue, note, category });
       
       const success = await sendPayment(recipient.trim(), amountValue, note);
       
       if (success) {
         toast.success(`Payment of $${amountValue.toFixed(2)} sent successfully!`);
+        
+        // Reset form
         setAmount("");
         setRecipient("");
         setNote("");
+        setCategory("Transfer");
+        
         // Refresh wallet to show updated balance
         await refetch();
+        
+        // Navigate back after short delay
+        setTimeout(() => {
+          navigate("/payments");
+        }, 2000);
       } else {
         toast.error("Failed to send payment. Please try again.");
       }
@@ -71,106 +80,162 @@ const SendPayment = () => {
     setLoading(false);
   };
 
+  const isValidRecipient = (value: string) => {
+    return value.includes('@') || /^\+?[\d\s-()]+$/.test(value);
+  };
+
   return (
-    <div className="min-h-screen bg-muted pt-3 px-2 animate-fade-in">
-      <div className="flex items-center gap-2 mb-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/payments")}>
-          &larr; Payments
-        </Button>
-        <h2 className="text-xl font-bold text-finance-blue">Send Payment</h2>
-      </div>
-      <Card className="max-w-md mx-auto shadow-lg rounded-2xl animate-scale-in">
-        <CardHeader>
-          <CardTitle>Send Money</CardTitle>
-          <CardDescription>
-            Transfer money from your wallet. Available balance: ${balance.toFixed(2)}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSend} className="space-y-5">
-            <div>
-              <label className="block text-sm mb-1 font-medium">From Wallet</label>
-              <div className="p-3 border rounded-md bg-gray-50">
-                <div className="text-sm text-gray-600">Current Balance</div>
-                <div className="text-lg font-semibold">${balance.toFixed(2)}</div>
-                {wallet?.user_phone && (
-                  <div className="text-xs text-gray-500">Phone: {wallet.user_phone}</div>
+    <div className="min-h-screen bg-gray-50 pt-4 px-4">
+      <div className="max-w-md mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate("/payments")}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Send Money</h1>
+        </div>
+
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Send Payment
+            </CardTitle>
+            <CardDescription>
+              Transfer money from your wallet to another user
+            </CardDescription>
+            
+            {/* Wallet Balance Display */}
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-blue-700">Available Balance</span>
+                <span className="text-lg font-bold text-blue-900">
+                  ${balance.toFixed(2)}
+                </span>
+              </div>
+              {wallet?.user_phone && (
+                <div className="text-xs text-gray-600 mt-1">
+                  Wallet: {wallet.user_phone}
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          
+          <CardContent>
+            <form onSubmit={handleSend} className="space-y-6">
+              {/* Recipient Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Send To
+                </label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Phone number or email address"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="pl-10"
+                  />
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                    {recipient.includes('@') ? (
+                      <Mail className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Phone className="h-4 w-4 text-gray-400" />
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter phone number (e.g., +1234567890) or email address
+                </p>
+              </div>
+              
+              {/* Amount Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount ($)
+                </label>
+                <Input
+                  type="number"
+                  min={0.01}
+                  step="0.01"
+                  max={balance}
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="text-lg"
+                />
+                {amount && parseFloat(amount) > balance && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Amount exceeds available balance
+                  </p>
                 )}
               </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm mb-1 font-medium">Recipient</label>
-              <Input
-                type="text"
-                placeholder="Phone number or email"
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                required
-                disabled={loading}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Enter phone number (e.g., +1234567890) or email address
-              </p>
-            </div>
-            
-            <div>
-              <label className="block text-sm mb-1 font-medium">Amount ($)</label>
-              <Input
-                type="number"
-                min={0.01}
-                step="0.01"
-                max={balance}
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm mb-1 font-medium">Category</label>
-              <select
-                className="w-full rounded-md p-2 border"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                disabled={loading}
-              >
-                {CATEGORY_OPTIONS.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm mb-1">Note (Optional)</label>
-              <Input
-                type="text"
-                value={note}
-                placeholder="Optional note"
-                onChange={(e) => setNote(e.target.value)}
-                disabled={loading}
-              />
-            </div>
+              
+              {/* Category Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <select
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 bg-white"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  disabled={loading}
+                >
+                  {CATEGORY_OPTIONS.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Note Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Note (Optional)
+                </label>
+                <Input
+                  type="text"
+                  value={note}
+                  placeholder="What's this payment for?"
+                  onChange={(e) => setNote(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
 
-            <Button 
-              type="submit" 
-              className="w-full mt-4 h-12" 
-              disabled={loading || balance < parseFloat(amount || "0") || !recipient.trim()}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                `Send $${amount || '0.00'}`
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              {/* Send Button */}
+              <Button 
+                type="submit" 
+                className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700" 
+                disabled={
+                  loading || 
+                  balance < parseFloat(amount || "0") || 
+                  !recipient.trim() || 
+                  !isValidRecipient(recipient) ||
+                  !amount
+                }
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  `Send $${amount || '0.00'}`
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

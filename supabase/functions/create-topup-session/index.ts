@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
       .single()
 
     const userPhone = profile?.phone
+    console.log('User profile:', { email: user.email, phone: userPhone })
 
     // Parse request body
     const body = await req.json()
@@ -52,7 +53,7 @@ Deno.serve(async (req) => {
       throw new Error('Invalid amount. Must be a positive number.')
     }
 
-    console.log('Creating topup session for:', { userId: user.id, phone: userPhone, amount })
+    console.log('Creating topup session:', { userId: user.id, phone: userPhone, amount })
     const amountInCents = Math.round(amount * 100)
 
     // Check if customer exists in Stripe
@@ -64,7 +65,7 @@ Deno.serve(async (req) => {
 
     if (customers.data.length > 0) {
       customerId = customers.data[0].id
-      console.log('Found existing customer:', customerId)
+      console.log('Found existing Stripe customer:', customerId)
     } else {
       const customer = await stripe.customers.create({
         email: user.email,
@@ -74,11 +75,11 @@ Deno.serve(async (req) => {
         }
       })
       customerId = customer.id
-      console.log('Created new customer:', customerId)
+      console.log('Created new Stripe customer:', customerId)
     }
 
     // Create Stripe Checkout session
-    const originHeader = req.headers.get('origin') || req.headers.get('referer') || 'http://localhost:3000'
+    const originHeader = req.headers.get('origin') || req.headers.get('referer') || 'https://your-app.com'
     const baseUrl = originHeader.replace(/\/$/, '')
     
     const session = await stripe.checkout.sessions.create({
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
             currency: currency,
             product_data: {
               name: 'Wallet Top-up',
-              description: `Add $${amount} to your wallet`,
+              description: `Add $${amount} to your wallet balance`,
             },
             unit_amount: amountInCents,
           },
@@ -112,29 +113,27 @@ Deno.serve(async (req) => {
 
     console.log('Stripe session created:', session.id)
 
-    // Create topup session record (status defaults to 'completed')
+    // Create topup session record
     const { data: topupSession, error: dbError } = await supabase
       .from('topup_sessions')
       .insert({
         user_id: user.id,
         stripe_session_id: session.id,
         amount: amountInCents,
-        currency: currency
+        currency: currency,
+        status: 'pending'
       })
       .select()
       .single()
 
     if (dbError) {
       console.error('Database error:', dbError)
-      throw new Error('Failed to create topup session')
+      throw new Error('Failed to create topup session record')
     }
 
-    console.log('Topup session created:', topupSession.id, 'status:', topupSession.status)
+    console.log('Topup session record created:', topupSession.id)
 
-    // Immediately update wallet balance since payment will be verified via success URL
-    console.log('Pre-updating wallet balance for user:', user.id)
-    
-    // Find wallet by phone or email
+    // Find or create wallet
     let walletQuery = supabase.from('wallets').select('*')
     if (userPhone) {
       walletQuery = walletQuery.eq('user_phone', userPhone)
@@ -145,7 +144,8 @@ Deno.serve(async (req) => {
     const { data: existingWallet } = await walletQuery.maybeSingle()
 
     if (existingWallet) {
-      // Update existing wallet
+      console.log('Found existing wallet:', existingWallet.id)
+      // Immediately update wallet balance for instant feedback
       await supabase
         .from('wallets')
         .update({
@@ -153,8 +153,9 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString()
         })
         .eq('id', existingWallet.id)
+      console.log('Wallet balance updated immediately')
     } else {
-      // Create new wallet
+      console.log('Creating new wallet')
       await supabase
         .from('wallets')
         .insert({
@@ -163,9 +164,23 @@ Deno.serve(async (req) => {
           user_phone: userPhone,
           balance: amount
         })
+      console.log('New wallet created with balance')
     }
 
-    console.log('Wallet balance updated immediately')
+    // Record transaction
+    await supabase
+      .from('transactions')
+      .insert({
+        user_id: user.id,
+        name: 'Wallet Top-up',
+        amount: amount,
+        type: 'income',
+        category: 'Top-up',
+        date: new Date().toISOString().split('T')[0],
+        status: 'completed'
+      })
+
+    console.log('Transaction recorded')
 
     return new Response(JSON.stringify({
       session_id: session.id,
@@ -173,15 +188,18 @@ Deno.serve(async (req) => {
       amount: amount,
       currency: currency,
       topup_session_id: topupSession.id,
-      success: true
+      success: true,
+      message: 'Checkout session created successfully'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error) {
-    console.error('CREATE TOPUP SESSION ERROR:', error)
+    console.error('=== CREATE TOPUP SESSION ERROR ===')
+    console.error('Error details:', error)
     return new Response(JSON.stringify({ 
-      error: error.message || 'Internal server error'
+      error: error.message || 'Internal server error',
+      success: false
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

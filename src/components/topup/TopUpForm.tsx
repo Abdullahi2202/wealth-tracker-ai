@@ -65,10 +65,13 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Redirecting to checkout:', data.checkout_url);
       
-      toast.success("Redirecting to payment...");
+      // Show success message and redirect
+      toast.success("Redirecting to secure payment...");
       
-      // Immediate redirect to avoid white pages
-      window.location.href = data.checkout_url;
+      // Small delay to show the message, then redirect
+      setTimeout(() => {
+        window.location.href = data.checkout_url;
+      }, 1000);
 
     } catch (error) {
       console.error("TopUpForm: Top-up error:", error);
@@ -83,48 +86,55 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
   };
 
   return (
-    <form onSubmit={handleTopUp} className="space-y-4">
-      <div>
-        <label className="block text-sm mb-2 font-medium">Top-up Amount ($)</label>
-        <Input
-          type="number"
-          placeholder="10.00"
-          min="1.00"
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-          disabled={loading}
-          className="text-lg"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Minimum amount: $1.00
-        </p>
-      </div>
-      
-      <div className="pt-2">
-        <Button 
-          type="submit" 
-          className="w-full h-12 text-lg font-semibold" 
-          disabled={loading || !amount || parseFloat(amount) < 1}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            `Top Up $${amount || '0.00'}`
-          )}
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <form onSubmit={handleTopUp} className="space-y-4">
+        <div>
+          <label className="block text-sm mb-2 font-medium text-gray-700">
+            Top-up Amount ($)
+          </label>
+          <Input
+            type="number"
+            placeholder="Enter amount (e.g., 50.00)"
+            min="1.00"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            disabled={loading}
+            className="text-lg h-12"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Minimum amount: $1.00 • Powered by Stripe
+          </p>
+        </div>
+        
+        <div className="pt-2">
+          <Button 
+            type="submit" 
+            className="w-full h-12 text-lg font-semibold bg-blue-600 hover:bg-blue-700" 
+            disabled={loading || !amount || parseFloat(amount) < 1}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `Add $${amount || '0.00'} to Wallet`
+            )}
+          </Button>
+        </div>
+      </form>
 
       {loading && (
-        <div className="text-center text-sm text-gray-600 mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="font-medium text-blue-800">Processing your payment...</p>
-          <p className="text-blue-700">Redirecting to secure payment page...</p>
+        <div className="text-center text-sm text-gray-600 mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            <p className="font-medium text-blue-800">Processing Payment</p>
+          </div>
+          <p className="text-blue-700">You'll be redirected to Stripe's secure payment page...</p>
         </div>
       )}
-    </form>
+    </div>
   );
 };

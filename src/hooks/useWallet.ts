@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Wallet data type
+// Updated Wallet data type to include user_phone
 export interface Wallet {
   id: string;
   user_email: string;
@@ -11,6 +11,9 @@ export interface Wallet {
   updated_at: string;
   user_id?: string;
   wallet_number?: number;
+  currency?: string;
+  created_at?: string;
+  is_frozen?: boolean;
 }
 
 /**
@@ -65,7 +68,7 @@ export function useWallet() {
           phone: walletData.user_phone,
           updated_at: walletData.updated_at
         });
-        setWallet(walletData);
+        setWallet(walletData as Wallet);
       } else {
         console.log('useWallet: No wallet found, creating one...');
         // Create wallet if it doesn't exist
@@ -85,7 +88,7 @@ export function useWallet() {
           setWallet(null);
         } else {
           console.log('useWallet: New wallet created:', newWallet);
-          setWallet(newWallet);
+          setWallet(newWallet as Wallet);
         }
       }
     } catch (error) {

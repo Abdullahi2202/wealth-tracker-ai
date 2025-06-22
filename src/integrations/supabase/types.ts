@@ -838,6 +838,7 @@ export type Database = {
           updated_at: string | null
           user_email: string | null
           user_id: string | null
+          user_phone: string | null
           wallet_number: number
         }
         Insert: {
@@ -849,6 +850,7 @@ export type Database = {
           updated_at?: string | null
           user_email?: string | null
           user_id?: string | null
+          user_phone?: string | null
           wallet_number?: number
         }
         Update: {
@@ -860,6 +862,7 @@ export type Database = {
           updated_at?: string | null
           user_email?: string | null
           user_id?: string | null
+          user_phone?: string | null
           wallet_number?: number
         }
         Relationships: []

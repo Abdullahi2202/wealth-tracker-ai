@@ -25,40 +25,48 @@ export const PaymentVerificationHandler = ({
         const sessionId = searchParams.get('session_id');
         const amount = searchParams.get('amount');
 
-        console.log('Payment result:', { success, canceled, sessionId, amount });
+        console.log('Payment verification:', { success, canceled, sessionId, amount });
 
         if (success === 'true' && sessionId) {
-          console.log('Payment successful, updating wallet...');
+          console.log('Payment successful - processing wallet update...');
           onVerificationStart();
           
           // Show immediate success message
           toast.success(`Payment successful! Adding $${amount || 'amount'} to your wallet...`);
           
-          // Force wallet refresh with multiple attempts
+          // Multiple wallet refresh attempts to ensure balance updates
           console.log('Refreshing wallet balance...');
           await onRefetchWallet();
           
-          // Additional refresh attempts with delays
-          setTimeout(async () => {
-            console.log('Additional wallet refresh attempt 1');
-            await onRefetchWallet();
-          }, 1000);
+          // Additional refresh with delays to handle any propagation delays
+          const refreshAttempts = [1000, 2500, 4000];
           
-          setTimeout(async () => {
-            console.log('Additional wallet refresh attempt 2');
-            await onRefetchWallet();
-            toast.success(`Wallet updated! $${amount || 'amount'} added successfully.`);
-          }, 2000);
+          refreshAttempts.forEach((delay, index) => {
+            setTimeout(async () => {
+              console.log(`Wallet refresh attempt ${index + 2}`);
+              await onRefetchWallet();
+              
+              // Show final success message on last attempt
+              if (index === refreshAttempts.length - 1) {
+                toast.success(`Wallet updated! $${amount || 'amount'} added successfully.`);
+              }
+            }, delay);
+          });
           
-          // Clean URL and navigate to dashboard
+          // Clean URL and navigate back to dashboard
           setTimeout(() => {
             window.history.replaceState({}, document.title, '/payments/topup');
             navigate('/dashboard', { replace: true });
-          }, 3000);
+          }, 5000);
           
         } else if (canceled === 'true') {
-          console.log('Payment was canceled');
+          console.log('Payment was canceled by user');
           toast.error('Payment was canceled');
+          window.history.replaceState({}, document.title, '/payments/topup');
+        } else if (searchParams.has('success') || searchParams.has('canceled')) {
+          // Invalid parameters
+          console.log('Invalid payment parameters received');
+          toast.error('Invalid payment response received');
           window.history.replaceState({}, document.title, '/payments/topup');
         }
         
@@ -70,7 +78,7 @@ export const PaymentVerificationHandler = ({
       }
     };
 
-    // Only run if we have URL parameters
+    // Only process if we have relevant URL parameters
     if (searchParams.has('success') || searchParams.has('canceled')) {
       handlePaymentResult();
     } else {
