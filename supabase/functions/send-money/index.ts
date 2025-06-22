@@ -27,15 +27,21 @@ Deno.serve(async (req) => {
       throw new Error('Invalid authentication')
     }
 
-    const { recipient_phone, recipient_email, amount, description } = await req.json()
+    const { recipient_phone, amount, description } = await req.json()
 
-    if ((!recipient_phone && !recipient_email) || !amount || amount <= 0) {
-      throw new Error('Invalid recipient or amount')
+    // Only allow phone numbers - no email support
+    if (!recipient_phone || amount <= 0) {
+      throw new Error('Invalid recipient phone number or amount')
+    }
+
+    // Reject if email is provided instead of phone
+    if (recipient_phone.includes('@')) {
+      throw new Error('Only phone number transfers are supported. Email transfers are not allowed.')
     }
 
     console.log('Processing payment:', { 
       from: user.email, 
-      to: recipient_phone || recipient_email, 
+      to: recipient_phone, 
       amount 
     })
 
@@ -49,15 +55,16 @@ Deno.serve(async (req) => {
     const senderPhone = senderProfile?.phone
     console.log('Sender profile:', { email: user.email, phone: senderPhone })
 
-    // Get sender's wallet (prioritize phone, fallback to email)
-    let senderWalletQuery = supabase.from('wallets').select('*')
-    if (senderPhone) {
-      senderWalletQuery = senderWalletQuery.eq('user_phone', senderPhone)
-    } else {
-      senderWalletQuery = senderWalletQuery.eq('user_email', user.email)
+    if (!senderPhone) {
+      throw new Error('Sender phone number not found. Please update your profile.')
     }
 
-    const { data: senderWallet, error: senderWalletError } = await senderWalletQuery.single()
+    // Get sender's wallet by phone number
+    const { data: senderWallet, error: senderWalletError } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('user_phone', senderPhone)
+      .single()
 
     if (senderWalletError || !senderWallet) {
       console.error('Sender wallet not found:', senderWalletError)
@@ -70,39 +77,25 @@ Deno.serve(async (req) => {
       throw new Error(`Insufficient balance: $${senderWallet.balance} available, $${amount} required`)
     }
 
-    // Find recipient profile by phone or email
-    let recipientProfile = null
-    if (recipient_phone) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, email, phone')
-        .eq('phone', recipient_phone)
-        .single()
-      recipientProfile = data
-    } else if (recipient_email) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, email, phone')
-        .eq('email', recipient_email)
-        .single()
-      recipientProfile = data
-    }
+    // Find recipient profile by phone number only
+    const { data: recipientProfile } = await supabase
+      .from('profiles')
+      .select('id, email, phone')
+      .eq('phone', recipient_phone)
+      .single()
 
     if (!recipientProfile) {
-      throw new Error('Recipient not found in our system')
+      throw new Error('Recipient phone number not found in our system')
     }
 
     console.log('Recipient found:', { email: recipientProfile.email, phone: recipientProfile.phone })
 
-    // Get recipient's wallet (prioritize phone, fallback to email)
-    let recipientWalletQuery = supabase.from('wallets').select('*')
-    if (recipientProfile.phone) {
-      recipientWalletQuery = recipientWalletQuery.eq('user_phone', recipientProfile.phone)
-    } else {
-      recipientWalletQuery = recipientWalletQuery.eq('user_email', recipientProfile.email)
-    }
-
-    const { data: recipientWallet, error: recipientWalletError } = await recipientWalletQuery.single()
+    // Get recipient's wallet by phone number
+    const { data: recipientWallet, error: recipientWalletError } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('user_phone', recipient_phone)
+      .single()
 
     if (recipientWalletError || !recipientWallet) {
       console.error('Recipient wallet not found:', recipientWalletError)
@@ -175,7 +168,7 @@ Deno.serve(async (req) => {
         .from('transactions')
         .insert({
           user_id: user.id,
-          name: `Sent to ${recipient_phone || recipient_email}`,
+          name: `Sent to ${recipient_phone}`,
           amount: amount,
           type: 'expense',
           category: 'Transfer',
@@ -189,7 +182,7 @@ Deno.serve(async (req) => {
         .from('transactions')
         .insert({
           user_id: recipientProfile.id,
-          name: `Received from ${senderPhone || user.email}`,
+          name: `Received from ${senderPhone}`,
           amount: amount,
           type: 'income',
           category: 'Transfer',

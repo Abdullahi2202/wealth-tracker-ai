@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
-import { Loader2, Phone, Mail, ArrowLeft } from "lucide-react";
+import { Loader2, Phone, ArrowLeft } from "lucide-react";
 
 const CATEGORY_OPTIONS = [
   "Transfer", "Food", "Bills", "Shopping", "Transport", "Entertainment", "Utilities", "Other"
@@ -37,7 +37,13 @@ const SendPayment = () => {
     }
     
     if (!recipient.trim()) {
-      toast.error("Enter recipient phone number or email.");
+      toast.error("Enter recipient phone number.");
+      return;
+    }
+
+    // Only allow phone numbers (no emails)
+    if (!isValidPhoneNumber(recipient)) {
+      toast.error("Please enter a valid phone number (e.g., +1234567890)");
       return;
     }
 
@@ -49,7 +55,7 @@ const SendPayment = () => {
     setLoading(true);
 
     try {
-      console.log('Sending payment:', { recipient, amount: amountValue, note, category });
+      console.log('Sending payment to phone:', { recipient, amount: amountValue, note, category });
       
       const success = await sendPayment(recipient.trim(), amountValue, note);
       
@@ -80,8 +86,9 @@ const SendPayment = () => {
     setLoading(false);
   };
 
-  const isValidRecipient = (value: string) => {
-    return value.includes('@') || /^\+?[\d\s-()]+$/.test(value);
+  const isValidPhoneNumber = (value: string) => {
+    // Only allow phone numbers, no emails
+    return /^\+?[\d\s-()]+$/.test(value) && !value.includes('@');
   };
 
   return (
@@ -107,7 +114,7 @@ const SendPayment = () => {
               Send Payment
             </CardTitle>
             <CardDescription>
-              Transfer money from your wallet to another user
+              Transfer money from your wallet to another user's phone number
             </CardDescription>
             
             {/* Wallet Balance Display */}
@@ -128,15 +135,15 @@ const SendPayment = () => {
           
           <CardContent>
             <form onSubmit={handleSend} className="space-y-6">
-              {/* Recipient Input */}
+              {/* Recipient Input - Phone Only */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Send To
+                  Send To (Phone Number Only)
                 </label>
                 <div className="relative">
                   <Input
-                    type="text"
-                    placeholder="Phone number or email address"
+                    type="tel"
+                    placeholder="Phone number (e.g., +1234567890)"
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     required
@@ -144,16 +151,17 @@ const SendPayment = () => {
                     className="pl-10"
                   />
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                    {recipient.includes('@') ? (
-                      <Mail className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Phone className="h-4 w-4 text-gray-400" />
-                    )}
+                    <Phone className="h-4 w-4 text-gray-400" />
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Enter phone number (e.g., +1234567890) or email address
+                  Enter phone number only (e.g., +1234567890). Email transfers are not supported.
                 </p>
+                {recipient && !isValidPhoneNumber(recipient) && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Please enter a valid phone number (numbers, spaces, +, -, () only)
+                  </p>
+                )}
               </div>
               
               {/* Amount Input */}
@@ -219,7 +227,7 @@ const SendPayment = () => {
                   loading || 
                   balance < parseFloat(amount || "0") || 
                   !recipient.trim() || 
-                  !isValidRecipient(recipient) ||
+                  !isValidPhoneNumber(recipient) ||
                   !amount
                 }
               >

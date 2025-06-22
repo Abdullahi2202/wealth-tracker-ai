@@ -148,19 +148,24 @@ export function useWallet() {
     setupRealtime();
   }, [fetchWallet]);
 
-  // Send payment using phone number or email
+  // Send payment using phone number only (no email support)
   const sendPayment = useCallback(
-    async (recipientIdentifier: string, amount: number, note?: string) => {
+    async (recipientPhone: string, amount: number, note?: string) => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Not authenticated');
 
-        console.log('Sending payment to:', recipientIdentifier, 'amount:', amount);
+        // Validate phone number format
+        if (!recipientPhone || recipientPhone.includes('@')) {
+          throw new Error('Only phone numbers are supported for transfers');
+        }
+
+        console.log('Sending payment to phone:', recipientPhone, 'amount:', amount);
 
         const { data, error } = await supabase.functions.invoke('send-money', {
           body: JSON.stringify({ 
-            recipient_phone: recipientIdentifier.includes('@') ? null : recipientIdentifier,
-            recipient_email: recipientIdentifier.includes('@') ? recipientIdentifier : null,
+            recipient_phone: recipientPhone, // Phone only, no email
+            recipient_email: null, // Explicitly set to null
             amount, 
             description: note 
           }),
