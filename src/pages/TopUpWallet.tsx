@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useWallet } from "@/hooks/useWallet";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { PaymentVerificationHandler } from "@/components/topup/PaymentVerificationHandler";
 import { WalletBalanceDisplay } from "@/components/topup/WalletBalanceDisplay";
 import { TopUpForm } from "@/components/topup/TopUpForm";
 import { LoadingScreen } from "@/components/topup/LoadingScreen";
+import { toast } from "sonner";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ const TopUpWallet = () => {
   const [verifyingPayment, setVerifyingPayment] = useState(false);
 
   const { methods } = usePaymentMethods();
-  const { wallet, refetch } = useWallet();
+  const { wallet, loading: walletLoading, error: walletError, refetch } = useWallet();
 
   // Auto-refresh wallet balance more frequently during topup process
   useEffect(() => {
@@ -40,6 +41,7 @@ const TopUpWallet = () => {
         console.log('TopUpWallet: Page initialization complete');
       } catch (error) {
         console.error('TopUpWallet: Error during initialization:', error);
+        toast.error('Failed to initialize wallet data');
       } finally {
         // Reduce initialization time to show page faster
         setTimeout(() => {
@@ -68,11 +70,12 @@ const TopUpWallet = () => {
       console.log('TopUpWallet: Wallet refetch completed successfully');
     } catch (error) {
       console.error('TopUpWallet: Error during wallet refetch:', error);
+      toast.error('Failed to refresh wallet data');
     }
     return Promise.resolve();
   };
 
-  // Show loading screen only during payment verification, not initialization
+  // Show loading screen during payment verification
   if (verifyingPayment) {
     return (
       <LoadingScreen 
@@ -100,9 +103,26 @@ const TopUpWallet = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Top Up Your Wallet
-            {(loading || initializing) && <Loader2 className="h-4 w-4 animate-spin" />}
+            {(loading || initializing || walletLoading) && <Loader2 className="h-4 w-4 animate-spin" />}
           </CardTitle>
           <CardDescription>Add funds to your wallet securely via Stripe.</CardDescription>
+          
+          {/* Show wallet error if any */}
+          {walletError && (
+            <div className="flex items-center gap-2 p-2 bg-red-50 text-red-700 rounded-md text-sm">
+              <AlertCircle className="h-4 w-4" />
+              <span>{walletError}</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleRefetchWallet}
+                className="ml-auto text-red-600 hover:text-red-800"
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          
           <WalletBalanceDisplay wallet={wallet} onRefresh={handleRefetchWallet} />
         </CardHeader>
         <CardContent>

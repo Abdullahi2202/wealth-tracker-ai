@@ -23,10 +23,12 @@ export interface Wallet {
 export function useWallet() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchWallet = useCallback(async () => {
     try {
       console.log('useWallet: Starting wallet fetch...');
+      setError(null);
       
       // Get authenticated user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -39,11 +41,15 @@ export function useWallet() {
       }
 
       // Get user profile to find phone number
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('phone')
         .eq('id', user.id)
         .single();
+
+      if (profileError) {
+        console.warn('useWallet: Profile fetch error:', profileError);
+      }
 
       const userPhone = profile?.phone;
       console.log('useWallet: User details:', { email: user.email, phone: userPhone });
@@ -61,6 +67,7 @@ export function useWallet() {
 
       if (walletError) {
         console.error("useWallet: Wallet fetch error:", walletError);
+        setError('Failed to fetch wallet data');
         setWallet(null);
       } else if (walletData) {
         console.log('useWallet: Wallet fetched successfully:', {
@@ -85,6 +92,7 @@ export function useWallet() {
 
         if (createError) {
           console.error('useWallet: Error creating wallet:', createError);
+          setError('Failed to create wallet');
           setWallet(null);
         } else {
           console.log('useWallet: New wallet created:', newWallet);
@@ -93,6 +101,7 @@ export function useWallet() {
       }
     } catch (error) {
       console.error("useWallet: Error in fetchWallet:", error);
+      setError('An unexpected error occurred');
       setWallet(null);
     } finally {
       setLoading(false);
@@ -163,12 +172,12 @@ export function useWallet() {
         console.log('Sending payment to phone:', recipientPhone, 'amount:', amount);
 
         const { data, error } = await supabase.functions.invoke('send-money', {
-          body: JSON.stringify({ 
+          body: { 
             recipient_phone: recipientPhone, // Phone only, no email
             recipient_email: null, // Explicitly set to null
             amount, 
             description: note 
-          }),
+          },
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
@@ -191,6 +200,7 @@ export function useWallet() {
     wallet,
     balance: wallet?.balance ?? 0,
     loading,
+    error,
     refetch: fetchWallet,
     sendPayment,
   };

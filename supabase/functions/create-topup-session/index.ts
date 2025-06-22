@@ -28,14 +28,28 @@ Deno.serve(async (req) => {
     console.log('Authorization header present:', !!authHeader)
     
     if (!authHeader) {
-      throw new Error('Authorization required')
+      console.error('No authorization header')
+      return new Response(JSON.stringify({ 
+        error: 'Authorization required',
+        success: false 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
     if (authError || !user) {
       console.error('Auth error:', authError)
-      throw new Error('Invalid authentication')
+      return new Response(JSON.stringify({ 
+        error: 'Invalid authentication',
+        success: false 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     console.log('User authenticated:', user.email)
@@ -50,36 +64,39 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // Parse request body with comprehensive error handling
+    // Parse request body
     let requestBody
     try {
       const contentType = req.headers.get('content-type') || ''
       console.log('Content-Type:', contentType)
       
-      if (!contentType.includes('application/json')) {
-        console.error('Invalid content type:', contentType)
-        throw new Error('Content-Type must be application/json')
-      }
-
       const rawBody = await req.text()
       console.log('Raw request body length:', rawBody.length)
       console.log('Raw request body:', rawBody)
       
-      if (!rawBody || rawBody.trim() === '' || rawBody === 'undefined' || rawBody === 'null') {
-        console.error('Empty or invalid request body')
-        throw new Error('Request body is empty or invalid')
+      if (!rawBody || rawBody.trim() === '') {
+        console.error('Empty request body')
+        return new Response(JSON.stringify({ 
+          error: 'Request body is required',
+          success: false 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
       
       requestBody = JSON.parse(rawBody)
       console.log('Parsed request body:', requestBody)
       
-      if (!requestBody || typeof requestBody !== 'object') {
-        throw new Error('Request body must be a valid JSON object')
-      }
-      
     } catch (parseError) {
       console.error('Request parsing error:', parseError)
-      throw new Error(`Invalid request format: ${parseError.message}`)
+      return new Response(JSON.stringify({ 
+        error: 'Invalid JSON format',
+        success: false 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     const { amount, currency = 'usd' } = requestBody
@@ -87,11 +104,23 @@ Deno.serve(async (req) => {
     // Validate amount
     if (!amount || typeof amount !== 'number' || amount <= 0) {
       console.error('Invalid amount:', amount)
-      throw new Error('Invalid amount. Must be a positive number.')
+      return new Response(JSON.stringify({ 
+        error: 'Invalid amount. Must be a positive number.',
+        success: false 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     if (amount < 1) {
-      throw new Error('Minimum top-up amount is $1.00')
+      return new Response(JSON.stringify({ 
+        error: 'Minimum top-up amount is $1.00',
+        success: false 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     console.log('Creating topup session:', { userId: user.id, phone: userPhone, amount })
@@ -121,7 +150,13 @@ Deno.serve(async (req) => {
       }
     } catch (stripeError) {
       console.error('Stripe customer error:', stripeError)
-      throw new Error('Failed to create or retrieve Stripe customer')
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create or retrieve Stripe customer',
+        success: false 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     // Create Stripe Checkout session
@@ -161,7 +196,13 @@ Deno.serve(async (req) => {
       console.log('Stripe session created:', session.id)
     } catch (stripeError) {
       console.error('Stripe session creation error:', stripeError)
-      throw new Error('Failed to create Stripe checkout session')
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create Stripe checkout session',
+        success: false 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     // Create topup session record
@@ -181,14 +222,26 @@ Deno.serve(async (req) => {
 
       if (dbError) {
         console.error('Database error:', dbError)
-        throw new Error('Failed to create topup session record')
+        return new Response(JSON.stringify({ 
+          error: 'Failed to create topup session record',
+          success: false 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
       
       topupSession = data
       console.log('Topup session record created:', topupSession.id)
     } catch (dbError) {
       console.error('Database operation failed:', dbError)
-      throw new Error('Failed to save topup session')
+      return new Response(JSON.stringify({ 
+        error: 'Failed to save topup session',
+        success: false 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     const response = {
@@ -210,9 +263,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('=== CREATE TOPUP SESSION ERROR ===')
-    console.error('Error type:', typeof error)
-    console.error('Error message:', error?.message || 'Unknown error')
-    console.error('Error stack:', error?.stack || 'No stack trace')
+    console.error('Error details:', error)
     
     const errorResponse = { 
       error: error?.message || 'Internal server error',

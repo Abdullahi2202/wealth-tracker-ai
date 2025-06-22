@@ -41,37 +41,47 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Creating checkout session...');
 
-      // Prepare request body
-      const requestBody = { 
+      // Prepare request body as a proper object
+      const requestPayload = { 
         amount: amountValue,
         currency: 'usd'
       };
 
-      console.log('TopUpForm: Request body:', requestBody);
+      console.log('TopUpForm: Request payload:', requestPayload);
 
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: requestBody,
+        body: requestPayload,
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         }
       });
 
-      console.log('TopUpForm: Checkout response:', { data, error });
+      console.log('TopUpForm: Function response:', { data, error });
 
       if (error) {
-        console.error('TopUpForm: Checkout creation error:', error);
+        console.error('TopUpForm: Function invocation error:', error);
         throw new Error(error.message || 'Failed to create payment session');
       }
 
-      if (!data || !data.checkout_url) {
-        console.error('TopUpForm: Invalid response data:', data);
+      if (!data) {
+        console.error('TopUpForm: No response data received');
+        throw new Error('No response received from server');
+      }
+
+      if (!data.success) {
+        console.error('TopUpForm: Server returned error:', data.error);
+        throw new Error(data.error || 'Server error occurred');
+      }
+
+      if (!data.checkout_url) {
+        console.error('TopUpForm: No checkout URL in response:', data);
         throw new Error('No checkout URL received');
       }
 
       console.log('TopUpForm: Redirecting to checkout:', data.checkout_url);
       
-      // Redirect immediately without showing processing message
+      // Redirect to Stripe Checkout
       window.location.href = data.checkout_url;
 
     } catch (error) {
@@ -118,7 +128,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
+                Creating Payment Session...
               </>
             ) : (
               `Add $${amount || '0.00'} to Wallet`
