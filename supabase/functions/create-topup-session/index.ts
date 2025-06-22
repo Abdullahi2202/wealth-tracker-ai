@@ -64,23 +64,19 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // Parse request body with multiple methods
+    // Parse request body - Supabase Functions automatically parse JSON
     let requestBody
-    const contentType = req.headers.get('content-type') || ''
-    console.log('Content-Type:', contentType)
     
     try {
-      // Get raw body text
-      const rawBody = await req.text()
-      console.log('Raw request body length:', rawBody.length)
-      console.log('Raw request body:', rawBody)
+      // For Supabase Functions, the body is automatically parsed from JSON
+      const rawBody = await req.json()
+      console.log('Parsed request body:', rawBody)
+      requestBody = rawBody
       
-      // Handle empty body
-      if (!rawBody || rawBody.trim() === '') {
-        console.log('Empty request body detected, using default values')
-        // If no body provided, return error asking for amount
+      if (!requestBody || typeof requestBody !== 'object') {
+        console.log('Invalid request body format')
         return new Response(JSON.stringify({ 
-          error: 'Request body is required. Please provide amount.',
+          error: 'Request body must be a valid JSON object',
           success: false 
         }), {
           status: 400,
@@ -88,29 +84,10 @@ Deno.serve(async (req) => {
         })
       }
       
-      // Try to parse JSON
-      try {
-        requestBody = JSON.parse(rawBody)
-        console.log('Successfully parsed request body:', requestBody)
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError)
-        // Try to handle as form data or other formats
-        if (rawBody.includes('amount=')) {
-          const params = new URLSearchParams(rawBody)
-          requestBody = {
-            amount: parseFloat(params.get('amount') || '0'),
-            currency: params.get('currency') || 'usd'
-          }
-          console.log('Parsed as form data:', requestBody)
-        } else {
-          throw new Error('Invalid request format. Expected JSON.')
-        }
-      }
-      
     } catch (bodyError) {
-      console.error('Request body processing error:', bodyError)
+      console.error('Request body parsing error:', bodyError)
       return new Response(JSON.stringify({ 
-        error: 'Invalid request body format',
+        error: 'Invalid JSON in request body',
         success: false 
       }), {
         status: 400,

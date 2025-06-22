@@ -41,7 +41,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Creating checkout session...');
 
-      // Create request payload
+      // Create request payload - use object directly, not JSON string
       const requestPayload = { 
         amount: amountValue,
         currency: 'usd'
@@ -49,9 +49,9 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Request payload:', requestPayload);
 
-      // Use invoke method with proper body serialization
+      // Use invoke method with the payload as an object (not JSON string)
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: JSON.stringify(requestPayload),
+        body: requestPayload, // Pass as object, not JSON string
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
