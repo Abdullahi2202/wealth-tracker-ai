@@ -674,6 +674,7 @@ export type Database = {
           created_at: string | null
           currency: string | null
           id: string
+          numeric_id: number | null
           status: string
           stripe_session_id: string
           updated_at: string | null
@@ -684,6 +685,7 @@ export type Database = {
           created_at?: string | null
           currency?: string | null
           id?: string
+          numeric_id?: number | null
           status?: string
           stripe_session_id: string
           updated_at?: string | null
@@ -694,6 +696,7 @@ export type Database = {
           created_at?: string | null
           currency?: string | null
           id?: string
+          numeric_id?: number | null
           status?: string
           stripe_session_id?: string
           updated_at?: string | null
