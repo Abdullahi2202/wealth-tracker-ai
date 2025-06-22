@@ -64,23 +64,15 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // 🔍 ROBUST BODY PARSING WITH FALLBACK 🔍
+    // Parse request body properly
     let requestBody
     try {
-      // First try req.body (pre-parsed by Supabase)
-      requestBody = req.body
-      console.log('BODY RECEIVED (req.body):', requestBody)
-      
-      // If req.body is empty/undefined, try manual parsing
-      if (!requestBody || Object.keys(requestBody).length === 0) {
-        console.log('req.body was empty, trying manual parsing...')
-        requestBody = await req.json()
-        console.log('BODY RECEIVED (await req.json()):', requestBody)
-      }
+      requestBody = await req.json()
+      console.log('Request body parsed:', requestBody)
     } catch (parseError) {
       console.error('Body parsing error:', parseError)
       return new Response(JSON.stringify({ 
-        error: 'Invalid request body format',
+        error: 'Invalid request body format. Please send valid JSON.',
         success: false 
       }), {
         status: 400,
@@ -88,11 +80,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Validate the request body with gentle error handling
+    // Validate the request body
     if (!requestBody || typeof requestBody !== 'object') {
       console.error('Invalid request body:', requestBody)
       return new Response(JSON.stringify({ 
-        error: 'Request body must be a valid object',
+        error: 'Request body must be a valid JSON object',
         success: false 
       }), {
         status: 400,
@@ -102,7 +94,7 @@ Deno.serve(async (req) => {
 
     const { amount, currency = 'usd' } = requestBody
 
-    // 🧁 Bonus gentle validation for amount!
+    // Validate amount
     if (!amount || typeof amount !== 'number' || amount <= 0) {
       console.error('Invalid amount:', amount)
       return new Response(JSON.stringify({ 
@@ -245,7 +237,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 😄 Clean, happy response!
+    // Clean, happy response!
     const response = {
       session_id: session.id,
       checkout_url: session.url,
