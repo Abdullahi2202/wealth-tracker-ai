@@ -64,12 +64,13 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // Get request body - Supabase automatically parses JSON for functions.invoke()
-    const requestBody = await req.json()
-    console.log('Request body received:', requestBody)
+    // 🌱 Use the lovely pre-parsed body that Supabase gives us! 💌
+    const requestBody = req.body
+    console.log('Request body received (pre-parsed by Supabase):', requestBody)
 
-    // Validate the request body
+    // Validate the request body with gentle error handling
     if (!requestBody || typeof requestBody !== 'object') {
+      console.error('Invalid request body:', requestBody)
       return new Response(JSON.stringify({ 
         error: 'Request body must be a valid object',
         success: false 
@@ -81,7 +82,7 @@ Deno.serve(async (req) => {
 
     const { amount, currency = 'usd' } = requestBody
 
-    // Validate amount
+    // 🧁 Bonus gentle validation for amount!
     if (!amount || typeof amount !== 'number' || amount <= 0) {
       console.error('Invalid amount:', amount)
       return new Response(JSON.stringify({ 
@@ -224,6 +225,7 @@ Deno.serve(async (req) => {
       })
     }
 
+    // 😄 Clean, happy response!
     const response = {
       session_id: session.id,
       checkout_url: session.url,
