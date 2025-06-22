@@ -60,18 +60,16 @@ serve(async (req) => {
         console.log('Processing wallet topup completion')
         
         const userId = session.metadata.user_id
-        const userEmail = session.metadata.user_email
-        const topupSessionId = session.metadata.topup_session_id
-        const amountInCents = parseInt(session.metadata.amount_cents || '0')
+        const userPhone = session.metadata.phone
+        const amountInCents = session.amount_total
         
         console.log('Topup details:', {
           userId,
-          userEmail,
-          topupSessionId,
+          userPhone,
           amountInCents
         })
         
-        if (userId && userEmail && topupSessionId && amountInCents > 0) {
+        if (userId && amountInCents > 0) {
           // Update topup session status first
           console.log('Updating topup session status to completed')
           const { error: sessionError } = await supabase
@@ -80,7 +78,7 @@ serve(async (req) => {
               status: 'completed',
               updated_at: new Date().toISOString()
             })
-            .eq('id', topupSessionId)
+            .eq('stripe_session_id', session.id)
 
           if (sessionError) {
             console.error('Error updating topup session:', sessionError)
@@ -126,8 +124,6 @@ serve(async (req) => {
         } else {
           console.error('Missing required data for wallet topup:', {
             userId: !!userId,
-            userEmail: !!userEmail,
-            topupSessionId: !!topupSessionId,
             amountInCents
           })
         }

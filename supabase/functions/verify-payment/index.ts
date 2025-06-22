@@ -21,18 +21,19 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     
-    // Parse request body
-    const body = await req.json()
+    let body;
+    try {
+      body = await req.json()
+    } catch {
+      throw new Error('Invalid JSON in request body')
+    }
+
     const { session_id } = body
 
     console.log('Request body received:', { session_id })
 
     if (!session_id) {
-      console.error('Missing session_id')
-      return new Response(JSON.stringify({ error: 'Missing session_id' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      throw new Error('Missing session_id')
     }
 
     console.log('Verifying payment for session:', session_id)
@@ -48,14 +49,7 @@ Deno.serve(async (req) => {
     })
 
     if (session.payment_status !== 'paid') {
-      console.error('Payment not completed:', session.payment_status)
-      return new Response(JSON.stringify({ 
-        error: 'Payment not completed', 
-        payment_status: session.payment_status 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      throw new Error(`Payment not completed. Status: ${session.payment_status}`)
     }
 
     // Find the topup session using the stripe_session_id
@@ -69,14 +63,7 @@ Deno.serve(async (req) => {
     console.log('Topup session query result:', { topupSession, fetchError })
 
     if (fetchError || !topupSession) {
-      console.error('Error fetching topup session:', fetchError)
-      return new Response(JSON.stringify({ 
-        error: 'Topup session not found',
-        details: fetchError?.message || 'Session not found in database'
-      }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      throw new Error('Topup session not found in database')
     }
 
     console.log('Found topup session:', topupSession.id, 'for user:', topupSession.user_id, 'status:', topupSession.status)
@@ -91,14 +78,7 @@ Deno.serve(async (req) => {
     console.log('RPC function result:', { rpcResult, walletError })
 
     if (walletError) {
-      console.error('Error updating wallet balance:', walletError)
-      return new Response(JSON.stringify({ 
-        error: 'Failed to update wallet balance',
-        details: walletError.message
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      throw new Error(`Failed to update wallet balance: ${walletError.message}`)
     }
 
     console.log('Wallet balance updated successfully')
@@ -140,8 +120,8 @@ Deno.serve(async (req) => {
     console.error('=== VERIFY PAYMENT ERROR ===')
     console.error('Error details:', error)
     return new Response(JSON.stringify({ 
-      error: 'Payment verification failed',
-      details: error.message || 'Unknown error'
+      error: error.message || 'Payment verification failed',
+      success: false
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
