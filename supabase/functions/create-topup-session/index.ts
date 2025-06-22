@@ -64,20 +64,23 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // Parse request body
+    // Parse request body with multiple methods
     let requestBody
+    const contentType = req.headers.get('content-type') || ''
+    console.log('Content-Type:', contentType)
+    
     try {
-      const contentType = req.headers.get('content-type') || ''
-      console.log('Content-Type:', contentType)
-      
+      // Get raw body text
       const rawBody = await req.text()
       console.log('Raw request body length:', rawBody.length)
       console.log('Raw request body:', rawBody)
       
+      // Handle empty body
       if (!rawBody || rawBody.trim() === '') {
-        console.error('Empty request body')
+        console.log('Empty request body detected, using default values')
+        // If no body provided, return error asking for amount
         return new Response(JSON.stringify({ 
-          error: 'Request body is required',
+          error: 'Request body is required. Please provide amount.',
           success: false 
         }), {
           status: 400,
@@ -85,13 +88,29 @@ Deno.serve(async (req) => {
         })
       }
       
-      requestBody = JSON.parse(rawBody)
-      console.log('Parsed request body:', requestBody)
+      // Try to parse JSON
+      try {
+        requestBody = JSON.parse(rawBody)
+        console.log('Successfully parsed request body:', requestBody)
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError)
+        // Try to handle as form data or other formats
+        if (rawBody.includes('amount=')) {
+          const params = new URLSearchParams(rawBody)
+          requestBody = {
+            amount: parseFloat(params.get('amount') || '0'),
+            currency: params.get('currency') || 'usd'
+          }
+          console.log('Parsed as form data:', requestBody)
+        } else {
+          throw new Error('Invalid request format. Expected JSON.')
+        }
+      }
       
-    } catch (parseError) {
-      console.error('Request parsing error:', parseError)
+    } catch (bodyError) {
+      console.error('Request body processing error:', bodyError)
       return new Response(JSON.stringify({ 
-        error: 'Invalid JSON format',
+        error: 'Invalid request body format',
         success: false 
       }), {
         status: 400,

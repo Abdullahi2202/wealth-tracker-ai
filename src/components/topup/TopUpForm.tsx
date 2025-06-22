@@ -41,7 +41,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Creating checkout session...');
 
-      // Prepare request body as a proper object
+      // Create request payload
       const requestPayload = { 
         amount: amountValue,
         currency: 'usd'
@@ -49,8 +49,9 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Request payload:', requestPayload);
 
+      // Use invoke method with proper body serialization
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: requestPayload,
+        body: JSON.stringify(requestPayload),
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
@@ -84,11 +85,11 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
       // Redirect to Stripe Checkout
       window.location.href = data.checkout_url;
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("TopUpForm: Top-up error:", error);
       onLoadingChange(false);
       
-      if (error instanceof Error) {
+      if (error?.message) {
         toast.error(error.message);
       } else {
         toast.error('Failed to process top-up. Please try again.');
