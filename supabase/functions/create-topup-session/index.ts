@@ -45,8 +45,23 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // Parse request body
-    const body = await req.json()
+    // Parse request body with better error handling
+    let body
+    try {
+      const rawBody = await req.text()
+      console.log('Raw request body:', rawBody)
+      
+      if (!rawBody || rawBody.trim() === '') {
+        throw new Error('Request body is empty')
+      }
+      
+      body = JSON.parse(rawBody)
+      console.log('Parsed request body:', body)
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      throw new Error('Invalid JSON in request body')
+    }
+
     const { amount, currency = 'usd' } = body
 
     if (!amount || typeof amount !== 'number' || amount <= 0) {
@@ -132,55 +147,6 @@ Deno.serve(async (req) => {
     }
 
     console.log('Topup session record created:', topupSession.id)
-
-    // Find or create wallet
-    let walletQuery = supabase.from('wallets').select('*')
-    if (userPhone) {
-      walletQuery = walletQuery.eq('user_phone', userPhone)
-    } else {
-      walletQuery = walletQuery.eq('user_email', user.email)
-    }
-
-    const { data: existingWallet } = await walletQuery.maybeSingle()
-
-    if (existingWallet) {
-      console.log('Found existing wallet:', existingWallet.id)
-      // Immediately update wallet balance for instant feedback
-      await supabase
-        .from('wallets')
-        .update({
-          balance: existingWallet.balance + amount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingWallet.id)
-      console.log('Wallet balance updated immediately')
-    } else {
-      console.log('Creating new wallet')
-      await supabase
-        .from('wallets')
-        .insert({
-          user_id: user.id,
-          user_email: user.email,
-          user_phone: userPhone,
-          balance: amount
-        })
-      console.log('New wallet created with balance')
-    }
-
-    // Record transaction
-    await supabase
-      .from('transactions')
-      .insert({
-        user_id: user.id,
-        name: 'Wallet Top-up',
-        amount: amount,
-        type: 'income',
-        category: 'Top-up',
-        date: new Date().toISOString().split('T')[0],
-        status: 'completed'
-      })
-
-    console.log('Transaction recorded')
 
     return new Response(JSON.stringify({
       session_id: session.id,
