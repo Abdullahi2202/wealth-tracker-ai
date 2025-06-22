@@ -23,17 +23,38 @@ const TopUpWallet = () => {
   // Auto-refresh wallet balance periodically
   useEffect(() => {
     const interval = setInterval(() => {
+      console.log('TopUpWallet: Auto-refreshing wallet balance...');
       refetch();
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
   }, [refetch]);
 
+  // Initialize the page
+  useEffect(() => {
+    const initializePage = async () => {
+      try {
+        console.log('TopUpWallet: Initializing page...');
+        // Allow some time for payment verification to complete if needed
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('TopUpWallet: Page initialization complete');
+      } catch (error) {
+        console.error('TopUpWallet: Error during initialization:', error);
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    initializePage();
+  }, []);
+
   const handleVerificationStart = () => {
+    console.log('TopUpWallet: Payment verification started');
     setVerifyingPayment(true);
   };
 
   const handleVerificationEnd = () => {
+    console.log('TopUpWallet: Payment verification ended');
     setVerifyingPayment(false);
     setInitializing(false);
   };

@@ -78,11 +78,13 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Redirecting to Stripe checkout:', data.checkout_url);
       
-      // Show loading state with message
+      // Show loading message and redirect
       toast.info("Redirecting to Stripe checkout...");
       
-      // Use window.location.href for better compatibility
-      window.location.href = data.checkout_url;
+      // Small delay to ensure the toast is visible
+      setTimeout(() => {
+        window.location.href = data.checkout_url;
+      }, 500);
 
     } catch (error) {
       console.error("TopUpForm: === TOP-UP ERROR ===");
@@ -158,6 +160,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
         <div className="text-center text-sm text-gray-600 mt-3 p-3 bg-yellow-50 rounded-lg border">
           <p className="font-medium">Processing your request...</p>
           <p>You will be redirected to Stripe to complete the payment securely.</p>
+          <p className="text-xs mt-1">Please do not close this window.</p>
         </div>
       )}
     </form>
