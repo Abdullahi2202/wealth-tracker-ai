@@ -79,35 +79,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    console.log('Found topup session:', topupSession.id, 'for user:', topupSession.user_id)
-
-    if (topupSession.status === 'completed') {
-      console.log('Payment already processed')
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'Already processed',
-        already_completed: true
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // Update topup session status to completed
-    console.log('Updating topup session status to completed')
-    const { error: updateError } = await supabase
-      .from('topup_sessions')
-      .update({ 
-        status: 'completed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', topupSession.id)
-
-    if (updateError) {
-      console.error('Error updating topup session:', updateError)
-      throw updateError
-    }
-
-    console.log('Topup session updated to completed')
+    console.log('Found topup session:', topupSession.id, 'for user:', topupSession.user_id, 'status:', topupSession.status)
 
     // Update wallet balance using the RPC function
     console.log('Updating wallet balance for user:', topupSession.user_id, 'amount:', session.amount_total)
@@ -120,7 +92,13 @@ Deno.serve(async (req) => {
 
     if (walletError) {
       console.error('Error updating wallet balance:', walletError)
-      throw walletError
+      return new Response(JSON.stringify({ 
+        error: 'Failed to update wallet balance',
+        details: walletError.message
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     console.log('Wallet balance updated successfully')
@@ -152,7 +130,8 @@ Deno.serve(async (req) => {
       success: true,
       message: 'Payment verified and wallet updated',
       amount: session.amount_total / 100,
-      session_id: session_id
+      session_id: session_id,
+      wallet_updated: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

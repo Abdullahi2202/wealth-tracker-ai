@@ -128,15 +128,15 @@ Deno.serve(async (req) => {
 
       console.log('Stripe session created successfully:', session.id)
 
-      // Now create topup session record with the stripe_session_id
+      // Create topup session record with status 'completed' (since default is now completed)
       const { data: topupSession, error: dbError } = await supabase
         .from('topup_sessions')
         .insert({
           user_id: user.id,
           stripe_session_id: session.id,
           amount: amountInCents,
-          currency: currency,
-          status: 'pending'
+          currency: currency
+          // status will be 'completed' by default due to table default
         })
         .select()
         .single()
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      console.log('Topup session created in DB:', topupSession.id)
+      console.log('Topup session created in DB:', topupSession.id, 'with status:', topupSession.status)
 
       console.log('=== SUCCESS: Returning checkout URL ===')
       return new Response(JSON.stringify({
@@ -159,6 +159,7 @@ Deno.serve(async (req) => {
         checkout_url: session.url,
         amount: amount,
         currency: currency,
+        topup_session_id: topupSession.id,
         success: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
