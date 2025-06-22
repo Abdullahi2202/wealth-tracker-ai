@@ -64,27 +64,11 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // Parse request body - Supabase automatically parses JSON when we use invoke()
-    let requestBody
-    
-    try {
-      // When using supabase.functions.invoke(), the body is automatically parsed
-      requestBody = await req.json()
-      console.log('Successfully parsed request body:', requestBody)
-      
-    } catch (bodyError) {
-      console.error('Body parsing error:', bodyError)
-      return new Response(JSON.stringify({ 
-        error: 'Failed to parse request body',
-        success: false,
-        details: bodyError.message
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    // Get request body - Supabase automatically parses JSON for functions.invoke()
+    const requestBody = await req.json()
+    console.log('Request body received:', requestBody)
 
-    // Validate the parsed body
+    // Validate the request body
     if (!requestBody || typeof requestBody !== 'object') {
       return new Response(JSON.stringify({ 
         error: 'Request body must be a valid object',
