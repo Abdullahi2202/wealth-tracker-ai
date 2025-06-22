@@ -41,11 +41,16 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Creating checkout session...');
 
+      // Prepare request body
+      const requestBody = { 
+        amount: amountValue,
+        currency: 'usd'
+      };
+
+      console.log('TopUpForm: Request body:', requestBody);
+
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: { 
-          amount: amountValue,
-          currency: 'usd'
-        },
+        body: requestBody,
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
@@ -60,6 +65,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
       }
 
       if (!data || !data.checkout_url) {
+        console.error('TopUpForm: Invalid response data:', data);
         throw new Error('No checkout URL received');
       }
 
