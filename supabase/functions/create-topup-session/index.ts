@@ -64,30 +64,77 @@ Deno.serve(async (req) => {
     const userPhone = profile?.phone
     console.log('User profile:', { email: user.email, phone: userPhone })
 
-    // Parse request body - Supabase Functions automatically parse JSON
+    // Parse request body with better error handling
     let requestBody
     
     try {
-      // For Supabase Functions, the body is automatically parsed from JSON
-      const rawBody = await req.json()
-      console.log('Parsed request body:', rawBody)
-      requestBody = rawBody
+      // First check if we have a body
+      const contentType = req.headers.get('content-type') || ''
+      console.log('Content-Type header:', contentType)
       
-      if (!requestBody || typeof requestBody !== 'object') {
-        console.log('Invalid request body format')
+      // Clone the request to avoid body already read issues
+      const requestClone = req.clone()
+      
+      // Try to get the body as text first to see what we're working with
+      const bodyText = await requestClone.text()
+      console.log('Raw body text:', bodyText)
+      console.log('Body length:', bodyText.length)
+      
+      if (!bodyText || bodyText.trim() === '') {
+        console.log('Empty body received')
         return new Response(JSON.stringify({ 
-          error: 'Request body must be a valid JSON object',
+          error: 'Request body is required. Please provide amount and currency.',
           success: false 
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
+
+      // Now parse the JSON
+      try {
+        requestBody = JSON.parse(bodyText)
+        console.log('Successfully parsed JSON body:', requestBody)
+      } catch (jsonError) {
+        console.error('JSON parsing failed:', jsonError)
+        console.log('Attempting to parse as form data...')
+        
+        // Try form data parsing as fallback
+        if (bodyText.includes('=') && bodyText.includes('&')) {
+          const params = new URLSearchParams(bodyText)
+          requestBody = {
+            amount: parseFloat(params.get('amount') || '0'),
+            currency: params.get('currency') || 'usd'
+          }
+          console.log('Parsed as form data:', requestBody)
+        } else {
+          return new Response(JSON.stringify({ 
+            error: 'Invalid request format. Expected JSON with amount and currency.',
+            success: false,
+            received_body: bodyText.substring(0, 100) // First 100 chars for debugging
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+      }
       
     } catch (bodyError) {
-      console.error('Request body parsing error:', bodyError)
+      console.error('Body processing error:', bodyError)
       return new Response(JSON.stringify({ 
-        error: 'Invalid JSON in request body',
+        error: 'Failed to process request body',
+        success: false,
+        details: bodyError.message
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Validate the parsed body
+    if (!requestBody || typeof requestBody !== 'object') {
+      return new Response(JSON.stringify({ 
+        error: 'Request body must be a valid object',
         success: false 
       }), {
         status: 400,
