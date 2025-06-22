@@ -1,15 +1,9 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import Stripe from 'https://esm.sh/stripe@14.21.0'
 import { corsHeaders } from '../_shared/cors.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')!
-
-const stripe = new Stripe(stripeKey, {
-  apiVersion: '2023-10-16',
-})
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -31,22 +25,34 @@ Deno.serve(async (req) => {
       throw new Error('Invalid authentication')
     }
 
-    const { recipient_email, amount, currency = 'usd', description } = await req.json()
+    const { recipient_phone, recipient_email, amount, description } = await req.json()
 
-    if (!recipient_email || !amount || amount <= 0) {
-      throw new Error('Invalid recipient email or amount')
+    if ((!recipient_phone && !recipient_email) || !amount || amount <= 0) {
+      throw new Error('Invalid recipient or amount')
     }
 
-    console.log('Sending money from user:', user.id, 'to:', recipient_email, 'amount:', amount)
+    console.log('Sending money from user:', user.id, 'to:', recipient_phone || recipient_email, 'amount:', amount)
 
     const amountInCents = Math.round(amount * 100)
 
-    // Get sender's wallet
-    const { data: senderWallet, error: senderWalletError } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
+    // Get sender's profile and wallet
+    const { data: senderProfile } = await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', user.id)
       .single()
+
+    const senderPhone = senderProfile?.phone
+
+    // Get sender's wallet (try by phone first, then email)
+    let senderWalletQuery = supabase.from('wallets').select('*')
+    if (senderPhone) {
+      senderWalletQuery = senderWalletQuery.eq('user_phone', senderPhone)
+    } else {
+      senderWalletQuery = senderWalletQuery.eq('user_email', user.email)
+    }
+
+    const { data: senderWallet, error: senderWalletError } = await senderWalletQuery.single()
 
     if (senderWalletError || !senderWallet) {
       throw new Error('Sender wallet not found')
@@ -56,62 +62,40 @@ Deno.serve(async (req) => {
       throw new Error('Insufficient balance')
     }
 
-    // Get recipient user
-    const { data: recipientProfile, error: recipientError } = await supabase
-      .from('profiles')
-      .select('id, email')
-      .eq('email', recipient_email)
-      .single()
+    // Find recipient by phone or email
+    let recipientProfile = null
+    if (recipient_phone) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, email, phone')
+        .eq('phone', recipient_phone)
+        .single()
+      recipientProfile = data
+    } else if (recipient_email) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, email, phone')
+        .eq('email', recipient_email)
+        .single()
+      recipientProfile = data
+    }
 
-    if (recipientError || !recipientProfile) {
+    if (!recipientProfile) {
       throw new Error('Recipient not found')
     }
 
     // Get recipient's wallet
-    const { data: recipientWallet, error: recipientWalletError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', recipientProfile.id)
-      .single()
+    let recipientWalletQuery = supabase.from('wallets').select('*')
+    if (recipientProfile.phone) {
+      recipientWalletQuery = recipientWalletQuery.eq('user_phone', recipientProfile.phone)
+    } else {
+      recipientWalletQuery = recipientWalletQuery.eq('user_email', recipientProfile.email)
+    }
+
+    const { data: recipientWallet, error: recipientWalletError } = await recipientWalletQuery.single()
 
     if (recipientWalletError || !recipientWallet) {
       throw new Error('Recipient wallet not found')
-    }
-
-    // Check if both users have connect accounts for Stripe transfer
-    const { data: senderConnect } = await supabase
-      .from('connect_accounts')
-      .select('stripe_account_id')
-      .eq('user_id', user.id)
-      .single()
-
-    const { data: recipientConnect } = await supabase
-      .from('connect_accounts')
-      .select('stripe_account_id')
-      .eq('user_id', recipientProfile.id)
-      .single()
-
-    let stripeTransferId = null
-
-    // If both have connect accounts, create Stripe transfer
-    if (senderConnect && recipientConnect) {
-      try {
-        const transfer = await stripe.transfers.create({
-          amount: amountInCents,
-          currency: currency,
-          destination: recipientConnect.stripe_account_id,
-          description: description || `Transfer from ${user.email}`,
-          metadata: {
-            sender_id: user.id,
-            recipient_id: recipientProfile.id
-          }
-        })
-        stripeTransferId = transfer.id
-        console.log('Stripe transfer created:', transfer.id)
-      } catch (stripeError) {
-        console.error('Stripe transfer failed:', stripeError)
-        // Continue with internal transfer even if Stripe fails
-      }
     }
 
     // Update balances
@@ -125,7 +109,7 @@ Deno.serve(async (req) => {
         balance: newSenderBalance, 
         updated_at: new Date().toISOString() 
       })
-      .eq('user_id', user.id)
+      .eq('id', senderWallet.id)
 
     if (senderUpdateError) {
       throw new Error('Failed to update sender balance')
@@ -138,7 +122,7 @@ Deno.serve(async (req) => {
         balance: newRecipientBalance, 
         updated_at: new Date().toISOString() 
       })
-      .eq('user_id', recipientProfile.id)
+      .eq('id', recipientWallet.id)
 
     if (recipientUpdateError) {
       throw new Error('Failed to update recipient balance')
@@ -151,9 +135,8 @@ Deno.serve(async (req) => {
         sender_id: user.id,
         recipient_id: recipientProfile.id,
         amount: amountInCents,
-        currency: currency,
+        currency: 'usd',
         status: 'completed',
-        stripe_transfer_id: stripeTransferId,
         description: description
       })
       .select()
@@ -161,7 +144,6 @@ Deno.serve(async (req) => {
 
     if (transferError) {
       console.error('Failed to record transfer:', transferError)
-      throw new Error('Failed to record transfer')
     }
 
     // Record transactions for both users
@@ -171,11 +153,12 @@ Deno.serve(async (req) => {
         .from('transactions')
         .insert({
           user_id: user.id,
-          name: `Money sent to ${recipient_email}`,
+          name: `Money sent to ${recipient_phone || recipient_email}`,
           amount: amount,
           type: 'expense',
           category: 'Transfer',
-          date: new Date().toISOString().split('T')[0]
+          date: new Date().toISOString().split('T')[0],
+          status: 'completed'
         }),
       
       // Recipient transaction
@@ -183,21 +166,22 @@ Deno.serve(async (req) => {
         .from('transactions')
         .insert({
           user_id: recipientProfile.id,
-          name: `Money received from ${user.email}`,
+          name: `Money received from ${senderPhone || user.email}`,
           amount: amount,
           type: 'income',
           category: 'Transfer',
-          date: new Date().toISOString().split('T')[0]
+          date: new Date().toISOString().split('T')[0],
+          status: 'completed'
         })
     ])
 
     console.log('Money transfer completed successfully')
 
     return new Response(JSON.stringify({
-      transfer: transfer,
+      success: true,
+      transfer_id: transfer?.id,
       sender_new_balance: newSenderBalance / 100,
-      recipient_new_balance: newRecipientBalance / 100,
-      stripe_transfer_id: stripeTransferId
+      recipient_new_balance: newRecipientBalance / 100
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

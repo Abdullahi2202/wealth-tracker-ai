@@ -6,14 +6,16 @@ import { supabase } from "@/integrations/supabase/client";
 export interface Wallet {
   id: string;
   user_email: string;
+  user_phone?: string;
   balance: number;
   updated_at: string;
   user_id?: string;
+  wallet_number?: number;
 }
 
 /**
  * React hook for managing the authenticated user's wallet balance.
- * Keeps the wallet balance up-to-date, returns current wallet object, loading, and refetch utility.
+ * Uses phone number as primary identifier with email as fallback.
  */
 export function useWallet() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
@@ -33,14 +35,26 @@ export function useWallet() {
         return;
       }
 
-      console.log('useWallet: Fetching wallet for user:', user.email);
+      // Get user profile to find phone number
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', user.id)
+        .single();
 
-      // Fetch wallet from database directly with fresh data
-      const { data: walletData, error: walletError } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_email', user.email)
-        .maybeSingle();
+      const userPhone = profile?.phone;
+      console.log('useWallet: User details:', { email: user.email, phone: userPhone });
+
+      // Try to fetch wallet by phone first, then by email
+      let walletQuery = supabase.from('wallets').select('*');
+      
+      if (userPhone) {
+        walletQuery = walletQuery.eq('user_phone', userPhone);
+      } else {
+        walletQuery = walletQuery.eq('user_email', user.email);
+      }
+
+      const { data: walletData, error: walletError } = await walletQuery.maybeSingle();
 
       if (walletError) {
         console.error("useWallet: Wallet fetch error:", walletError);
@@ -48,17 +62,19 @@ export function useWallet() {
       } else if (walletData) {
         console.log('useWallet: Wallet fetched successfully:', {
           balance: walletData.balance,
+          phone: walletData.user_phone,
           updated_at: walletData.updated_at
         });
         setWallet(walletData);
       } else {
-        console.log('useWallet: No wallet found for user, creating one...');
+        console.log('useWallet: No wallet found, creating one...');
         // Create wallet if it doesn't exist
         const { data: newWallet, error: createError } = await supabase
           .from('wallets')
           .insert({
             user_id: user.id,
             user_email: user.email,
+            user_phone: userPhone,
             balance: 0
           })
           .select()
@@ -86,19 +102,27 @@ export function useWallet() {
     
     const setupRealtime = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) return;
+      if (!user) return;
       
-      console.log('useWallet: Setting up realtime subscription for:', user.email);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', user.id)
+        .single();
+
+      const userPhone = profile?.phone;
+      
+      console.log('useWallet: Setting up realtime subscription for:', { email: user.email, phone: userPhone });
       
       const channel = supabase
         .channel("wallet-changes")
         .on(
           "postgres_changes",
           {
-            event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+            event: "*",
             schema: "public",
             table: "wallets",
-            filter: `user_email=eq.${user.email}`,
+            filter: userPhone ? `user_phone=eq.${userPhone}` : `user_email=eq.${user.email}`,
           },
           (payload) => {
             console.log('useWallet: Real-time wallet update received:', payload);
@@ -121,42 +145,22 @@ export function useWallet() {
     setupRealtime();
   }, [fetchWallet]);
 
-  // Add funds to wallet using edge function
-  const addFunds = useCallback(
-    async (amount: number, source?: string, description?: string) => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
-
-        const { data, error } = await supabase.functions.invoke('wallet-operations', {
-          body: JSON.stringify({ action: 'add-funds', amount, source, description }),
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-        });
-
-        if (error) throw error;
-        
-        setWallet(data);
-        return true;
-      } catch (error) {
-        console.error("Error adding funds:", error);
-        return false;
-      }
-    },
-    []
-  );
-
-  // Send payment using edge function
+  // Send payment using phone number or email
   const sendPayment = useCallback(
-    async (recipient: string, amount: number, note?: string) => {
+    async (recipientIdentifier: string, amount: number, note?: string) => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Not authenticated');
 
-        const { data, error } = await supabase.functions.invoke('wallet-operations', {
-          body: JSON.stringify({ action: 'send-payment', recipient, sendAmount: amount, note }),
+        console.log('Sending payment to:', recipientIdentifier, 'amount:', amount);
+
+        const { data, error } = await supabase.functions.invoke('send-money', {
+          body: JSON.stringify({ 
+            recipient_phone: recipientIdentifier.includes('@') ? null : recipientIdentifier,
+            recipient_email: recipientIdentifier.includes('@') ? recipientIdentifier : null,
+            amount, 
+            description: note 
+          }),
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
@@ -180,7 +184,6 @@ export function useWallet() {
     balance: wallet?.balance ?? 0,
     loading,
     refetch: fetchWallet,
-    addFunds,
     sendPayment,
   };
 }

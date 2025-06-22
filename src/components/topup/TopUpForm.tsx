@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import PaymentMethodPicker from "@/components/payments/PaymentMethodPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
@@ -14,82 +13,65 @@ interface TopUpFormProps {
 
 export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState("");
-  const [note, setNote] = useState("");
 
   const handleTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const amountValue = parseFloat(amount);
     if (!amount || amountValue <= 0) {
-      toast.error("Enter a valid amount.");
+      toast.error("Enter a valid amount (minimum $1.00).");
       return;
     }
 
-    if (!method) {
-      toast.error("Please select a payment method.");
+    if (amountValue < 1) {
+      toast.error("Minimum top-up amount is $1.00");
       return;
     }
     
     onLoadingChange(true);
 
     try {
-      console.log('TopUpForm: === STARTING TOP-UP PROCESS ===');
-      console.log('TopUpForm: Amount:', amountValue);
+      console.log('TopUpForm: Starting top-up process for amount:', amountValue);
 
-      // Get current session to ensure we're authenticated
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError) {
-        console.error('TopUpForm: Session error:', sessionError);
-        throw new Error('Authentication error. Please log in again.');
-      }
-
-      if (!session) {
-        console.error('TopUpForm: No session found');
+      if (sessionError || !session) {
         throw new Error('Please log in to continue.');
       }
 
-      console.log('TopUpForm: User authenticated, calling create-topup-session...');
+      console.log('TopUpForm: Creating checkout session...');
 
-      // Call the create-topup-session function
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
         body: { 
           amount: amountValue,
           currency: 'usd'
+        },
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
         }
       });
 
-      console.log('TopUpForm: Function response:', { data, error });
+      console.log('TopUpForm: Checkout response:', { data, error });
 
       if (error) {
-        console.error('TopUpForm: Function invocation error:', error);
-        let errorMessage = 'Failed to create payment session';
-        if (error.message) {
-          errorMessage = error.message;
-        }
-        throw new Error(errorMessage);
+        console.error('TopUpForm: Checkout creation error:', error);
+        throw new Error(error.message || 'Failed to create payment session');
       }
 
       if (!data || !data.checkout_url) {
-        console.error('TopUpForm: No checkout URL in response:', data);
-        throw new Error('No checkout URL received from payment processor');
+        throw new Error('No checkout URL received');
       }
 
-      console.log('TopUpForm: Redirecting to Stripe checkout:', data.checkout_url);
+      console.log('TopUpForm: Redirecting to checkout:', data.checkout_url);
       
-      // Show loading message and redirect
-      toast.success("Redirecting to Stripe checkout...");
+      toast.success("Redirecting to payment...");
       
-      // Small delay to ensure the toast is visible, then redirect
-      setTimeout(() => {
-        window.location.href = data.checkout_url;
-      }, 1000);
+      // Immediate redirect to avoid white pages
+      window.location.href = data.checkout_url;
 
     } catch (error) {
-      console.error("TopUpForm: === TOP-UP ERROR ===");
-      console.error("TopUpForm: Error details:", error);
-      
+      console.error("TopUpForm: Top-up error:", error);
       onLoadingChange(false);
       
       if (error instanceof Error) {
@@ -103,7 +85,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
   return (
     <form onSubmit={handleTopUp} className="space-y-4">
       <div>
-        <label className="block text-sm mb-1 font-medium">Amount ($)</label>
+        <label className="block text-sm mb-2 font-medium">Top-up Amount ($)</label>
         <Input
           type="number"
           placeholder="10.00"
@@ -120,30 +102,11 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
         </p>
       </div>
       
-      <PaymentMethodPicker 
-        value={method} 
-        onChange={setMethod} 
-        label="Payment Method" 
-        filterType="card"
-        disabled={loading}
-      />
-      
-      <div>
-        <label className="block text-xs mb-1">Note (Optional)</label>
-        <Input
-          type="text"
-          value={note}
-          placeholder="Optional note for this top-up"
-          onChange={(e) => setNote(e.target.value)}
-          disabled={loading}
-        />
-      </div>
-      
       <div className="pt-2">
         <Button 
           type="submit" 
           className="w-full h-12 text-lg font-semibold" 
-          disabled={loading || !amount || parseFloat(amount) <= 0}
+          disabled={loading || !amount || parseFloat(amount) < 1}
         >
           {loading ? (
             <>
@@ -158,9 +121,8 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       {loading && (
         <div className="text-center text-sm text-gray-600 mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="font-medium text-blue-800">Processing your top-up...</p>
-          <p className="text-blue-700">You will be redirected to Stripe to complete the payment securely.</p>
-          <p className="text-xs mt-1 text-blue-600">After payment, you'll be automatically redirected back.</p>
+          <p className="font-medium text-blue-800">Processing your payment...</p>
+          <p className="text-blue-700">Redirecting to secure payment page...</p>
         </div>
       )}
     </form>
