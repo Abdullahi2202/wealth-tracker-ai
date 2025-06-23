@@ -43,19 +43,14 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       // Create the request payload
       const requestPayload = {
-        amount: amountValue,
-        currency: 'usd'
+        amount: amountValue
       };
 
       console.log('TopUpForm: Request payload:', requestPayload);
 
-      // Use invoke method with proper JSON payload
+      // Use invoke method with proper payload - pass the object directly as body
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: requestPayload,
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
+        body: requestPayload
       });
 
       console.log('TopUpForm: Function response:', { data, error });
