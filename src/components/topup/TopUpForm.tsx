@@ -48,16 +48,16 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: User authenticated, creating checkout session...');
 
-      // Create the request payload
+      // Create the request payload as a proper JSON object
       const requestPayload = {
         amount: amountValue
       };
 
       console.log('TopUpForm: Request payload:', requestPayload);
 
-      // Use invoke method with proper payload and headers
+      // Use invoke method with proper JSON payload
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: requestPayload,
+        body: JSON.stringify(requestPayload),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
@@ -95,6 +95,9 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
       }
 
       console.log('TopUpForm: Redirecting to checkout:', data.checkout_url);
+      
+      // Show success message before redirect
+      toast.success(`Redirecting to Stripe Checkout for $${amount}...`);
       
       // Redirect to Stripe Checkout
       window.location.href = data.checkout_url;
@@ -140,7 +143,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
             className="text-lg h-12"
           />
           <p className="text-xs text-gray-500 mt-1">
-            Minimum amount: $1.00 • Powered by Stripe
+            Minimum amount: $1.00 • Powered by Stripe • Test cards accepted
           </p>
         </div>
         
@@ -159,6 +162,16 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
               `Add $${amount || '0.00'} to Wallet`
             )}
           </Button>
+        </div>
+        
+        {/* Test card information */}
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 className="text-sm font-medium text-blue-800 mb-2">Test Cards for Development</h4>
+          <div className="text-xs text-blue-700 space-y-1">
+            <p><strong>Success:</strong> 4242 4242 4242 4242</p>
+            <p><strong>Declined:</strong> 4000 0000 0000 0002</p>
+            <p><strong>Any future expiry date and CVC</strong></p>
+          </div>
         </div>
       </form>
     </div>

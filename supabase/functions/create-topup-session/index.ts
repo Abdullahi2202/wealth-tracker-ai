@@ -98,17 +98,40 @@ Deno.serve(async (req) => {
 
     const phone = profile?.phone || '';
 
-    // Parse request body
+    // Parse request body - handle both JSON and FormData
     let body;
     try {
-      body = await req.json();
+      const contentType = req.headers.get('content-type');
+      console.log('Content-Type:', contentType);
+      
+      if (contentType?.includes('application/json')) {
+        const bodyText = await req.text();
+        console.log('Raw body text:', bodyText);
+        
+        if (!bodyText.trim()) {
+          throw new Error('Empty request body');
+        }
+        
+        body = JSON.parse(bodyText);
+      } else {
+        // Try to read as JSON anyway
+        const bodyText = await req.text();
+        console.log('Raw body text (fallback):', bodyText);
+        
+        if (!bodyText.trim()) {
+          throw new Error('Empty request body');
+        }
+        
+        body = JSON.parse(bodyText);
+      }
+      
       console.log('Parsed request body:', body);
     } catch (parseError) {
-      console.error('JSON parsing error:', parseError);
+      console.error('Body parsing error:', parseError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Invalid JSON in request body' 
+          error: 'Invalid or empty request body. Please provide a valid JSON with amount field.' 
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
@@ -170,7 +193,7 @@ Deno.serve(async (req) => {
 
     console.log('Redirect URLs:', { successUrl, cancelUrl });
 
-    // Create Stripe checkout session
+    // Create Stripe checkout session with test card support
     console.log('Creating Stripe checkout session...');
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -197,6 +220,13 @@ Deno.serve(async (req) => {
         phone: phone,
         amount_dollars: amount.toString(),
       },
+      // Enable test card prefilling for easier testing
+      payment_intent_data: {
+        metadata: {
+          user_id: user.id,
+          type: 'wallet_topup'
+        }
+      }
     });
 
     console.log('Stripe session created:', { id: session.id, url: session.url });
