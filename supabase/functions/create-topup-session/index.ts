@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
 
     console.log('Stripe session created:', { id: session.id, url: session.url });
 
-    // Save session to database
+    // Save session to database with 'pending' status
     console.log('Saving topup session to database...');
     const { data: topupSession, error: dbError } = await supabase
       .from('topup_sessions')

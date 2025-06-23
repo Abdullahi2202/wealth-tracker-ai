@@ -54,16 +54,38 @@ export function useWallet() {
       const userPhone = profile?.phone;
       console.log('useWallet: User details:', { email: user.email, phone: userPhone });
 
-      // Try to fetch wallet by phone first, then by email
-      let walletQuery = supabase.from('wallets').select('*');
-      
-      if (userPhone) {
-        walletQuery = walletQuery.eq('user_phone', userPhone);
-      } else {
-        walletQuery = walletQuery.eq('user_email', user.email);
-      }
+      // First try to fetch wallet by user_id (most reliable)
+      let { data: walletData, error: walletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      const { data: walletData, error: walletError } = await walletQuery.maybeSingle();
+      // If not found by user_id, try by phone or email
+      if (!walletData && !walletError) {
+        if (userPhone) {
+          const { data: phoneWallet, error: phoneError } = await supabase
+            .from('wallets')
+            .select('*')
+            .eq('user_phone', userPhone)
+            .maybeSingle();
+          
+          walletData = phoneWallet;
+          walletError = phoneError;
+        }
+        
+        // If still not found, try by email
+        if (!walletData && !walletError) {
+          const { data: emailWallet, error: emailError } = await supabase
+            .from('wallets')
+            .select('*')
+            .eq('user_email', user.email)
+            .maybeSingle();
+          
+          walletData = emailWallet;
+          walletError = emailError;
+        }
+      }
 
       if (walletError) {
         console.error("useWallet: Wallet fetch error:", walletError);
@@ -116,16 +138,9 @@ export function useWallet() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('phone')
-        .eq('id', user.id)
-        .single();
-
-      const userPhone = profile?.phone;
+      console.log('useWallet: Setting up realtime subscription for user:', user.id);
       
-      console.log('useWallet: Setting up realtime subscription for:', { email: user.email, phone: userPhone });
-      
+      // Subscribe to changes for this specific user
       const channel = supabase
         .channel("wallet-changes")
         .on(
@@ -134,7 +149,7 @@ export function useWallet() {
             event: "*",
             schema: "public",
             table: "wallets",
-            filter: userPhone ? `user_phone=eq.${userPhone}` : `user_email=eq.${user.email}`,
+            filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
             console.log('useWallet: Real-time wallet update received:', payload);

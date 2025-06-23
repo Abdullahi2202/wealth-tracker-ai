@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PaymentVerificationHandlerProps {
   onVerificationStart: () => void;
@@ -28,28 +29,44 @@ export const PaymentVerificationHandler = ({
         console.log('Payment verification:', { success, canceled, sessionId, amount });
 
         if (success === 'true' && sessionId) {
-          console.log('Payment successful - processing wallet update...');
+          console.log('Payment successful - verifying and updating wallet...');
           onVerificationStart();
           
           // Show immediate success message
           toast.success(`Payment successful! Adding $${amount || 'amount'} to your wallet...`);
           
-          // Multiple wallet refresh attempts to ensure balance updates
+          // Verify payment with backend
+          try {
+            console.log('Verifying payment with backend...');
+            const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-payment', {
+              body: { session_id: sessionId }
+            });
+
+            console.log('Payment verification result:', { verificationData, verificationError });
+
+            if (verificationError || !verificationData?.success) {
+              console.error('Payment verification failed:', verificationError || verificationData?.error);
+              toast.error('Payment verification failed. Please contact support.');
+            } else {
+              console.log('Payment verified successfully');
+              toast.success(`Wallet updated! $${amount || 'amount'} added successfully.`);
+            }
+          } catch (error) {
+            console.error('Error during payment verification:', error);
+            toast.error('Error verifying payment. Please check your wallet balance.');
+          }
+          
+          // Refresh wallet balance multiple times to ensure it updates
           console.log('Refreshing wallet balance...');
           await onRefetchWallet();
           
-          // Additional refresh with delays to handle any propagation delays
+          // Additional refresh attempts with delays
           const refreshAttempts = [2000, 5000, 8000];
           
           refreshAttempts.forEach((delay, index) => {
             setTimeout(async () => {
               console.log(`Wallet refresh attempt ${index + 2}`);
               await onRefetchWallet();
-              
-              // Show final success message on last attempt
-              if (index === refreshAttempts.length - 1) {
-                toast.success(`Wallet updated! $${amount || 'amount'} added successfully.`);
-              }
             }, delay);
           });
           

@@ -48,7 +48,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Request payload:', requestPayload);
 
-      // Use invoke method with proper payload - pass the object directly as body
+      // Use invoke method with proper payload
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
         body: requestPayload
       });

@@ -70,7 +70,7 @@ serve(async (req) => {
         })
         
         if (userId && amountInCents > 0) {
-          // Update topup session status first
+          // Update topup session status to completed
           console.log('Updating topup session status to completed')
           const { error: sessionError } = await supabase
             .from('topup_sessions')
@@ -83,21 +83,7 @@ serve(async (req) => {
           if (sessionError) {
             console.error('Error updating topup session:', sessionError)
           } else {
-            console.log('Topup session updated successfully')
-          }
-
-          // Update wallet balance using the RPC function
-          console.log('Updating wallet balance using RPC function')
-          const { error: walletError } = await supabase.rpc('increment_wallet_balance', {
-            user_id_param: userId,
-            topup_amount_cents: amountInCents
-          })
-
-          if (walletError) {
-            console.error('Failed to update wallet balance:', walletError)
-            return new Response('Failed to update wallet', { status: 500 })
-          } else {
-            console.log('Wallet balance updated successfully')
+            console.log('Topup session updated successfully - wallet balance will be updated by trigger')
           }
 
           // Record transaction for tracking
