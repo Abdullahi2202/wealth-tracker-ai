@@ -11,28 +11,68 @@ import { WalletBalanceDisplay } from "@/components/topup/WalletBalanceDisplay";
 import { TopUpForm } from "@/components/topup/TopUpForm";
 import { LoadingScreen } from "@/components/topup/LoadingScreen";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const TopUpWallet = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const { methods } = usePaymentMethods();
   const { wallet, loading: walletLoading, error: walletError, refetch } = useWallet();
 
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('TopUpWallet: Auth check result:', { session: !!session, error });
+        
+        if (error) {
+          console.error('TopUpWallet: Auth error:', error);
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(!!session);
+        }
+      } catch (error) {
+        console.error('TopUpWallet: Auth check failed:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('TopUpWallet: Auth state changed:', { event, session: !!session });
+      setIsAuthenticated(!!session);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Auto-refresh wallet balance more frequently during topup process
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     const interval = setInterval(() => {
       console.log('TopUpWallet: Auto-refreshing wallet balance...');
       refetch();
     }, 5000); // Refresh every 5 seconds for faster updates
 
     return () => clearInterval(interval);
-  }, [refetch]);
+  }, [refetch, isAuthenticated]);
 
   // Initialize the page
   useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+    
     const initializePage = async () => {
       try {
         console.log('TopUpWallet: Initializing page...');
@@ -51,7 +91,7 @@ const TopUpWallet = () => {
     };
 
     initializePage();
-  }, [refetch]);
+  }, [refetch, isAuthenticated, authLoading]);
 
   const handleVerificationStart = () => {
     console.log('TopUpWallet: Payment verification started');
@@ -74,6 +114,63 @@ const TopUpWallet = () => {
     }
     return Promise.resolve();
   };
+
+  const handleLoginRedirect = () => {
+    navigate('/login');
+  };
+
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-muted flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-muted pt-3 px-2">
+        <div className="flex items-center gap-2 mb-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/payments")}>
+            &larr; Payments
+          </Button>
+          <h2 className="text-xl font-bold text-orange-600">Top-Up Wallet</h2>
+        </div>
+        
+        <Card className="max-w-md mx-auto shadow-lg rounded-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-500" />
+              Authentication Required
+            </CardTitle>
+            <CardDescription>
+              You need to be logged in to access your wallet and top-up funds.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Please log in to continue with topping up your wallet balance.
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={handleLoginRedirect} className="flex-1">
+                  Go to Login
+                </Button>
+                <Button variant="outline" onClick={() => navigate("/")}>
+                  Home
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Show loading screen during payment verification
   if (verifyingPayment) {

@@ -33,13 +33,20 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
     try {
       console.log('TopUpForm: Starting top-up process for amount:', amountValue);
 
+      // Check authentication first
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError || !session) {
+      if (sessionError) {
+        console.error('TopUpForm: Session error:', sessionError);
+        throw new Error('Authentication error. Please log in again.');
+      }
+      
+      if (!session) {
+        console.error('TopUpForm: No session found');
         throw new Error('Please log in to continue.');
       }
 
-      console.log('TopUpForm: Creating checkout session...');
+      console.log('TopUpForm: User authenticated, creating checkout session...');
 
       // Create the request payload
       const requestPayload = {
@@ -48,16 +55,28 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
 
       console.log('TopUpForm: Request payload:', requestPayload);
 
-      // Use invoke method with proper payload
+      // Use invoke method with proper payload and headers
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: requestPayload
+        body: requestPayload,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        }
       });
 
       console.log('TopUpForm: Function response:', { data, error });
 
       if (error) {
         console.error('TopUpForm: Function invocation error:', error);
-        throw new Error(error.message || 'Failed to create payment session');
+        
+        // Handle specific error types
+        if (error.message?.includes('AuthSessionMissingError')) {
+          throw new Error('Session expired. Please log in again.');
+        } else if (error.message?.includes('FunctionsHttpError')) {
+          throw new Error('Payment service is temporarily unavailable. Please try again.');
+        } else {
+          throw new Error(error.message || 'Failed to create payment session');
+        }
       }
 
       if (!data) {
@@ -84,8 +103,18 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
       console.error("TopUpForm: Top-up error:", error);
       onLoadingChange(false);
       
+      // Show user-friendly error messages
       if (error?.message) {
-        toast.error(error.message);
+        if (error.message.includes('log in')) {
+          toast.error(error.message, {
+            action: {
+              label: 'Login',
+              onClick: () => window.location.href = '/login'
+            }
+          });
+        } else {
+          toast.error(error.message);
+        }
       } else {
         toast.error('Failed to process top-up. Please try again.');
       }

@@ -33,8 +33,17 @@ export function useWallet() {
       // Get authenticated user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError || !user) {
+      if (userError) {
+        console.error('useWallet: User authentication error:', userError);
+        setError('Authentication failed');
+        setWallet(null);
+        setLoading(false);
+        return;
+      }
+      
+      if (!user) {
         console.log('useWallet: No authenticated user found');
+        setError('No authenticated user');
         setWallet(null);
         setLoading(false);
         return;
@@ -132,44 +141,70 @@ export function useWallet() {
 
   // Subscribe to real-time wallet balance changes
   useEffect(() => {
-    fetchWallet(); // initial load
-    
-    const setupRealtime = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('useWallet: Auth state changed:', { event, session: !!session });
       
-      console.log('useWallet: Setting up realtime subscription for user:', user.id);
+      if (!session) {
+        // User logged out, clear wallet data
+        setWallet(null);
+        setError('Not authenticated');
+        setLoading(false);
+        return;
+      }
       
-      // Subscribe to changes for this specific user
-      const channel = supabase
-        .channel("wallet-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "wallets",
-            filter: `user_id=eq.${user.id}`,
-          },
-          (payload) => {
-            console.log('useWallet: Real-time wallet update received:', payload);
-            if (payload.new) {
-              console.log('useWallet: Updating wallet state with new data:', payload.new);
-              setWallet(payload.new as Wallet);
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log('useWallet: Realtime subscription status:', status);
-        });
+      // User logged in or session restored, fetch wallet
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        fetchWallet();
+      }
+    });
+
+    // Initial session check and wallet fetch
+    const initializeWallet = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        fetchWallet();
         
-      return () => {
-        console.log('useWallet: Cleaning up realtime subscription');
-        supabase.removeChannel(channel);
-      };
+        // Set up realtime subscription for authenticated users
+        console.log('useWallet: Setting up realtime subscription for user:', session.user.id);
+        
+        const channel = supabase
+          .channel("wallet-changes")
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "wallets",
+              filter: `user_id=eq.${session.user.id}`,
+            },
+            (payload) => {
+              console.log('useWallet: Real-time wallet update received:', payload);
+              if (payload.new) {
+                console.log('useWallet: Updating wallet state with new data:', payload.new);
+                setWallet(payload.new as Wallet);
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log('useWallet: Realtime subscription status:', status);
+          });
+          
+        return () => {
+          console.log('useWallet: Cleaning up realtime subscription');
+          supabase.removeChannel(channel);
+        };
+      } else {
+        setWallet(null);
+        setError('Not authenticated');
+        setLoading(false);
+      }
     };
 
-    setupRealtime();
+    initializeWallet();
+    
+    return () => subscription.unsubscribe();
   }, [fetchWallet]);
 
   // Send payment using phone number only (no email support)
