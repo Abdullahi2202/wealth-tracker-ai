@@ -105,8 +105,7 @@ Deno.serve(async (req) => {
       console.log('Raw request body:', textBody);
       
       if (!textBody.trim()) {
-        console.log('Empty request body - using default amount');
-        // If body is empty, use a default or return error
+        console.log('Empty request body');
         return new Response(
           JSON.stringify({ 
             success: false, 

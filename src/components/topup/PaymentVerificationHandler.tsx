@@ -39,7 +39,7 @@ export const PaymentVerificationHandler = ({
           await onRefetchWallet();
           
           // Additional refresh with delays to handle any propagation delays
-          const refreshAttempts = [1000, 2500, 4000];
+          const refreshAttempts = [2000, 5000, 8000];
           
           refreshAttempts.forEach((delay, index) => {
             setTimeout(async () => {
@@ -57,7 +57,7 @@ export const PaymentVerificationHandler = ({
           setTimeout(() => {
             window.history.replaceState({}, document.title, '/payments/topup');
             navigate('/dashboard', { replace: true });
-          }, 5000);
+          }, 10000);
           
         } else if (canceled === 'true') {
           console.log('Payment was canceled by user');
