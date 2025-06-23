@@ -143,7 +143,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
             className="text-lg h-12"
           />
           <p className="text-xs text-gray-500 mt-1">
-            Minimum amount: $1.00 • Powered by Stripe • Test cards accepted
+            Minimum amount: $1.00 • Powered by Stripe
           </p>
         </div>
         
@@ -162,16 +162,6 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
               `Add $${amount || '0.00'} to Wallet`
             )}
           </Button>
-        </div>
-        
-        {/* Test card information */}
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">Test Cards for Development</h4>
-          <div className="text-xs text-blue-700 space-y-1">
-            <p><strong>Success:</strong> 4242 4242 4242 4242</p>
-            <p><strong>Declined:</strong> 4000 0000 0000 0002</p>
-            <p><strong>Any future expiry date and CVC</strong></p>
-          </div>
         </div>
       </form>
     </div>

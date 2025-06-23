@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +14,7 @@ import Payments from "./pages/Payments";
 import PaymentsHome from "./pages/PaymentsHome";
 import SendPayment from "./pages/SendPayment";
 import TopUpWallet from "./pages/TopUpWallet";
+import AddCard from "./pages/AddCard";
 import ReceivedPaymentsMobile from "./pages/ReceivedPaymentsMobile";
 import NotFound from "./pages/NotFound";
 import Transactions from "./pages/Transactions";
@@ -43,6 +45,7 @@ function App() {
             <Route path="/payments/home" element={<PaymentsHome />} />
             <Route path="/payments/send" element={<SendPayment />} />
             <Route path="/payments/topup" element={<TopUpWallet />} />
+            <Route path="/payments/add-card" element={<AddCard />} />
             <Route path="/payments/received" element={<ReceivedPaymentsMobile />} />
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/transactions" element={<Transactions />} />
