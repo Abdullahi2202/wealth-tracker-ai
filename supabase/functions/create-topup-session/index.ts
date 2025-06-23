@@ -98,18 +98,19 @@ Deno.serve(async (req) => {
 
     const phone = profile?.phone || '';
 
-    // Parse request body
+    // Parse request body with improved error handling
     let body;
     try {
       const textBody = await req.text();
       console.log('Raw request body:', textBody);
       
       if (!textBody.trim()) {
-        console.log('Empty request body');
+        console.log('Empty request body - using default amount');
+        // If body is empty, use a default or return error
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'Request body is empty' 
+            error: 'Request body is empty. Please provide amount.' 
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
