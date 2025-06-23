@@ -27,7 +27,7 @@ const BalanceCard = ({
     {
       title: "Top Up",
       icon: <ArrowUp className="h-5 w-5 text-white" />,
-      action: () => navigate("/payments?tab=request"),
+      action: () => navigate("/payments/topup"),
       description: "Add funds to your wallet balance"
     },
     {
@@ -56,18 +56,18 @@ const BalanceCard = ({
         <div className="flex justify-between items-start">
           <div>
             <p className="text-sm font-medium opacity-80">Total Balance</p>
-            <h3 className="text-3xl font-bold mt-1">
+            <div className="text-3xl font-bold mt-1">
               {loading ? (
                 <Skeleton className="h-8 w-28 bg-white/40" />
               ) : (
-                <>
+                <span>
                   {currency}{totalBalance.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
-                </>
+                </span>
               )}
-            </h3>
+            </div>
             <p className="text-sm mt-4 opacity-90">Available across all accounts</p>
           </div>
           <div className="bg-white/20 p-3 rounded-full">
@@ -79,33 +79,33 @@ const BalanceCard = ({
           <div className="flex justify-between mb-4">
             <div>
               <p className="text-xs opacity-70">This Month's Income</p>
-              <p className="text-lg font-medium">
+              <div className="text-lg font-medium">
                 {loading ? (
                   <Skeleton className="h-6 w-16 bg-white/40" />
                 ) : (
-                  <>
+                  <span>
                     {currency}{monthIncome.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
-                  </>
+                  </span>
                 )}
-              </p>
+              </div>
             </div>
             <div>
               <p className="text-xs opacity-70">This Month's Expenses</p>
-              <p className="text-lg font-medium">
+              <div className="text-lg font-medium">
                 {loading ? (
                   <Skeleton className="h-6 w-16 bg-white/40" />
                 ) : (
-                  <>
+                  <span>
                     {currency}{monthExpenses.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
-                  </>
+                  </span>
                 )}
-              </p>
+              </div>
             </div>
           </div>
 
@@ -141,28 +141,27 @@ const BalanceCard = ({
             <HoverCard>
               <HoverCardTrigger asChild>
                 <Button
-                  onClick={() => navigate("/payments?tab=request")}
+                  onClick={() => navigate("/payments/topup")}
                   variant="outline"
                   className="bg-white/10 border-white/20 hover:bg-white/20 text-white flex items-center justify-center gap-2"
                   disabled={loading}
                 >
-                  <ArrowDown className="h-4 w-4" />
-                  Receive
+                  <ArrowUp className="h-4 w-4" />
+                  Top Up
                 </Button>
               </HoverCardTrigger>
               <HoverCardContent className="w-80">
                 <div className="space-y-2">
-                  <h4 className="font-medium">Deposit Options</h4>
-                  <p className="text-sm">Received money can only be deposited to:</p>
+                  <h4 className="font-medium">Add Funds</h4>
+                  <p className="text-sm">Add money to your wallet balance</p>
                   <div className="flex gap-2 mt-1">
                     <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                       <Wallet className="h-3 w-3" /> Wallet Balance
                     </div>
                     <div className="flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                      <ArrowDown className="h-3 w-3" /> Bank Account
+                      <ArrowUp className="h-3 w-3" /> Stripe Checkout
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Note: Money cannot be received directly onto cards</p>
                 </div>
               </HoverCardContent>
             </HoverCard>
@@ -197,4 +196,3 @@ const BalanceCard = ({
 };
 
 export default BalanceCard;
-

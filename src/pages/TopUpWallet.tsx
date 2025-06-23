@@ -16,18 +16,17 @@ import { supabase } from "@/integrations/supabase/client";
 const TopUpWallet = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   const { methods } = usePaymentMethods();
   const { wallet, loading: walletLoading, error: walletError, refetch } = useWallet();
 
-  // Check authentication status
+  // Check authentication status immediately
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('TopUpWallet: Checking authentication...');
         const { data: { session }, error } = await supabase.auth.getSession();
         console.log('TopUpWallet: Auth check result:', { session: !!session, error });
         
@@ -40,8 +39,6 @@ const TopUpWallet = () => {
       } catch (error) {
         console.error('TopUpWallet: Auth check failed:', error);
         setIsAuthenticated(false);
-      } finally {
-        setAuthLoading(false);
       }
     };
 
@@ -51,7 +48,6 @@ const TopUpWallet = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('TopUpWallet: Auth state changed:', { event, session: !!session });
       setIsAuthenticated(!!session);
-      setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -68,30 +64,6 @@ const TopUpWallet = () => {
 
     return () => clearInterval(interval);
   }, [refetch, isAuthenticated]);
-
-  // Initialize the page
-  useEffect(() => {
-    if (!isAuthenticated || authLoading) return;
-    
-    const initializePage = async () => {
-      try {
-        console.log('TopUpWallet: Initializing page...');
-        // Initial wallet fetch
-        await refetch();
-        console.log('TopUpWallet: Page initialization complete');
-      } catch (error) {
-        console.error('TopUpWallet: Error during initialization:', error);
-        toast.error('Failed to initialize wallet data');
-      } finally {
-        // Reduce initialization time to show page faster
-        setTimeout(() => {
-          setInitializing(false);
-        }, 500);
-      }
-    };
-
-    initializePage();
-  }, [refetch, isAuthenticated, authLoading]);
 
   const handleVerificationStart = () => {
     console.log('TopUpWallet: Payment verification started');
@@ -120,7 +92,7 @@ const TopUpWallet = () => {
   };
 
   // Show loading screen while checking authentication
-  if (authLoading) {
+  if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
@@ -181,6 +153,7 @@ const TopUpWallet = () => {
     );
   }
 
+  // Main component render
   return (
     <div className="min-h-screen bg-muted pt-3 px-2 animate-fade-in">
       <PaymentVerificationHandler
@@ -200,7 +173,7 @@ const TopUpWallet = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Top Up Your Wallet
-            {(loading || initializing || walletLoading) && <Loader2 className="h-4 w-4 animate-spin" />}
+            {(loading || walletLoading) && <Loader2 className="h-4 w-4 animate-spin" />}
           </CardTitle>
           <CardDescription>Add funds to your wallet securely via Stripe.</CardDescription>
           
