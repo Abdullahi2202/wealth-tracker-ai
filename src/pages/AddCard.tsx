@@ -13,6 +13,7 @@ const AddCard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const topUpAmount = searchParams.get('amount');
+  const returnTo = searchParams.get('returnTo');
   
   const [cardData, setCardData] = useState({
     cardNumber: "",
@@ -57,6 +58,54 @@ const AddCard = () => {
     setCardData(prev => ({ ...prev, [field]: value }));
   };
 
+  const detectCardBrand = (cardNumber: string) => {
+    const number = cardNumber.replace(/\s/g, '');
+    if (/^4/.test(number)) return 'visa';
+    if (/^5[1-5]/.test(number) || /^2[2-7]/.test(number)) return 'mastercard';
+    if (/^3[47]/.test(number)) return 'amex';
+    if (/^6/.test(number)) return 'discover';
+    return 'card';
+  };
+
+  const saveCardToDatabase = async (user: any) => {
+    try {
+      const cardNumber = cardData.cardNumber.replace(/\s/g, '');
+      const brand = detectCardBrand(cardNumber);
+      const last4 = cardNumber.slice(-4);
+      const [expMonth, expYear] = cardData.expiryDate.split('/');
+
+      console.log('AddCard: Saving card to database...');
+
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .insert({
+          user_id: user.id,
+          type: 'card',
+          brand: brand,
+          last4: last4,
+          exp_month: parseInt(expMonth),
+          exp_year: parseInt(`20${expYear}`),
+          label: `${brand.charAt(0).toUpperCase() + brand.slice(1)} Card`,
+          is_default: false,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('AddCard: Database save error:', error);
+        throw error;
+      }
+
+      console.log('AddCard: Card saved successfully:', data);
+      return data;
+
+    } catch (error) {
+      console.error('AddCard: Error saving card:', error);
+      throw error;
+    }
+  };
+
   const handleProcessPayment = async () => {
     // Validate card data
     if (!cardData.cardNumber || !cardData.expiryDate || !cardData.cvv || !cardData.cardholderName) {
@@ -74,15 +123,10 @@ const AddCard = () => {
       return;
     }
 
-    if (!topUpAmount) {
-      toast.error("No amount specified for top-up");
-      return;
-    }
-
     setLoading(true);
 
     try {
-      console.log('AddCard: Starting payment process for amount:', topUpAmount);
+      console.log('AddCard: Starting payment process');
 
       // Check authentication first
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -97,56 +141,66 @@ const AddCard = () => {
         throw new Error('Please log in to continue.');
       }
 
-      console.log('AddCard: User authenticated, creating checkout session...');
+      console.log('AddCard: User authenticated, saving card...');
 
-      // Create the request payload
-      const requestPayload = {
-        amount: parseFloat(topUpAmount)
-      };
+      // Save card to database first
+      const savedCard = await saveCardToDatabase(session.user);
 
-      console.log('AddCard: Request payload:', requestPayload);
+      if (topUpAmount) {
+        console.log('AddCard: Processing top-up with saved card...');
 
-      // Use invoke method with proper JSON payload
-      const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: JSON.stringify(requestPayload),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+        // Process top-up with the saved card
+        const requestPayload = {
+          amount: parseFloat(topUpAmount),
+          payment_method_id: savedCard.id
+        };
+
+        console.log('AddCard: Request payload:', requestPayload);
+
+        const { data, error } = await supabase.functions.invoke('create-topup-session', {
+          body: JSON.stringify(requestPayload),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        console.log('AddCard: Function response:', { data, error });
+
+        if (error) {
+          console.error('AddCard: Function invocation error:', error);
+          throw new Error(error.message || 'Failed to create payment session');
         }
-      });
 
-      console.log('AddCard: Function response:', { data, error });
+        if (!data || !data.success) {
+          console.error('AddCard: Server returned error:', data?.error);
+          throw new Error(data?.error || 'Server error occurred');
+        }
 
-      if (error) {
-        console.error('AddCard: Function invocation error:', error);
-        throw new Error(error.message || 'Failed to create payment session');
+        if (!data.checkout_url) {
+          console.error('AddCard: No checkout URL in response:', data);
+          throw new Error('No checkout URL received');
+        }
+
+        console.log('AddCard: Redirecting to checkout:', data.checkout_url);
+        
+        toast.success(`Card saved! Redirecting to Stripe Checkout for $${topUpAmount}...`);
+        
+        // Redirect to Stripe Checkout
+        window.location.href = data.checkout_url;
+      } else {
+        // Just saving the card, redirect back
+        toast.success('Card saved successfully!');
+        
+        if (returnTo === 'topup') {
+          navigate('/payments/topup');
+        } else {
+          navigate('/cards');
+        }
       }
-
-      if (!data) {
-        console.error('AddCard: No response data received');
-        throw new Error('No response received from server');
-      }
-
-      if (!data.success) {
-        console.error('AddCard: Server returned error:', data.error);
-        throw new Error(data.error || 'Server error occurred');
-      }
-
-      if (!data.checkout_url) {
-        console.error('AddCard: No checkout URL in response:', data);
-        throw new Error('No checkout URL received');
-      }
-
-      console.log('AddCard: Redirecting to checkout:', data.checkout_url);
-      
-      // Show success message before redirect
-      toast.success(`Redirecting to Stripe Checkout for $${topUpAmount}...`);
-      
-      // Redirect to Stripe Checkout
-      window.location.href = data.checkout_url;
 
     } catch (error: any) {
-      console.error("AddCard: Payment error:", error);
+      console.error("AddCard: Error:", error);
       setLoading(false);
       
       // Show user-friendly error messages
@@ -162,20 +216,34 @@ const AddCard = () => {
           toast.error(error.message);
         }
       } else {
-        toast.error('Failed to process payment. Please try again.');
+        toast.error('Failed to process. Please try again.');
       }
     }
+  };
+
+  const getBackUrl = () => {
+    if (returnTo === 'topup' && topUpAmount) {
+      return '/payments/topup';
+    }
+    return '/payments/topup';
+  };
+
+  const getPageTitle = () => {
+    if (topUpAmount) {
+      return `Add $${topUpAmount} to Wallet`;
+    }
+    return 'Add Payment Method';
   };
 
   return (
     <div className="min-h-screen bg-muted pt-3 px-2">
       <div className="flex items-center gap-2 mb-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/payments/topup")}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(getBackUrl())}>
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back
         </Button>
         <h2 className="text-xl font-bold text-orange-600">
-          {topUpAmount ? `Add $${topUpAmount} to Wallet` : 'Add Payment Method'}
+          {getPageTitle()}
         </h2>
       </div>
       
@@ -187,7 +255,7 @@ const AddCard = () => {
           </CardTitle>
           <CardDescription>
             {topUpAmount 
-              ? `Enter your card details to add $${topUpAmount} to your wallet.`
+              ? `Enter your card details to add $${topUpAmount} to your wallet. Your card will be saved for future use.`
               : 'Enter your card details securely. All information is encrypted and protected.'
             }
           </CardDescription>
@@ -258,7 +326,7 @@ const AddCard = () => {
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => navigate("/payments/topup")}
+              onClick={() => navigate(getBackUrl())}
               className="w-full h-12"
               disabled={loading}
             >

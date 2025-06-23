@@ -87,44 +87,17 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', { id: user.id, email: user.email });
 
-    // Get user profile for phone number
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('phone')
-      .eq('id', user.id)
-      .single();
-
-    console.log('Profile fetch result:', { profile, error: profileError });
-
-    const phone = profile?.phone || '';
-
-    // Parse request body - handle both JSON and FormData
+    // Parse request body
     let body;
     try {
-      const contentType = req.headers.get('content-type');
-      console.log('Content-Type:', contentType);
+      const bodyText = await req.text();
+      console.log('Raw body text:', bodyText);
       
-      if (contentType?.includes('application/json')) {
-        const bodyText = await req.text();
-        console.log('Raw body text:', bodyText);
-        
-        if (!bodyText.trim()) {
-          throw new Error('Empty request body');
-        }
-        
-        body = JSON.parse(bodyText);
-      } else {
-        // Try to read as JSON anyway
-        const bodyText = await req.text();
-        console.log('Raw body text (fallback):', bodyText);
-        
-        if (!bodyText.trim()) {
-          throw new Error('Empty request body');
-        }
-        
-        body = JSON.parse(bodyText);
+      if (!bodyText.trim()) {
+        throw new Error('Empty request body');
       }
       
+      body = JSON.parse(bodyText);
       console.log('Parsed request body:', body);
     } catch (parseError) {
       console.error('Body parsing error:', parseError);
@@ -161,6 +134,16 @@ Deno.serve(async (req) => {
     const amountInCents = Math.round(amount * 100);
     console.log('Amount in cents:', amountInCents);
 
+    // Get user profile for phone number
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', user.id)
+      .single();
+
+    console.log('Profile fetch result:', { profile, error: profileError });
+    const phone = profile?.phone || '';
+
     // Check for existing Stripe customer
     console.log('Looking for existing Stripe customer with email:', user.email);
     const customerList = await stripe.customers.list({
@@ -193,7 +176,37 @@ Deno.serve(async (req) => {
 
     console.log('Redirect URLs:', { successUrl, cancelUrl });
 
-    // Create Stripe checkout session with test card support
+    // Handle payment with existing saved card
+    if (body.payment_method_id) {
+      console.log('Processing payment with existing card:', body.payment_method_id);
+      
+      // Get payment method from database
+      const { data: paymentMethod, error: pmError } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('id', body.payment_method_id)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single();
+
+      if (pmError || !paymentMethod) {
+        console.error('Payment method not found:', pmError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Payment method not found or not accessible' 
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+            status: 400 
+          }
+        );
+      }
+
+      console.log('Found payment method:', paymentMethod);
+    }
+
+    // Create Stripe checkout session
     console.log('Creating Stripe checkout session...');
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -219,12 +232,13 @@ Deno.serve(async (req) => {
         user_id: user.id,
         phone: phone,
         amount_dollars: amount.toString(),
+        payment_method_id: body.payment_method_id || '',
       },
-      // Enable test card prefilling for easier testing
       payment_intent_data: {
         metadata: {
           user_id: user.id,
-          type: 'wallet_topup'
+          type: 'wallet_topup',
+          payment_method_id: body.payment_method_id || '',
         }
       }
     });
