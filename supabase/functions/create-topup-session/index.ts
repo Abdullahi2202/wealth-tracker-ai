@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     console.log('User authenticated:', { id: user.id, email: user.email });
 
     // Parse request body
-    let body;
+    let requestBody;
     try {
       const bodyText = await req.text();
       console.log('Raw body text:', bodyText);
@@ -97,8 +97,8 @@ Deno.serve(async (req) => {
         throw new Error('Empty request body');
       }
       
-      body = JSON.parse(bodyText);
-      console.log('Parsed request body:', body);
+      requestBody = JSON.parse(bodyText);
+      console.log('Parsed request body:', requestBody);
     } catch (parseError) {
       console.error('Body parsing error:', parseError);
       return new Response(
@@ -114,8 +114,8 @@ Deno.serve(async (req) => {
     }
 
     // Validate amount
-    const amount = Number(body.amount);
-    console.log('Amount validation:', { original: body.amount, parsed: amount });
+    const amount = Number(requestBody.amount);
+    console.log('Amount validation:', { original: requestBody.amount, parsed: amount });
 
     if (!amount || isNaN(amount) || amount < 1) {
       console.log('Invalid amount:', amount);
@@ -177,14 +177,14 @@ Deno.serve(async (req) => {
     console.log('Redirect URLs:', { successUrl, cancelUrl });
 
     // Handle payment with existing saved card
-    if (body.payment_method_id) {
-      console.log('Processing payment with existing card:', body.payment_method_id);
+    if (requestBody.payment_method_id) {
+      console.log('Processing payment with existing card:', requestBody.payment_method_id);
       
       // Get payment method from database
       const { data: paymentMethod, error: pmError } = await supabase
         .from('payment_methods')
         .select('*')
-        .eq('id', body.payment_method_id)
+        .eq('id', requestBody.payment_method_id)
         .eq('user_id', user.id)
         .eq('is_active', true)
         .single();
@@ -232,13 +232,13 @@ Deno.serve(async (req) => {
         user_id: user.id,
         phone: phone,
         amount_dollars: amount.toString(),
-        payment_method_id: body.payment_method_id || '',
+        payment_method_id: requestBody.payment_method_id || '',
       },
       payment_intent_data: {
         metadata: {
           user_id: user.id,
           type: 'wallet_topup',
-          payment_method_id: body.payment_method_id || '',
+          payment_method_id: requestBody.payment_method_id || '',
         }
       }
     });
