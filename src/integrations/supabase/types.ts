@@ -371,54 +371,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_transactions: {
-        Row: {
-          amount: number
-          created_at: string | null
-          currency: string | null
-          description: string | null
-          id: string
-          metadata: Json | null
-          payment_method: string | null
-          processed_at: string | null
-          status: string
-          stripe_payment_intent_id: string | null
-          stripe_session_id: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          currency?: string | null
-          description?: string | null
-          id?: string
-          metadata?: Json | null
-          payment_method?: string | null
-          processed_at?: string | null
-          status: string
-          stripe_payment_intent_id?: string | null
-          stripe_session_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          currency?: string | null
-          description?: string | null
-          id?: string
-          metadata?: Json | null
-          payment_method?: string | null
-          processed_at?: string | null
-          status?: string
-          stripe_payment_intent_id?: string | null
-          stripe_session_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       payouts: {
         Row: {
           amount: number
@@ -670,37 +622,34 @@ export type Database = {
       }
       topup_sessions: {
         Row: {
-          amount: number
+          amount_cents: number
           created_at: string | null
           currency: string | null
           id: string
-          numeric_id: number | null
-          status: string
+          status: string | null
           stripe_session_id: string
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
-          amount: number
+          amount_cents: number
           created_at?: string | null
           currency?: string | null
           id?: string
-          numeric_id?: number | null
-          status?: string
+          status?: string | null
           stripe_session_id: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
-          amount?: number
+          amount_cents?: number
           created_at?: string | null
           currency?: string | null
           id?: string
-          numeric_id?: number | null
-          status?: string
+          status?: string | null
           stripe_session_id?: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
