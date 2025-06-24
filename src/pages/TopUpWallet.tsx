@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useWallet } from "@/hooks/useWallet";
 import { Loader2, AlertCircle } from "lucide-react";
 import { PaymentVerificationHandler } from "@/components/topup/PaymentVerificationHandler";
@@ -19,7 +18,6 @@ const TopUpWallet = () => {
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-  const { methods } = usePaymentMethods();
   const { wallet, loading: walletLoading, error: walletError, refetch } = useWallet();
 
   // Check authentication status immediately

@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     console.log('User authenticated:', user.id);
 
     // Parse request body
-    const { amount } = await req.json();
+    const { amount, payment_method_id } = await req.json();
     const amountCents = Math.round(amount * 100);
 
     if (!amount || amountCents < 100) {
@@ -64,10 +64,8 @@ Deno.serve(async (req) => {
     // Get origin for redirect URLs
     const origin = req.headers.get('origin') || 'http://localhost:3000';
 
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
+    let sessionConfig: any = {
       customer: customer.id,
-      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
@@ -89,7 +87,38 @@ Deno.serve(async (req) => {
         user_id: user.id,
         amount_cents: amountCents.toString(),
       },
-    });
+    };
+
+    // If payment_method_id is provided, try to use existing payment method
+    if (payment_method_id) {
+      try {
+        // Get the payment method from our database
+        const { data: paymentMethodData } = await supabase
+          .from('payment_methods')
+          .select('stripe_payment_method_id')
+          .eq('id', payment_method_id)
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .single();
+
+        if (paymentMethodData?.stripe_payment_method_id) {
+          // Add payment method types to session config
+          sessionConfig.payment_method_types = ['card'];
+          sessionConfig.payment_method_configuration = {
+            payment_method: paymentMethodData.stripe_payment_method_id,
+          };
+          console.log('Using existing payment method:', paymentMethodData.stripe_payment_method_id);
+        }
+      } catch (error) {
+        console.log('Could not use existing payment method, falling back to default:', error);
+      }
+    } else {
+      // Default payment method types for new payments
+      sessionConfig.payment_method_types = ['card'];
+    }
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     console.log('Stripe session created:', session.id);
 
