@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -70,9 +69,15 @@ export const CardSelectionDialog = ({
         throw new Error(data?.error || 'Failed to create payment session');
       }
 
-      // Close dialog and redirect to Stripe Checkout
+      // Close dialog first
       onOpenChange(false);
-      window.location.href = data.checkout_url;
+      
+      // Ensure we redirect at the top level, not in an iframe
+      if (window.top) {
+        window.top.location.href = data.checkout_url;
+      } else {
+        window.location.href = data.checkout_url;
+      }
 
     } catch (error: any) {
       console.error("Payment error:", error);
