@@ -46,8 +46,29 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get authorization header
+    const authHeader = req.headers.get('Authorization');
+    console.log('Authorization header present:', !!authHeader);
+    
+    if (!authHeader) {
+      console.log('No authorization header found');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing Authorization header' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+          status: 401 
+        }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    console.log('Token extracted, length:', token.length);
+
     // Get authenticated user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     console.log('User authentication result:', { user: !!user, error: userError });
 
     if (userError || !user) {
