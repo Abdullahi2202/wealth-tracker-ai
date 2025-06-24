@@ -72,12 +72,15 @@ export const CardSelectionDialog = ({
       // Close dialog first
       onOpenChange(false);
       
-      // Ensure we redirect at the top level, not in an iframe
-      if (window.top) {
-        window.top.location.href = data.checkout_url;
-      } else {
-        window.location.href = data.checkout_url;
+      // Open Stripe checkout in a new tab to avoid iframe navigation restrictions
+      const newWindow = window.open(data.checkout_url, '_blank', 'noopener,noreferrer');
+      if (!newWindow) {
+        toast.error('Please allow popups to complete payment');
+        return;
       }
+
+      // Show success message
+      toast.success('Redirecting to Stripe checkout...');
 
     } catch (error: any) {
       console.error("Payment error:", error);
