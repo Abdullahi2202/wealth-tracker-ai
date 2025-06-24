@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         amount_cents: amountCents.toString(),
       },
+      payment_method_types: ['card'], // Always allow card payments
     };
 
     // If payment_method_id is provided, try to use existing payment method
@@ -102,19 +103,23 @@ Deno.serve(async (req) => {
           .single();
 
         if (paymentMethodData?.stripe_payment_method_id) {
-          // Add payment method types to session config
-          sessionConfig.payment_method_types = ['card'];
-          sessionConfig.payment_method_configuration = {
-            payment_method: paymentMethodData.stripe_payment_method_id,
-          };
+          // Instead of using payment_method_configuration, we'll set the customer's default payment method
+          // This is a cleaner approach that works with Stripe Checkout
           console.log('Using existing payment method:', paymentMethodData.stripe_payment_method_id);
+          
+          // Attach the payment method to the customer if not already attached
+          try {
+            await stripe.paymentMethods.attach(paymentMethodData.stripe_payment_method_id, {
+              customer: customer.id,
+            });
+          } catch (attachError: any) {
+            // Payment method might already be attached, that's okay
+            console.log('Payment method attach note:', attachError.message);
+          }
         }
       } catch (error) {
         console.log('Could not use existing payment method, falling back to default:', error);
       }
-    } else {
-      // Default payment method types for new payments
-      sessionConfig.payment_method_types = ['card'];
     }
 
     // Create Stripe checkout session
