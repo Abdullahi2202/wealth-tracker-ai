@@ -46,29 +46,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get authorization header
-    const authHeader = req.headers.get('Authorization');
-    console.log('Authorization header present:', !!authHeader);
-    
-    if (!authHeader) {
-      console.log('No authorization header found');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Missing Authorization header' 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-          status: 401 
-        }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    console.log('Token extracted, length:', token.length);
-
     // Get authenticated user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     console.log('User authentication result:', { user: !!user, error: userError });
 
     if (userError || !user) {
@@ -87,30 +66,37 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', { id: user.id, email: user.email });
 
-    // Parse request body
+    // Parse request body - use req.json() for Supabase function invoke
     let requestBody;
     try {
-      const bodyText = await req.text();
-      console.log('Raw body text:', bodyText);
-      
-      if (!bodyText.trim()) {
-        throw new Error('Empty request body');
-      }
-      
-      requestBody = JSON.parse(bodyText);
-      console.log('Parsed request body:', requestBody);
-    } catch (parseError) {
-      console.error('Body parsing error:', parseError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Invalid or empty request body. Please provide a valid JSON with amount field.' 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-          status: 400 
+      // First try to parse as JSON using req.json()
+      requestBody = await req.json();
+      console.log('Parsed request body using req.json():', requestBody);
+    } catch (jsonError) {
+      console.log('req.json() failed, trying req.text():', jsonError);
+      try {
+        const bodyText = await req.text();
+        console.log('Raw body text:', bodyText);
+        
+        if (!bodyText.trim()) {
+          throw new Error('Empty request body');
         }
-      );
+        
+        requestBody = JSON.parse(bodyText);
+        console.log('Parsed request body using req.text():', requestBody);
+      } catch (parseError) {
+        console.error('Body parsing error:', parseError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Invalid or empty request body. Please provide a valid JSON with amount field.' 
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+            status: 400 
+          }
+        );
+      }
     }
 
     // Validate amount

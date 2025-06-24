@@ -65,12 +65,12 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
       };
 
       console.log('TopUpForm: Request payload:', requestPayload);
+      console.log('TopUpForm: Request payload JSON:', JSON.stringify(requestPayload));
 
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
         body: requestPayload,
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Content-Type': 'application/json'
         }
       });
 
