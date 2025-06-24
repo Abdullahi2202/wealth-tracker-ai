@@ -48,6 +48,11 @@ export const CardSelector = ({
     );
   }
 
+  // For now, proceed directly without requiring card selection
+  const handleDirectProceed = () => {
+    onProceedWithCard();
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -63,8 +68,21 @@ export const CardSelector = ({
         </Button>
       </div>
 
-      {methods.length > 0 ? (
-        <div className="space-y-4">
+      <div className="space-y-4">
+        <div className="pt-4 space-y-3">
+          <Button 
+            onClick={handleDirectProceed}
+            className="w-full h-12 text-lg font-semibold bg-blue-600 hover:bg-blue-700"
+            disabled={loading}
+          >
+            {loading ? 'Processing...' : `Pay $${topUpAmount} with Stripe`}
+          </Button>
+        </div>
+      </div>
+
+      {methods.length > 0 && (
+        <div className="border-t pt-4">
+          <h4 className="text-sm font-medium mb-3">Saved Payment Methods</h4>
           <RadioGroup value={selectedCardId} onValueChange={onCardSelect}>
             {methods.map((method) => (
               <div key={method.id} className="flex items-center space-x-3">
@@ -99,27 +117,7 @@ export const CardSelector = ({
               </div>
             ))}
           </RadioGroup>
-
-          <div className="pt-4 space-y-3">
-            <Button 
-              onClick={onProceedWithCard}
-              className="w-full h-12 text-lg font-semibold bg-blue-600 hover:bg-blue-700"
-              disabled={!selectedCardId || loading}
-            >
-              {loading ? 'Processing...' : `Pay $${topUpAmount} with Selected Card`}
-            </Button>
-          </div>
         </div>
-      ) : (
-        <Card className="text-center py-8">
-          <CardContent>
-            <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-lg font-medium mb-2">No Payment Methods</h3>
-            <p className="text-gray-600 mb-4">
-              Add a payment method to continue with your top-up.
-            </p>
-          </CardContent>
-        </Card>
       )}
 
       <div className="border-t pt-4">

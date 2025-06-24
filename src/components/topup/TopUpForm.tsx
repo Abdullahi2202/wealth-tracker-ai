@@ -34,39 +34,35 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
   };
 
   const handleProceedWithCard = async () => {
-    if (!selectedCardId) {
-      toast.error("Please select a payment method");
-      return;
-    }
-
     const amountValue = parseFloat(amount);
     onLoadingChange(true);
 
     try {
-      console.log('TopUpForm: Starting payment with selected card:', selectedCardId);
+      console.log('Starting payment process for amount:', amountValue);
 
+      // Get current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
-        console.error('TopUpForm: Session error:', sessionError);
+        console.error('Session error:', sessionError);
         throw new Error('Authentication error. Please log in again.');
       }
       
       if (!session) {
-        console.error('TopUpForm: No session found');
+        console.error('No session found');
         throw new Error('Please log in to continue.');
       }
 
-      console.log('TopUpForm: Creating checkout session...');
+      console.log('Creating checkout session...');
 
+      // Create the request payload
       const requestPayload = {
-        amount: amountValue,
-        payment_method_id: selectedCardId
+        amount: amountValue
       };
 
-      console.log('TopUpForm: Request payload:', requestPayload);
-      console.log('TopUpForm: Request payload JSON:', JSON.stringify(requestPayload));
+      console.log('Request payload:', requestPayload);
 
+      // Call the edge function
       const { data, error } = await supabase.functions.invoke('create-topup-session', {
         body: requestPayload,
         headers: {
@@ -75,29 +71,24 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
         }
       });
 
-      console.log('TopUpForm: Function response:', { data, error });
+      console.log('Function response:', { data, error });
 
       if (error) {
-        console.error('TopUpForm: Function invocation error:', error);
+        console.error('Function error:', error);
         throw new Error(error.message || 'Failed to create payment session');
       }
 
       if (!data) {
-        console.error('TopUpForm: No response data received');
+        console.error('No response data');
         throw new Error('No response received from server');
       }
 
-      if (!data.success) {
-        console.error('TopUpForm: Server returned error:', data.error);
-        throw new Error(data.error || 'Server error occurred');
+      if (!data.success || !data.checkout_url) {
+        console.error('Invalid response:', data);
+        throw new Error(data.error || 'Invalid response from server');
       }
 
-      if (!data.checkout_url) {
-        console.error('TopUpForm: No checkout URL in response:', data);
-        throw new Error('No checkout URL received');
-      }
-
-      console.log('TopUpForm: Redirecting to checkout:', data.checkout_url);
+      console.log('Redirecting to checkout:', data.checkout_url);
       
       toast.success(`Redirecting to Stripe Checkout for $${amountValue}...`);
       
@@ -105,7 +96,7 @@ export const TopUpForm = ({ loading, onLoadingChange }: TopUpFormProps) => {
       window.location.href = data.checkout_url;
 
     } catch (error: any) {
-      console.error("TopUpForm: Payment error:", error);
+      console.error("Payment error:", error);
       onLoadingChange(false);
       
       if (error?.message) {

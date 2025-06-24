@@ -7,38 +7,33 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
 
-// Validate environment variables
+console.log('Environment check:', {
+  supabaseUrl: !!supabaseUrl,
+  supabaseServiceKey: !!supabaseServiceKey,
+  stripeKey: !!stripeKey
+});
+
 if (!supabaseUrl || !supabaseServiceKey || !stripeKey) {
   console.error('Missing required environment variables');
 }
 
-const supabase = createClient(
-  supabaseUrl || '',
-  supabaseServiceKey || ''
-);
-
-const stripe = new Stripe(stripeKey || '', {
-  apiVersion: '2023-10-16',
-});
+const supabase = createClient(supabaseUrl || '', supabaseServiceKey || '');
+const stripe = new Stripe(stripeKey || '', { apiVersion: '2023-10-16' });
 
 Deno.serve(async (req) => {
   console.log('=== CREATE TOPUP SESSION STARTED ===');
-  console.log('Request method:', req.method);
-  console.log('Request URL:', req.url);
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Validate request method
     if (req.method !== 'POST') {
       console.log('Invalid method:', req.method);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Method not allowed. Use POST.' 
-        }),
+        JSON.stringify({ error: 'Method not allowed. Use POST.' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
           status: 405 
@@ -48,15 +43,12 @@ Deno.serve(async (req) => {
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization');
-    console.log('Authorization header present:', !!authHeader);
+    console.log('Auth header present:', !!authHeader);
     
     if (!authHeader) {
-      console.log('No authorization header found');
+      console.log('No authorization header');
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Missing Authorization header' 
-        }),
+        JSON.stringify({ error: 'Missing Authorization header' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
           status: 401 
@@ -65,19 +57,16 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    console.log('Token extracted, length:', token.length);
+    console.log('Token length:', token.length);
 
-    // Get authenticated user
+    // Authenticate user
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    console.log('User authentication result:', { user: !!user, error: userError });
+    console.log('User auth result:', { user: !!user, error: userError });
 
     if (userError || !user) {
       console.log('Authentication failed:', userError);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Invalid or missing user authentication' 
-        }),
+        JSON.stringify({ error: 'Authentication failed' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
           status: 401 
@@ -87,31 +76,9 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', { id: user.id, email: user.email });
 
-    // Parse request body - read it only once
-    let requestBody;
-    try {
-      const bodyText = await req.text();
-      console.log('Raw body text:', bodyText);
-      
-      if (!bodyText.trim()) {
-        throw new Error('Empty request body');
-      }
-      
-      requestBody = JSON.parse(bodyText);
-      console.log('Parsed request body:', requestBody);
-    } catch (parseError) {
-      console.error('Body parsing error:', parseError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Invalid or empty request body. Please provide a valid JSON with amount field.' 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-          status: 400 
-        }
-      );
-    }
+    // Parse request body
+    const requestBody = await req.json();
+    console.log('Request body:', requestBody);
 
     // Validate amount
     const amount = Number(requestBody.amount);
@@ -120,10 +87,7 @@ Deno.serve(async (req) => {
     if (!amount || isNaN(amount) || amount < 1) {
       console.log('Invalid amount:', amount);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Invalid amount. Must be at least $1.00' 
-        }),
+        JSON.stringify({ error: 'Invalid amount. Must be at least $1.00' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
           status: 400 
@@ -134,18 +98,18 @@ Deno.serve(async (req) => {
     const amountInCents = Math.round(amount * 100);
     console.log('Amount in cents:', amountInCents);
 
-    // Get user profile for phone number
-    const { data: profile, error: profileError } = await supabase
+    // Get user profile for phone
+    const { data: profile } = await supabase
       .from('profiles')
       .select('phone')
       .eq('id', user.id)
       .single();
 
-    console.log('Profile fetch result:', { profile, error: profileError });
     const phone = profile?.phone || '';
+    console.log('User phone:', phone);
 
     // Check for existing Stripe customer
-    console.log('Looking for existing Stripe customer with email:', user.email);
+    console.log('Looking for existing Stripe customer:', user.email);
     const customerList = await stripe.customers.list({
       email: user.email,
       limit: 1,
@@ -169,44 +133,11 @@ Deno.serve(async (req) => {
 
     // Get origin for redirect URLs
     const origin = req.headers.get('origin') || 'https://your-app.com';
-    console.log('Origin for redirects:', origin);
+    console.log('Origin:', origin);
 
     const successUrl = `${origin}/payments/topup?success=true&session_id={CHECKOUT_SESSION_ID}&amount=${amount}`;
     const cancelUrl = `${origin}/payments/topup?canceled=true`;
 
-    console.log('Redirect URLs:', { successUrl, cancelUrl });
-
-    // Handle payment with existing saved card
-    if (requestBody.payment_method_id) {
-      console.log('Processing payment with existing card:', requestBody.payment_method_id);
-      
-      // Get payment method from database
-      const { data: paymentMethod, error: pmError } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .eq('id', requestBody.payment_method_id)
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .single();
-
-      if (pmError || !paymentMethod) {
-        console.error('Payment method not found:', pmError);
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Payment method not found or not accessible' 
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-            status: 400 
-          }
-        );
-      }
-
-      console.log('Found payment method:', paymentMethod);
-    }
-
-    // Create Stripe checkout session
     console.log('Creating Stripe checkout session...');
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -232,20 +163,12 @@ Deno.serve(async (req) => {
         user_id: user.id,
         phone: phone,
         amount_dollars: amount.toString(),
-        payment_method_id: requestBody.payment_method_id || '',
       },
-      payment_intent_data: {
-        metadata: {
-          user_id: user.id,
-          type: 'wallet_topup',
-          payment_method_id: requestBody.payment_method_id || '',
-        }
-      }
     });
 
     console.log('Stripe session created:', { id: session.id, url: session.url });
 
-    // Save session to database with 'pending' status
+    // Save session to database
     console.log('Saving topup session to database...');
     const { data: topupSession, error: dbError } = await supabase
       .from('topup_sessions')
@@ -260,12 +183,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (dbError) {
-      console.error('Database insert error:', dbError);
+      console.error('Database error:', dbError);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to save session to database' 
-        }),
+        JSON.stringify({ error: 'Failed to save session' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
           status: 500 
@@ -273,8 +193,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('Topup session saved:', topupSession.id);
-    console.log('=== CREATE TOPUP SESSION COMPLETED SUCCESSFULLY ===');
+    console.log('Session saved:', topupSession.id);
+    console.log('=== SUCCESS ===');
 
     return new Response(
       JSON.stringify({
@@ -290,14 +210,12 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('=== CREATE TOPUP SESSION ERROR ===');
-    console.error('Error type:', error.constructor.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
+    console.error('=== ERROR ===');
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
 
     return new Response(
       JSON.stringify({ 
-        success: false, 
         error: error.message || 'An unexpected error occurred',
         details: error.stack
       }),
