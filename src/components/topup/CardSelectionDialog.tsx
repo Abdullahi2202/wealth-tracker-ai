@@ -33,14 +33,39 @@ export const CardSelectionDialog = ({
         throw new Error("Invalid amount");
       }
 
-      const { data, error } = await supabase.functions.invoke('create-topup-session', {
-        body: { 
-          amount: amountValue,
-          payment_method_id: paymentMethodId 
-        }
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No valid session found");
+      }
+
+      const topupDetails = {
+        amount: amountValue,
+        payment_method_id: paymentMethodId 
+      };
+
+      console.log("Sending topup request with details:", topupDetails);
+
+      const response = await fetch('https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/create-topup-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiaHRpZnFtbGtkb2V2eG1iam1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcyOTY3MjYsImV4cCI6MjA2Mjg3MjcyNn0.USk2Wi_HbcfFni8TTyZMqAjdbGC3eVIvqZvWm5dq_i8',
+        },
+        body: JSON.stringify(topupDetails),
       });
 
-      if (error || !data?.success) {
+      if (!response.ok) {
+        const errorBody = await response.json();
+        console.error(`HTTP error! status: ${response.status}`, errorBody);
+        throw new Error(errorBody.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Topup session created:", data);
+
+      if (!data?.success || !data?.checkout_url) {
         throw new Error(data?.error || 'Failed to create payment session');
       }
 
