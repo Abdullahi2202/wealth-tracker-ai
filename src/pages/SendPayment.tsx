@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { Loader2, Phone, ArrowLeft, CreditCard, QrCode, User, Building } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
 
 const CATEGORY_OPTIONS = [
   "Transfer", "Food", "Bills", "Shopping", "Transport", "Entertainment", "Utilities", "Other"
