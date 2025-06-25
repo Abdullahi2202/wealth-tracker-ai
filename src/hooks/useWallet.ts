@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Updated Wallet data type to include user_phone
 export interface Wallet {
   id: string;
   user_email: string;
@@ -16,10 +15,6 @@ export interface Wallet {
   is_frozen?: boolean;
 }
 
-/**
- * React hook for managing the authenticated user's wallet balance.
- * Uses phone number as primary identifier with email as fallback.
- */
 export function useWallet() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +25,6 @@ export function useWallet() {
       console.log('useWallet: Starting wallet fetch...');
       setError(null);
       
-      // Get authenticated user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
@@ -49,7 +43,6 @@ export function useWallet() {
         return;
       }
 
-      // Get user profile to find phone number
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('phone')
@@ -63,14 +56,12 @@ export function useWallet() {
       const userPhone = profile?.phone;
       console.log('useWallet: User details:', { email: user.email, phone: userPhone });
 
-      // First try to fetch wallet by user_id (most reliable)
       let { data: walletData, error: walletError } = await supabase
         .from('wallets')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      // If not found by user_id, try by phone or email
       if (!walletData && !walletError) {
         if (userPhone) {
           const { data: phoneWallet, error: phoneError } = await supabase
@@ -83,7 +74,6 @@ export function useWallet() {
           walletError = phoneError;
         }
         
-        // If still not found, try by email
         if (!walletData && !walletError) {
           const { data: emailWallet, error: emailError } = await supabase
             .from('wallets')
@@ -109,7 +99,6 @@ export function useWallet() {
         setWallet(walletData as Wallet);
       } else {
         console.log('useWallet: No wallet found, creating one...');
-        // Create wallet if it doesn't exist
         const { data: newWallet, error: createError } = await supabase
           .from('wallets')
           .insert({
@@ -139,34 +128,28 @@ export function useWallet() {
     }
   }, []);
 
-  // Subscribe to real-time wallet balance changes
   useEffect(() => {
-    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('useWallet: Auth state changed:', { event, session: !!session });
       
       if (!session) {
-        // User logged out, clear wallet data
         setWallet(null);
         setError('Not authenticated');
         setLoading(false);
         return;
       }
       
-      // User logged in or session restored, fetch wallet
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         fetchWallet();
       }
     });
 
-    // Initial session check and wallet fetch
     const initializeWallet = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
         fetchWallet();
         
-        // Set up realtime subscription for authenticated users
         console.log('useWallet: Setting up realtime subscription for user:', session.user.id);
         
         const channel = supabase
@@ -207,14 +190,12 @@ export function useWallet() {
     return () => subscription.unsubscribe();
   }, [fetchWallet]);
 
-  // Send payment using phone number only (no email support)
   const sendPayment = useCallback(
     async (recipientPhone: string, amount: number, note?: string) => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Not authenticated');
 
-        // Validate phone number format
         if (!recipientPhone || recipientPhone.includes('@')) {
           throw new Error('Only phone numbers are supported for transfers');
         }
@@ -223,10 +204,10 @@ export function useWallet() {
 
         const { data, error } = await supabase.functions.invoke('send-money', {
           body: { 
-            recipient_phone: recipientPhone, // Phone only, no email
-            recipient_email: null, // Explicitly set to null
+            recipient_phone: recipientPhone,
             amount, 
-            description: note 
+            description: note,
+            transfer_type: 'user_to_user'
           },
           headers: { 
             'Content-Type': 'application/json',
@@ -236,8 +217,8 @@ export function useWallet() {
 
         if (error) throw error;
         
-        await fetchWallet(); // Refresh wallet data
-        return true;
+        await fetchWallet();
+        return data?.success || false;
       } catch (error) {
         console.error("Error sending payment:", error);
         return false;
