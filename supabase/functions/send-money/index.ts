@@ -270,7 +270,8 @@ async function processBankTransfer(
       amount: Math.round(amount * 100),
       currency: 'usd',
       status: 'processing',
-      description: `Bank transfer to ${bank_account.account_number.slice(-4)}`
+      description: `Bank transfer to ${bank_account.account_number.slice(-4)}`,
+      bank_account_data: bank_account
     })
     .select()
     .single()
@@ -329,7 +330,8 @@ async function processQRPayment(
       amount: Math.round(amount * 100),
       currency: 'usd',
       status: 'completed',
-      description: `QR Payment to ${qr_code_data.merchant_name || qr_code_data.merchant_id}`
+      description: `QR Payment to ${qr_code_data.merchant_name || qr_code_data.merchant_id}`,
+      qr_code_data: qr_code_data
     })
     .select()
     .single()

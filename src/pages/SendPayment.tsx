@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,6 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { Loader2, Phone, ArrowLeft, CreditCard, QrCode, User, Building } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
 
 const CATEGORY_OPTIONS = [
   "Transfer", "Food", "Bills", "Shopping", "Transport", "Entertainment", "Utilities", "Other"
@@ -62,7 +62,7 @@ const SendPayment = () => {
         return;
       }
     } else if (transferType === 'bank_transfer') {
-      if (!bankAccount.account_number || !bankAccount.routing_number) {
+      if (!bankAccount.account_number || !bankAccount.routing_number || !bankAccount.account_name) {
         toast.error("Please fill in all bank account details");
         return;
       }
@@ -86,7 +86,29 @@ const SendPayment = () => {
         qrData
       });
       
-      const success = await processTransfer(transferType, amountValue, note);
+      let additionalData;
+      let recipientIdentifier = recipient;
+      
+      switch (transferType) {
+        case 'bank_transfer':
+          additionalData = bankAccount;
+          recipientIdentifier = '';
+          break;
+        case 'qr_payment':
+          additionalData = qrData;
+          recipientIdentifier = '';
+          break;
+        default:
+          additionalData = null;
+      }
+      
+      const success = await sendPayment(
+        recipientIdentifier,
+        amountValue,
+        note,
+        transferType as 'user_to_user' | 'bank_transfer' | 'qr_payment',
+        additionalData
+      );
       
       if (success) {
         toast.success(`Transfer of $${amountValue.toFixed(2)} completed successfully!`);
@@ -113,42 +135,6 @@ const SendPayment = () => {
     }
     
     setLoading(false);
-  };
-
-  const processTransfer = async (type: string, amountValue: number, note?: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
-
-    let transferData: any = {
-      amount: amountValue,
-      description: note,
-      transfer_type: type
-    };
-
-    switch (type) {
-      case 'user_to_user':
-        transferData.recipient_phone = recipient.trim();
-        break;
-      case 'bank_transfer':
-        transferData.bank_account = bankAccount;
-        break;
-      case 'qr_payment':
-        transferData.qr_code_data = qrData;
-        break;
-    }
-
-    console.log('Sending transfer request:', transferData);
-
-    const { data, error } = await supabase.functions.invoke('send-money', {
-      body: transferData,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      },
-    });
-
-    if (error) throw error;
-    return data?.success || false;
   };
 
   const isValidPhoneNumber = (value: string) => {
@@ -368,7 +354,7 @@ const SendPayment = () => {
                     balance < parseFloat(amount || "0") || 
                     !amount ||
                     (transferType === 'user_to_user' && (!recipient.trim() || !isValidPhoneNumber(recipient))) ||
-                    (transferType === 'bank_transfer' && (!bankAccount.account_number || !bankAccount.routing_number)) ||
+                    (transferType === 'bank_transfer' && (!bankAccount.account_number || !bankAccount.routing_number || !bankAccount.account_name)) ||
                     (transferType === 'qr_payment' && !qrData.merchant_id)
                   }
                 >

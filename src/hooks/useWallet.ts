@@ -191,24 +191,48 @@ export function useWallet() {
   }, [fetchWallet]);
 
   const sendPayment = useCallback(
-    async (recipientPhone: string, amount: number, note?: string) => {
+    async (
+      recipientPhone: string, 
+      amount: number, 
+      note?: string,
+      transferType: 'user_to_user' | 'bank_transfer' | 'qr_payment' = 'user_to_user',
+      additionalData?: any
+    ) => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Not authenticated');
 
-        if (!recipientPhone || recipientPhone.includes('@')) {
-          throw new Error('Only phone numbers are supported for transfers');
+        console.log('Sending payment:', { 
+          recipientPhone, 
+          amount, 
+          transferType, 
+          additionalData 
+        });
+
+        const requestBody: any = {
+          amount,
+          description: note,
+          transfer_type: transferType
+        };
+
+        // Add specific data based on transfer type
+        switch (transferType) {
+          case 'user_to_user':
+            if (!recipientPhone || recipientPhone.includes('@')) {
+              throw new Error('Only phone numbers are supported for user transfers');
+            }
+            requestBody.recipient_phone = recipientPhone;
+            break;
+          case 'bank_transfer':
+            requestBody.bank_account = additionalData;
+            break;
+          case 'qr_payment':
+            requestBody.qr_code_data = additionalData;
+            break;
         }
 
-        console.log('Sending payment to phone:', recipientPhone, 'amount:', amount);
-
         const { data, error } = await supabase.functions.invoke('send-money', {
-          body: { 
-            recipient_phone: recipientPhone,
-            amount, 
-            description: note,
-            transfer_type: 'user_to_user'
-          },
+          body: requestBody,
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`

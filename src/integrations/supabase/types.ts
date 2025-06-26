@@ -284,38 +284,47 @@ export type Database = {
       money_transfers: {
         Row: {
           amount: number
+          bank_account_data: Json | null
           created_at: string | null
           currency: string | null
           description: string | null
           id: string
+          qr_code_data: Json | null
           recipient_id: string | null
           sender_id: string | null
           status: string
           stripe_transfer_id: string | null
+          transfer_metadata: Json | null
           updated_at: string | null
         }
         Insert: {
           amount: number
+          bank_account_data?: Json | null
           created_at?: string | null
           currency?: string | null
           description?: string | null
           id?: string
+          qr_code_data?: Json | null
           recipient_id?: string | null
           sender_id?: string | null
           status?: string
           stripe_transfer_id?: string | null
+          transfer_metadata?: Json | null
           updated_at?: string | null
         }
         Update: {
           amount?: number
+          bank_account_data?: Json | null
           created_at?: string | null
           currency?: string | null
           description?: string | null
           id?: string
+          qr_code_data?: Json | null
           recipient_id?: string | null
           sender_id?: string | null
           status?: string
           stripe_transfer_id?: string | null
+          transfer_metadata?: Json | null
           updated_at?: string | null
         }
         Relationships: []
@@ -755,6 +764,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_qr_codes: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          qr_data: Json
+          qr_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          qr_data: Json
+          qr_type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          qr_data?: Json
+          qr_type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
