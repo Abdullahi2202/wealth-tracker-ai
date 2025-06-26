@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -194,43 +193,28 @@ export function useWallet() {
     async (
       recipientPhone: string, 
       amount: number, 
-      note?: string,
-      transferType: 'user_to_user' | 'bank_transfer' | 'qr_payment' = 'user_to_user',
-      additionalData?: any
+      note?: string
     ) => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Not authenticated');
 
-        console.log('Sending payment:', { 
+        console.log('Sending user-to-user payment:', { 
           recipientPhone, 
           amount, 
-          transferType, 
-          additionalData 
+          note 
         });
 
-        // Build request body properly
-        const requestBody: any = {
+        if (!recipientPhone || recipientPhone.includes('@')) {
+          throw new Error('Valid phone number required for user transfers');
+        }
+
+        const requestBody = {
           amount: Number(amount),
           description: note || '',
-          transfer_type: transferType
+          transfer_type: 'user_to_user',
+          recipient_phone: recipientPhone.trim()
         };
-
-        // Add specific data based on transfer type
-        switch (transferType) {
-          case 'user_to_user':
-            if (!recipientPhone || recipientPhone.includes('@')) {
-              throw new Error('Valid phone number required for user transfers');
-            }
-            requestBody.recipient_phone = recipientPhone.trim();
-            break;
-          case 'bank_transfer':
-            requestBody.bank_account = additionalData;
-            break;
-          case 'qr_payment':
-            requestBody.qr_code_data = additionalData;
-            break;
-        }
 
         console.log('Final request body:', requestBody);
 
