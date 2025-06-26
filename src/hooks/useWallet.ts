@@ -209,9 +209,10 @@ export function useWallet() {
           additionalData 
         });
 
+        // Build request body properly
         const requestBody: any = {
-          amount,
-          description: note,
+          amount: Number(amount),
+          description: note || '',
           transfer_type: transferType
         };
 
@@ -219,9 +220,9 @@ export function useWallet() {
         switch (transferType) {
           case 'user_to_user':
             if (!recipientPhone || recipientPhone.includes('@')) {
-              throw new Error('Only phone numbers are supported for user transfers');
+              throw new Error('Valid phone number required for user transfers');
             }
-            requestBody.recipient_phone = recipientPhone;
+            requestBody.recipient_phone = recipientPhone.trim();
             break;
           case 'bank_transfer':
             requestBody.bank_account = additionalData;
@@ -231,21 +232,28 @@ export function useWallet() {
             break;
         }
 
+        console.log('Final request body:', requestBody);
+
         const { data, error } = await supabase.functions.invoke('send-money', {
-          body: requestBody,
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
+          body: requestBody
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Edge function error:', error);
+          throw error;
+        }
         
-        await fetchWallet();
-        return data?.success || false;
+        console.log('Payment response:', data);
+        
+        if (data?.success) {
+          await fetchWallet();
+          return true;
+        } else {
+          throw new Error(data?.error || 'Payment failed');
+        }
       } catch (error) {
         console.error("Error sending payment:", error);
-        return false;
+        throw error;
       }
     },
     [fetchWallet]

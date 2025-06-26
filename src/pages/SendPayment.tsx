@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,7 +77,7 @@ const SendPayment = () => {
     try {
       console.log('Processing transfer:', { 
         transferType, 
-        recipient, 
+        recipient: recipient.trim(), 
         amount: amountValue, 
         note, 
         category,
@@ -87,7 +86,7 @@ const SendPayment = () => {
       });
       
       let additionalData;
-      let recipientIdentifier = recipient;
+      let recipientIdentifier = recipient.trim();
       
       switch (transferType) {
         case 'bank_transfer':
@@ -102,7 +101,7 @@ const SendPayment = () => {
           additionalData = null;
       }
       
-      const success = await sendPayment(
+      await sendPayment(
         recipientIdentifier,
         amountValue,
         note,
@@ -110,31 +109,28 @@ const SendPayment = () => {
         additionalData
       );
       
-      if (success) {
-        toast.success(`Transfer of $${amountValue.toFixed(2)} completed successfully!`);
-        
-        // Reset form
-        setAmount("");
-        setRecipient("");
-        setNote("");
-        setCategory("Transfer");
-        setBankAccount({ account_number: "", routing_number: "", account_name: "" });
-        setQrData({ merchant_id: "", merchant_name: "" });
-        
-        await refetch();
-        
-        setTimeout(() => {
-          navigate("/payments");
-        }, 2000);
-      } else {
-        toast.error("Failed to process transfer. Please try again.");
-      }
-    } catch (error) {
+      toast.success(`Transfer of $${amountValue.toFixed(2)} completed successfully!`);
+      
+      // Reset form
+      setAmount("");
+      setRecipient("");
+      setNote("");
+      setCategory("Transfer");
+      setBankAccount({ account_number: "", routing_number: "", account_name: "" });
+      setQrData({ merchant_id: "", merchant_name: "" });
+      
+      await refetch();
+      
+      setTimeout(() => {
+        navigate("/payments");
+      }, 2000);
+      
+    } catch (error: any) {
       console.error("Transfer error:", error);
-      toast.error("Failed to process transfer. Please try again.");
+      toast.error(error.message || "Failed to process transfer. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const isValidPhoneNumber = (value: string) => {
@@ -216,7 +212,7 @@ const SendPayment = () => {
                     <div className="relative">
                       <Input
                         type="tel"
-                        placeholder="Phone number (e.g., +1234567890)"
+                        placeholder="Phone number (e.g., 01121338969)"
                         value={recipient}
                         onChange={(e) => setRecipient(e.target.value)}
                         required
@@ -225,6 +221,9 @@ const SendPayment = () => {
                       />
                       <Phone className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter the registered phone number of the recipient
+                    </p>
                   </div>
                 </TabsContent>
 

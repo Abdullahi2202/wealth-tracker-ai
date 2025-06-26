@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -27,26 +26,27 @@ Deno.serve(async (req) => {
       throw new Error('Invalid authentication')
     }
 
-    // Parse request body
+    // Parse request body with better error handling
     let requestBody
     try {
       const bodyText = await req.text()
       console.log('Raw request body:', bodyText)
       
       if (!bodyText.trim()) {
-        throw new Error('Empty request body')
+        throw new Error('Request body is empty')
       }
       
       requestBody = JSON.parse(bodyText)
+      console.log('Parsed request body:', requestBody)
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
-      throw new Error('Invalid JSON in request body')
+      throw new Error('Invalid JSON format in request body')
     }
 
     const { 
       recipient_phone, 
       amount, 
-      description, 
+      description = '', 
       transfer_type = 'user_to_user',
       bank_account,
       qr_code_data 
@@ -76,19 +76,31 @@ Deno.serve(async (req) => {
       throw new Error('Sender phone number not found. Please update your profile.')
     }
 
-    // Get sender's wallet
-    const { data: senderWallet, error: senderWalletError } = await supabase
+    // Get sender's wallet by user_id first, then fallback to phone
+    let { data: senderWallet, error: senderWalletError } = await supabase
       .from('wallets')
       .select('*')
-      .eq('user_phone', senderPhone)
+      .eq('user_id', user.id)
       .single()
 
     if (senderWalletError || !senderWallet) {
-      console.error('Sender wallet not found:', senderWalletError)
-      throw new Error('Sender wallet not found')
+      console.log('Trying to find wallet by phone:', senderPhone)
+      const { data: phoneWallet, error: phoneError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_phone', senderPhone.trim())
+        .single()
+      
+      if (phoneError || !phoneWallet) {
+        console.error('Sender wallet not found:', { senderWalletError, phoneError })
+        throw new Error('Sender wallet not found')
+      }
+      senderWallet = phoneWallet
     }
 
-    if (senderWallet.balance < amount) {
+    console.log('Sender wallet found:', { balance: senderWallet.balance, phone: senderWallet.user_phone })
+
+    if (Number(senderWallet.balance) < Number(amount)) {
       throw new Error(`Insufficient balance: $${senderWallet.balance} available, $${amount} required`)
     }
 
@@ -126,7 +138,8 @@ Deno.serve(async (req) => {
     console.error('=== SEND MONEY ERROR ===')
     console.error('Error details:', error)
     return new Response(JSON.stringify({ 
-      error: error.message || 'Failed to process transfer'
+      error: error.message || 'Failed to process transfer',
+      success: false
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -146,34 +159,59 @@ async function processUserToUserTransfer(
     throw new Error('Valid phone number required for user transfers')
   }
 
-  // Find recipient
+  const cleanRecipientPhone = recipient_phone.trim()
+  console.log('Looking for recipient with phone:', cleanRecipientPhone)
+
+  // Find recipient by phone number in profiles
   const { data: recipientProfile } = await supabase
     .from('profiles')
     .select('id, email, phone')
-    .eq('phone', recipient_phone)
+    .eq('phone', cleanRecipientPhone)
     .single()
 
   if (!recipientProfile) {
-    throw new Error('Recipient phone number not found in our system')
+    throw new Error(`No user found with phone number: ${cleanRecipientPhone}. Please ensure the recipient is registered.`)
   }
 
-  // Get recipient's wallet
-  const { data: recipientWallet, error: recipientWalletError } = await supabase
+  console.log('Recipient found:', recipientProfile)
+
+  // Get recipient's wallet - try by user_id first, then by phone
+  let { data: recipientWallet, error: recipientWalletError } = await supabase
     .from('wallets')
     .select('*')
-    .eq('user_phone', recipient_phone)
+    .eq('user_id', recipientProfile.id)
     .single()
 
   if (recipientWalletError || !recipientWallet) {
-    throw new Error('Recipient wallet not found')
+    console.log('Trying to find recipient wallet by phone')
+    const { data: phoneWallet, error: phoneError } = await supabase
+      .from('wallets')
+      .select('*')
+      .eq('user_phone', cleanRecipientPhone)
+      .single()
+    
+    if (phoneError || !phoneWallet) {
+      console.error('Recipient wallet not found:', { recipientWalletError, phoneError })
+      throw new Error('Recipient wallet not found')
+    }
+    recipientWallet = phoneWallet
   }
 
-  // Update balances
-  const newSenderBalance = senderWallet.balance - amount
-  const newRecipientBalance = recipientWallet.balance + amount
+  console.log('Recipient wallet found:', { balance: recipientWallet.balance })
+
+  // Calculate new balances
+  const newSenderBalance = Number(senderWallet.balance) - Number(amount)
+  const newRecipientBalance = Number(recipientWallet.balance) + Number(amount)
+
+  console.log('Balance calculations:', {
+    senderOld: senderWallet.balance,
+    senderNew: newSenderBalance,
+    recipientOld: recipientWallet.balance,
+    recipientNew: newRecipientBalance
+  })
 
   // Update sender wallet
-  await supabase
+  const { error: senderUpdateError } = await supabase
     .from('wallets')
     .update({ 
       balance: newSenderBalance, 
@@ -181,8 +219,13 @@ async function processUserToUserTransfer(
     })
     .eq('id', senderWallet.id)
 
+  if (senderUpdateError) {
+    console.error('Failed to update sender wallet:', senderUpdateError)
+    throw new Error('Failed to update sender wallet')
+  }
+
   // Update recipient wallet
-  await supabase
+  const { error: recipientUpdateError } = await supabase
     .from('wallets')
     .update({ 
       balance: newRecipientBalance, 
@@ -190,26 +233,40 @@ async function processUserToUserTransfer(
     })
     .eq('id', recipientWallet.id)
 
-  // Record transfer
-  const { data: transfer } = await supabase
+  if (recipientUpdateError) {
+    console.error('Failed to update recipient wallet:', recipientUpdateError)
+    // Rollback sender wallet
+    await supabase
+      .from('wallets')
+      .update({ balance: senderWallet.balance })
+      .eq('id', senderWallet.id)
+    throw new Error('Failed to update recipient wallet')
+  }
+
+  // Record transfer in money_transfers table
+  const { data: transfer, error: transferError } = await supabase
     .from('money_transfers')
     .insert({
       sender_id: user.id,
       recipient_id: recipientProfile.id,
-      amount: Math.round(amount * 100),
+      amount: Math.round(Number(amount) * 100), // Store in cents
       currency: 'usd',
       status: 'completed',
-      description: description || 'User to user transfer'
+      description: description || `Transfer to ${cleanRecipientPhone}`
     })
     .select()
     .single()
+
+  if (transferError) {
+    console.error('Failed to record transfer:', transferError)
+  }
 
   // Create transaction records
   await Promise.all([
     supabase.from('transactions').insert({
       user_id: user.id,
-      name: `Sent to ${recipient_phone}`,
-      amount: amount,
+      name: `Sent to ${cleanRecipientPhone}`,
+      amount: Number(amount),
       type: 'expense',
       category: 'Transfer',
       date: new Date().toISOString().split('T')[0],
@@ -218,8 +275,8 @@ async function processUserToUserTransfer(
     }),
     supabase.from('transactions').insert({
       user_id: recipientProfile.id,
-      name: `Received from ${senderWallet.user_phone}`,
-      amount: amount,
+      name: `Received from ${senderWallet.user_phone || user.email}`,
+      amount: Number(amount),
       type: 'income',
       category: 'Transfer',
       date: new Date().toISOString().split('T')[0],
@@ -234,8 +291,8 @@ async function processUserToUserTransfer(
     transfer_type: 'user_to_user',
     sender_new_balance: newSenderBalance,
     recipient_new_balance: newRecipientBalance,
-    amount_transferred: amount,
-    message: 'Transfer completed successfully'
+    amount_transferred: Number(amount),
+    message: `Transfer of $${amount} completed successfully to ${cleanRecipientPhone}`
   }
 }
 
