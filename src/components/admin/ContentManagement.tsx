@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,12 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Search, ShoppingCart, Home, Car, Gamepad2, 
-         Utensils, Heart, GraduationCap, Lightbulb, Smartphone, Gift, TrendingUp, 
-         Briefcase, CreditCard, Plane } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Edit, Trash2, Search, Eye, Flag, RotateCcw, Download } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Category {
   id: string;
@@ -25,59 +25,45 @@ interface Category {
   updated_at: string;
 }
 
-interface Setting {
+interface UserContent {
   id: string;
-  key: string;
-  value: any;
-  description?: string;
+  user_id: string;
+  content_type: string;
+  title: string;
+  content: string;
+  status: 'active' | 'flagged' | 'removed';
+  created_at: string;
   updated_at: string;
+  moderation_notes?: string;
+  user_email?: string;
+  user_name?: string;
+  reports_count?: number;
 }
 
-const iconMap = {
-  'Shopping': ShoppingCart,
-  'ShoppingCart': ShoppingCart,
-  'Food': Utensils,
-  'Utensils': Utensils,
-  'Housing': Home,
-  'Home': Home,
-  'Transport': Car,
-  'Car': Car,
-  'Transportation': Car,
-  'Entertainment': Gamepad2,
-  'Gamepad2': Gamepad2,
-  'Healthcare': Heart,
-  'Heart': Heart,
-  'Education': GraduationCap,
-  'GraduationCap': GraduationCap,
-  'Utilities': Lightbulb,
-  'Lightbulb': Lightbulb,
-  'Technology': Smartphone,
-  'Smartphone': Smartphone,
-  'Gifts': Gift,
-  'Gift': Gift,
-  'Investment': TrendingUp,
-  'TrendingUp': TrendingUp,
-  'Business': Briefcase,
-  'Briefcase': Briefcase,
-  'Misc': CreditCard,
-  'CreditCard': CreditCard,
-  'Travel': Plane,
-  'Plane': Plane,
-};
+interface ContentMetrics {
+  total_content: number;
+  active_content: number;
+  flagged_content: number;
+  removed_content: number;
+  most_active_users: Array<{
+    user_id: string;
+    user_name: string;
+    content_count: number;
+  }>;
+}
 
 const ContentManagement = () => {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [settings, setSettings] = useState<Setting[]>([]);
+  const [userContent, setUserContent] = useState<UserContent[]>([]);
+  const [contentMetrics, setContentMetrics] = useState<ContentMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showAddCategory, setShowAddCategory] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [newCategory, setNewCategory] = useState({
-    name: "",
-    description: "",
-    color: "#3B82F6",
-    icon: "CreditCard"
-  });
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedContent, setSelectedContent] = useState<UserContent | null>(null);
+  const [showContentModal, setShowContentModal] = useState(false);
+  const [showModerationModal, setShowModerationModal] = useState(false);
+  const [moderationNotes, setModerationNotes] = useState("");
+  const [activeTab, setActiveTab] = useState<'categories' | 'content' | 'metrics'>('categories');
 
   useEffect(() => {
     fetchData();
@@ -87,7 +73,7 @@ const ContentManagement = () => {
     try {
       setLoading(true);
       
-      // Fetch categories from Supabase
+      // Fetch categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
         .select('*')
@@ -118,13 +104,53 @@ const ContentManagement = () => {
         setCategories(categoriesWithCounts);
       }
 
-      // Fetch app settings
-      const { data: settingsData } = await supabase
-        .from('settings')
-        .select('*')
-        .order('key', { ascending: true });
+      // For demo purposes, we'll create mock user content since there's no content table yet
+      // In a real app, you'd fetch from actual content tables
+      const mockUserContent: UserContent[] = [
+        {
+          id: '1',
+          user_id: 'user1',
+          content_type: 'comment',
+          title: 'Payment feedback',
+          content: 'Great payment experience!',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_email: 'user1@example.com',
+          user_name: 'John Doe',
+          reports_count: 0
+        },
+        {
+          id: '2',
+          user_id: 'user2',
+          content_type: 'review',
+          title: 'Service review',
+          content: 'This service needs improvement...',
+          status: 'flagged',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_email: 'user2@example.com',
+          user_name: 'Jane Smith',
+          reports_count: 2,
+          moderation_notes: 'Reported for negative content'
+        }
+      ];
 
-      setSettings(settingsData || []);
+      setUserContent(mockUserContent);
+
+      // Calculate content metrics
+      const metrics: ContentMetrics = {
+        total_content: mockUserContent.length,
+        active_content: mockUserContent.filter(c => c.status === 'active').length,
+        flagged_content: mockUserContent.filter(c => c.status === 'flagged').length,
+        removed_content: mockUserContent.filter(c => c.status === 'removed').length,
+        most_active_users: [
+          { user_id: 'user1', user_name: 'John Doe', content_count: 5 },
+          { user_id: 'user2', user_name: 'Jane Smith', content_count: 3 }
+        ]
+      };
+
+      setContentMetrics(metrics);
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -134,127 +160,94 @@ const ContentManagement = () => {
     }
   };
 
-  const handleAddCategory = async () => {
-    if (!newCategory.name.trim()) {
-      toast.error('Category name is required');
-      return;
-    }
-
+  const updateContentStatus = async (contentId: string, newStatus: 'active' | 'flagged' | 'removed', notes?: string) => {
     try {
-      const { data, error } = await supabase
-        .from('categories')
-        .insert([{
-          name: newCategory.name,
-          description: newCategory.description,
-          color: newCategory.color,
-          icon: newCategory.icon,
-          is_active: true
-        }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding category:', error);
-        toast.error('Failed to add category');
-        return;
-      }
-
-      setCategories(prev => [...prev, { ...data, transaction_count: 0 }]);
-      toast.success('Category added successfully');
-      setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "CreditCard" });
-      setShowAddCategory(false);
-    } catch (error) {
-      console.error('Error adding category:', error);
-      toast.error('Failed to add category');
-    }
-  };
-
-  const handleEditCategory = (category: Category) => {
-    setEditingCategory(category);
-    setNewCategory({
-      name: category.name,
-      description: category.description || "",
-      color: category.color,
-      icon: category.icon
-    });
-    setShowAddCategory(true);
-  };
-
-  const handleUpdateCategory = async () => {
-    if (!editingCategory || !newCategory.name.trim()) {
-      toast.error('Category name is required');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .update({
-          name: newCategory.name,
-          description: newCategory.description,
-          color: newCategory.color,
-          icon: newCategory.icon
-        })
-        .eq('id', editingCategory.id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating category:', error);
-        toast.error('Failed to update category');
-        return;
-      }
-
-      setCategories(prev => prev.map(cat => 
-        cat.id === editingCategory.id 
-          ? { ...data, transaction_count: cat.transaction_count }
-          : cat
+      // In a real app, you'd update the actual content table
+      setUserContent(prev => prev.map(content => 
+        content.id === contentId 
+          ? { 
+              ...content, 
+              status: newStatus, 
+              moderation_notes: notes || content.moderation_notes,
+              updated_at: new Date().toISOString()
+            }
+          : content
       ));
-      
-      toast.success('Category updated successfully');
-      setEditingCategory(null);
-      setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "CreditCard" });
-      setShowAddCategory(false);
+
+      toast.success(`Content ${newStatus} successfully`);
+      setShowModerationModal(false);
+      setModerationNotes("");
     } catch (error) {
-      console.error('Error updating category:', error);
-      toast.error('Failed to update category');
+      console.error('Error updating content:', error);
+      toast.error('Failed to update content');
     }
   };
 
-  const handleDeleteCategory = async (categoryId: string) => {
-    if (!confirm('Are you sure you want to delete this category? This action cannot be undone.')) {
+  const deleteContent = async (contentId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this content?')) {
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', categoryId);
-
-      if (error) {
-        console.error('Error deleting category:', error);
-        toast.error('Failed to delete category');
-        return;
-      }
-
-      setCategories(prev => prev.filter(cat => cat.id !== categoryId));
-      toast.success('Category deleted successfully');
+      // In a real app, you'd delete from the actual content table
+      setUserContent(prev => prev.filter(content => content.id !== contentId));
+      toast.success('Content deleted successfully');
     } catch (error) {
-      console.error('Error deleting category:', error);
-      toast.error('Failed to delete category');
+      console.error('Error deleting content:', error);
+      toast.error('Failed to delete content');
     }
   };
 
-  const renderIcon = (iconName: string, className = "h-4 w-4") => {
-    const IconComponent = iconMap[iconName as keyof typeof iconMap] || CreditCard;
-    return <IconComponent className={className} />;
+  const exportContentReport = async () => {
+    try {
+      const csvContent = [
+        ['Date', 'Content ID', 'User', 'Type', 'Title', 'Status', 'Reports', 'Notes'].join(','),
+        ...filteredContent.map(c => [
+          new Date(c.created_at).toLocaleDateString(),
+          c.id,
+          c.user_name || c.user_email || 'Unknown',
+          c.content_type,
+          c.title,
+          c.status,
+          c.reports_count || 0,
+          c.moderation_notes || ''
+        ].map(field => `"${field}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `content_report_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('Content report exported successfully');
+    } catch (error) {
+      console.error('Error exporting content report:', error);
+      toast.error('Failed to export content report');
+    }
   };
 
-  const filteredCategories = categories.filter(category =>
-    category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    category.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredContent = userContent.filter(content => {
+    const matchesSearch = 
+      content.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      content.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      content.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      content.user_email?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || content.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active": return "bg-green-100 text-green-800";
+      case "flagged": return "bg-yellow-100 text-yellow-800";
+      case "removed": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
 
   if (loading) {
     return (
@@ -267,198 +260,339 @@ const ContentManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-semibold">Transaction Categories</h2>
-          <p className="text-sm text-muted-foreground">Manage transaction categories with icons and colors</p>
-        </div>
-        <Dialog open={showAddCategory} onOpenChange={setShowAddCategory}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Category
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingCategory ? 'Edit Category' : 'Add New Category'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Name</label>
-                  <Input
-                    value={newCategory.name}
-                    onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-                    placeholder="Category name"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Color</label>
-                  <Input
-                    type="color"
-                    value={newCategory.color}
-                    onChange={(e) => setNewCategory({ ...newCategory, color: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Icon</label>
-                <select
-                  value={newCategory.icon}
-                  onChange={(e) => setNewCategory({ ...newCategory, icon: e.target.value })}
-                  className="w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
-                >
-                  {Object.keys(iconMap).filter(key => !key.includes('Cart') || key === 'ShoppingCart').map(iconName => (
-                    <option key={iconName} value={iconName}>{iconName}</option>
-                  ))}
-                </select>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Preview:</span>
-                  <div 
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: newCategory.color + '20', border: `1px solid ${newCategory.color}` }}
-                  >
-                    {renderIcon(newCategory.icon, "h-5 w-5")}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Description</label>
-                <Textarea
-                  value={newCategory.description}
-                  onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
-                  placeholder="Category description"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={editingCategory ? handleUpdateCategory : handleAddCategory}>
-                  {editingCategory ? 'Update Category' : 'Add Category'}
-                </Button>
-                <Button variant="outline" onClick={() => {
-                  setShowAddCategory(false);
-                  setEditingCategory(null);
-                  setNewCategory({ name: "", description: "", color: "#3B82F6", icon: "CreditCard" });
-                }}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+        <button
+          onClick={() => setActiveTab('categories')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'categories'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Categories
+        </button>
+        <button
+          onClick={() => setActiveTab('content')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'content'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          User Content
+        </button>
+        <button
+          onClick={() => setActiveTab('metrics')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'metrics'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Analytics
+        </button>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search categories..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+      {/* Categories Tab */}
+      {activeTab === 'categories' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Transaction Categories</h3>
+            <p className="text-sm text-muted-foreground">
+              {categories.length} categories total
+            </p>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Categories Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredCategories.map((category) => (
-          <Card key={category.id} className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div 
-                  className="p-3 rounded-xl shadow-sm"
-                  style={{ backgroundColor: category.color + '20', border: `1px solid ${category.color}` }}
-                >
-                  {renderIcon(category.icon, "h-6 w-6")}
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => handleEditCategory(category)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <h3 className="font-semibold text-sm mb-1">{category.name}</h3>
-              <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{category.description}</p>
-              <div className="flex items-center justify-between">
-                <Badge variant="secondary" className="text-xs">
-                  {category.transaction_count || 0} transactions
-                </Badge>
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: category.color }}
-                  />
-                  <Badge variant={category.is_active ? "default" : "secondary"} className="text-xs">
-                    {category.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filteredCategories.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">No categories found</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {categories.map((category) => (
+              <Card key={category.id} className="hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div 
+                      className="p-3 rounded-xl shadow-sm"
+                      style={{ backgroundColor: category.color + '20', border: `1px solid ${category.color}` }}
+                    >
+                      <div className="h-6 w-6" />
+                    </div>
+                    <Badge variant={category.is_active ? "default" : "secondary"} className="text-xs">
+                      {category.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <h3 className="font-semibold text-sm mb-1">{category.name}</h3>
+                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{category.description}</p>
+                  <div className="flex items-center justify-between">
+                    <Badge variant="secondary" className="text-xs">
+                      {category.transaction_count || 0} transactions
+                    </Badge>
+                    <div 
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: category.color }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* App Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>App Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Setting</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Last Updated</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {settings.map((setting) => (
-                <TableRow key={setting.id}>
-                  <TableCell className="font-medium">{setting.key}</TableCell>
-                  <TableCell>
-                    <code className="text-sm bg-muted px-2 py-1 rounded">
-                      {typeof setting.value === 'object' 
-                        ? JSON.stringify(setting.value) 
-                        : String(setting.value)
-                      }
-                    </code>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {setting.description}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {setting.updated_at && format(new Date(setting.updated_at), 'MMM dd, yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+      {/* User Content Tab */}
+      {activeTab === 'content' && (
+        <div className="space-y-4">
+          {/* Content Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">{contentMetrics?.total_content || 0}</div>
+                <p className="text-xs text-muted-foreground">Total Content</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-green-600">{contentMetrics?.active_content || 0}</div>
+                <p className="text-xs text-muted-foreground">Active</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-yellow-600">{contentMetrics?.flagged_content || 0}</div>
+                <p className="text-xs text-muted-foreground">Flagged</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold text-red-600">{contentMetrics?.removed_content || 0}</div>
+                <p className="text-xs text-muted-foreground">Removed</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="flex gap-4 items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search content..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Content</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="flagged">Flagged</SelectItem>
+                <SelectItem value="removed">Removed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={exportContentReport} variant="outline" className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+          </div>
+
+          {/* Content Table */}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Content</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Reports</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {filteredContent.map((content) => (
+                  <TableRow key={content.id}>
+                    <TableCell>
+                      {new Date(content.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{content.user_name || "Unknown"}</div>
+                        <div className="text-sm text-muted-foreground">{content.user_email}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{content.title}</div>
+                        <div className="text-sm text-muted-foreground truncate max-w-xs">
+                          {content.content}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{content.content_type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(content.status)}>
+                        {content.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {content.reports_count || 0}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedContent(content);
+                            setShowContentModal(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedContent(content);
+                            setShowModerationModal(true);
+                          }}
+                        >
+                          <Flag className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={() => deleteContent(content.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      {/* Analytics Tab */}
+      {activeTab === 'metrics' && contentMetrics && (
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold">Content Analytics</h3>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Most Active Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {contentMetrics.most_active_users.map((user) => (
+                  <div key={user.user_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <div className="font-medium">{user.user_name}</div>
+                      <div className="text-sm text-muted-foreground">User ID: {user.user_id}</div>
+                    </div>
+                    <Badge variant="secondary">{user.content_count} posts</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Content Details Modal */}
+      <Dialog open={showContentModal} onOpenChange={setShowContentModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Content Details</DialogTitle>
+          </DialogHeader>
+          {selectedContent && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Title</label>
+                  <p>{selectedContent.title}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Type</label>
+                  <Badge variant="outline">{selectedContent.content_type}</Badge>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">User</label>
+                  <p>{selectedContent.user_name || selectedContent.user_email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <Badge className={getStatusColor(selectedContent.status)}>
+                    {selectedContent.status}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Content</label>
+                <p className="text-sm bg-gray-50 p-3 rounded-md whitespace-pre-wrap">
+                  {selectedContent.content}
+                </p>
+              </div>
+              {selectedContent.moderation_notes && (
+                <div>
+                  <label className="text-sm font-medium">Moderation Notes</label>
+                  <p className="text-sm bg-yellow-50 p-3 rounded-md">
+                    {selectedContent.moderation_notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Moderation Modal */}
+      <Dialog open={showModerationModal} onOpenChange={setShowModerationModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Moderate Content</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Moderation Notes</label>
+              <Textarea
+                value={moderationNotes}
+                onChange={(e) => setModerationNotes(e.target.value)}
+                placeholder="Add moderation notes..."
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => selectedContent && updateContentStatus(selectedContent.id, 'active', moderationNotes)}
+                variant="outline"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Restore
+              </Button>
+              <Button 
+                onClick={() => selectedContent && updateContentStatus(selectedContent.id, 'flagged', moderationNotes)}
+                variant="outline"
+              >
+                <Flag className="h-4 w-4 mr-2" />
+                Flag
+              </Button>
+              <Button 
+                onClick={() => selectedContent && updateContentStatus(selectedContent.id, 'removed', moderationNotes)}
+                variant="destructive"
+              >
+                Remove
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

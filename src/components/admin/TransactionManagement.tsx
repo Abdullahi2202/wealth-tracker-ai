@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { DollarSign, TrendingUp, AlertCircle, CheckCircle, Download, Search, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 type Transaction = {
@@ -20,14 +22,31 @@ type Transaction = {
   category: string | null;
   note: string | null;
   created_at: string;
+  profiles?: {
+    email: string;
+    full_name: string;
+    phone: string;
+  };
+};
+
+type TransactionWithDetails = Transaction & {
+  user_email?: string;
+  user_name?: string;
+  user_phone?: string;
 };
 
 const TransactionManagement = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<TransactionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [dateRange, setDateRange] = useState({ from: "", to: "" });
+  const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithDetails | null>(null);
+  const [statusUpdateReason, setStatusUpdateReason] = useState("");
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
 
   useEffect(() => {
     fetchTransactions();
@@ -39,24 +58,23 @@ const TransactionManagement = () => {
       const { data, error } = await supabase
         .from('transactions')
         .select(`
-          id,
-          user_id,
-          amount,
-          type,
-          status,
-          name,
-          category,
-          note,
-          created_at
+          *,
+          profiles!inner(email, full_name, phone)
         `)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500);
 
       if (error) {
         console.error('Error fetching transactions:', error);
         toast.error('Failed to fetch transactions');
       } else {
-        setTransactions(data || []);
+        const transactionsWithDetails = data?.map(transaction => ({
+          ...transaction,
+          user_email: transaction.profiles?.email,
+          user_name: transaction.profiles?.full_name,
+          user_phone: transaction.profiles?.phone
+        })) || [];
+        setTransactions(transactionsWithDetails);
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -65,19 +83,30 @@ const TransactionManagement = () => {
     setLoading(false);
   };
 
-  const updateTransactionStatus = async (transactionId: string, newStatus: string) => {
+  const updateTransactionStatus = async (transactionId: string, newStatus: string, reason?: string) => {
     try {
+      const updateData: any = { 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      if (reason) {
+        updateData.note = `${updateData.note || ''}\n[Admin Update: ${reason}]`.trim();
+      }
+
       const { error } = await supabase
         .from('transactions')
-        .update({ status: newStatus })
+        .update(updateData)
         .eq('id', transactionId);
 
       if (error) {
         console.error('Error updating transaction:', error);
         toast.error('Failed to update transaction');
       } else {
-        toast.success('Transaction updated successfully');
+        toast.success(`Transaction marked as ${newStatus}`);
         fetchTransactions();
+        setShowStatusModal(false);
+        setStatusUpdateReason("");
       }
     } catch (error) {
       console.error('Error updating transaction:', error);
@@ -85,14 +114,51 @@ const TransactionManagement = () => {
     }
   };
 
+  const exportTransactions = async () => {
+    try {
+      const csvContent = [
+        ['Date', 'Transaction ID', 'User', 'Type', 'Amount', 'Status', 'Category', 'Note'].join(','),
+        ...filteredTransactions.map(t => [
+          new Date(t.created_at).toLocaleDateString(),
+          t.id,
+          t.user_name || t.user_email || 'Unknown',
+          t.type,
+          t.amount,
+          t.status,
+          t.category || '',
+          t.note || ''
+        ].map(field => `"${field}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('Transactions exported successfully');
+    } catch (error) {
+      console.error('Error exporting transactions:', error);
+      toast.error('Failed to export transactions');
+    }
+  };
+
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch =
+    const matchesSearch = 
+      transaction.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.user_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.id.toLowerCase().includes(searchTerm.toLowerCase());
+      transaction.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.user_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
     const matchesType = typeFilter === "all" || transaction.type === typeFilter;
-    return matchesSearch && matchesStatus && matchesType;
+    
+    const matchesDateRange = (!dateRange.from || new Date(transaction.created_at) >= new Date(dateRange.from)) &&
+                           (!dateRange.to || new Date(transaction.created_at) <= new Date(dateRange.to));
+    
+    return matchesSearch && matchesStatus && matchesType && matchesDateRange;
   });
 
   const getStatusColor = (status: string) => {
@@ -107,8 +173,8 @@ const TransactionManagement = () => {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case "credit": return "bg-green-100 text-green-800";
-      case "debit": return "bg-red-100 text-red-800";
+      case "income": return "bg-green-100 text-green-800";
+      case "expense": return "bg-red-100 text-red-800";
       case "transfer": return "bg-blue-100 text-blue-800";
       default: return "bg-gray-100 text-gray-800";
     }
@@ -176,15 +242,19 @@ const TransactionManagement = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex gap-4 items-center">
-        <Input
-          placeholder="Search by user id, transaction name, or ID..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="flex-1"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search transactions..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger>
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -195,17 +265,38 @@ const TransactionManagement = () => {
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger>
             <SelectValue placeholder="Filter by type" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="credit">Credit</SelectItem>
-            <SelectItem value="debit">Debit</SelectItem>
+            <SelectItem value="income">Income</SelectItem>
+            <SelectItem value="expense">Expense</SelectItem>
             <SelectItem value="transfer">Transfer</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex gap-2">
+          <Input
+            type="date"
+            value={dateRange.from}
+            onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
+            placeholder="From date"
+          />
+          <Input
+            type="date"
+            value={dateRange.to}
+            onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
+            placeholder="To date"
+          />
+        </div>
+
+        <Button onClick={exportTransactions} variant="outline" className="flex items-center gap-2">
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Transactions Table */}
@@ -214,7 +305,8 @@ const TransactionManagement = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>User</TableHead>
+              <TableHead>Transaction ID</TableHead>
+              <TableHead>User Details</TableHead>
               <TableHead>Transaction</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Amount</TableHead>
@@ -229,14 +321,23 @@ const TransactionManagement = () => {
                   {new Date(transaction.created_at).toLocaleDateString()}
                 </TableCell>
                 <TableCell>
+                  <div className="font-mono text-sm">{transaction.id.substring(0, 8)}...</div>
+                </TableCell>
+                <TableCell>
                   <div>
-                    <div className="font-medium">{transaction.user_id || "Unknown"}</div>
+                    <div className="font-medium">{transaction.user_name || "Unknown"}</div>
+                    <div className="text-sm text-muted-foreground">{transaction.user_email}</div>
+                    {transaction.user_phone && (
+                      <div className="text-sm text-muted-foreground">{transaction.user_phone}</div>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
                   <div>
                     <div className="font-medium">{transaction.name}</div>
-                    <div className="text-sm text-muted-foreground">ID: {transaction.id.substring(0, 8)}...</div>
+                    {transaction.category && (
+                      <div className="text-sm text-muted-foreground">{transaction.category}</div>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -254,33 +355,26 @@ const TransactionManagement = () => {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    {transaction.status === "pending" && (
-                      <>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => updateTransactionStatus(transaction.id, "completed")}
-                        >
-                          Approve
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="destructive"
-                          onClick={() => updateTransactionStatus(transaction.id, "failed")}
-                        >
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                    {transaction.status === "failed" && (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => updateTransactionStatus(transaction.id, "pending")}
-                      >
-                        Retry
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedTransaction(transaction);
+                        setShowDetailsModal(true);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedTransaction(transaction);
+                        setShowStatusModal(true);
+                      }}
+                    >
+                      Update Status
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -294,6 +388,112 @@ const TransactionManagement = () => {
           No transactions found matching your criteria.
         </div>
       )}
+
+      {/* Transaction Details Modal */}
+      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Transaction ID</label>
+                  <p className="font-mono text-sm">{selectedTransaction.id}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Date</label>
+                  <p>{new Date(selectedTransaction.created_at).toLocaleString()}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">User</label>
+                  <p>{selectedTransaction.user_name || selectedTransaction.user_email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Amount</label>
+                  <p className="font-mono">${selectedTransaction.amount.toFixed(2)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Type</label>
+                  <Badge className={getTypeColor(selectedTransaction.type)}>
+                    {selectedTransaction.type}
+                  </Badge>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <Badge className={getStatusColor(selectedTransaction.status)}>
+                    {selectedTransaction.status}
+                  </Badge>
+                </div>
+              </div>
+              {selectedTransaction.note && (
+                <div>
+                  <label className="text-sm font-medium">Notes</label>
+                  <p className="text-sm bg-gray-50 p-3 rounded-md whitespace-pre-wrap">
+                    {selectedTransaction.note}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Status Update Modal */}
+      <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Transaction Status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">New Status</label>
+              <Select value={newStatus} onValueChange={setNewStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select new status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Reason (Optional)</label>
+              <Textarea
+                value={statusUpdateReason}
+                onChange={(e) => setStatusUpdateReason(e.target.value)}
+                placeholder="Enter reason for status change..."
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => selectedTransaction && updateTransactionStatus(
+                  selectedTransaction.id, 
+                  newStatus, 
+                  statusUpdateReason
+                )}
+                disabled={!newStatus}
+              >
+                Update Status
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowStatusModal(false);
+                  setNewStatus("");
+                  setStatusUpdateReason("");
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
