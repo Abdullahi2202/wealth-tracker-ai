@@ -22,11 +22,6 @@ type Transaction = {
   category: string | null;
   note: string | null;
   created_at: string;
-  profiles?: {
-    email: string;
-    full_name: string;
-    phone: string;
-  };
 };
 
 type TransactionWithDetails = Transaction & {
@@ -55,32 +50,57 @@ const TransactionManagement = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      console.log('Fetching transactions...');
+      
+      // First, fetch transactions
+      const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
-        .select(`
-          *,
-          profiles!inner(email, full_name, phone)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(500);
 
-      if (error) {
-        console.error('Error fetching transactions:', error);
+      if (transactionsError) {
+        console.error('Error fetching transactions:', transactionsError);
         toast.error('Failed to fetch transactions');
-      } else {
-        const transactionsWithDetails = data?.map(transaction => ({
-          ...transaction,
-          user_email: transaction.profiles?.email,
-          user_name: transaction.profiles?.full_name,
-          user_phone: transaction.profiles?.phone
-        })) || [];
-        setTransactions(transactionsWithDetails);
+        return;
       }
+
+      console.log('Transactions fetched:', transactionsData?.length || 0);
+
+      // Then, fetch user profiles for each transaction
+      const transactionsWithDetails: TransactionWithDetails[] = [];
+      
+      if (transactionsData) {
+        for (const transaction of transactionsData) {
+          let userDetails = null;
+          
+          if (transaction.user_id) {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('email, full_name, phone')
+              .eq('id', transaction.user_id)
+              .single();
+            
+            userDetails = profileData;
+          }
+
+          transactionsWithDetails.push({
+            ...transaction,
+            user_email: userDetails?.email,
+            user_name: userDetails?.full_name,
+            user_phone: userDetails?.phone
+          });
+        }
+      }
+
+      console.log('Transactions with details:', transactionsWithDetails.length);
+      setTransactions(transactionsWithDetails);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast.error('Failed to fetch transactions');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const updateTransactionStatus = async (transactionId: string, newStatus: string, reason?: string) => {
@@ -91,7 +111,10 @@ const TransactionManagement = () => {
       };
 
       if (reason) {
-        updateData.note = `${updateData.note || ''}\n[Admin Update: ${reason}]`.trim();
+        // Get the current transaction to append to existing notes
+        const currentTransaction = transactions.find(t => t.id === transactionId);
+        const existingNote = currentTransaction?.note || '';
+        updateData.note = `${existingNote}\n[Admin Update: ${reason}]`.trim();
       }
 
       const { error } = await supabase
@@ -104,9 +127,10 @@ const TransactionManagement = () => {
         toast.error('Failed to update transaction');
       } else {
         toast.success(`Transaction marked as ${newStatus}`);
-        fetchTransactions();
+        fetchTransactions(); // Refresh the list
         setShowStatusModal(false);
         setStatusUpdateReason("");
+        setNewStatus("");
       }
     } catch (error) {
       console.error('Error updating transaction:', error);
