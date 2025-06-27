@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -50,51 +49,65 @@ const TransactionManagement = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      console.log('Fetching transactions...');
+      console.log('Fetching transactions as admin...');
       
-      // First, fetch transactions
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
-
-      if (transactionsError) {
-        console.error('Error fetching transactions:', transactionsError);
-        toast.error('Failed to fetch transactions');
-        return;
-      }
-
-      console.log('Transactions fetched:', transactionsData?.length || 0);
-
-      // Then, fetch user profiles for each transaction
-      const transactionsWithDetails: TransactionWithDetails[] = [];
-      
-      if (transactionsData) {
-        for (const transaction of transactionsData) {
-          let userDetails = null;
-          
-          if (transaction.user_id) {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('email, full_name, phone')
-              .eq('id', transaction.user_id)
-              .single();
-            
-            userDetails = profileData;
-          }
-
-          transactionsWithDetails.push({
-            ...transaction,
-            user_email: userDetails?.email,
-            user_name: userDetails?.full_name,
-            user_phone: userDetails?.phone
-          });
+      // Use the admin-operations edge function to fetch all transactions
+      const { data: response, error } = await supabase.functions.invoke('admin-operations', {
+        body: { 
+          action: 'get_all_transactions'
         }
-      }
+      });
 
-      console.log('Transactions with details:', transactionsWithDetails.length);
-      setTransactions(transactionsWithDetails);
+      if (error) {
+        console.error('Error fetching transactions via edge function:', error);
+        
+        // Fallback: Try direct database query
+        console.log('Trying direct database query...');
+        const { data: transactionsData, error: directError } = await supabase
+          .from('transactions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        if (directError) {
+          console.error('Direct query also failed:', directError);
+          toast.error('Failed to fetch transactions');
+          return;
+        }
+
+        console.log('Direct query successful, transactions found:', transactionsData?.length || 0);
+        
+        // Fetch user details for each transaction
+        const transactionsWithDetails: TransactionWithDetails[] = [];
+        
+        if (transactionsData) {
+          for (const transaction of transactionsData) {
+            let userDetails = null;
+            
+            if (transaction.user_id) {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('email, full_name, phone')
+                .eq('id', transaction.user_id)
+                .maybeSingle();
+              
+              userDetails = profileData;
+            }
+
+            transactionsWithDetails.push({
+              ...transaction,
+              user_email: userDetails?.email,
+              user_name: userDetails?.full_name,
+              user_phone: userDetails?.phone
+            });
+          }
+        }
+
+        setTransactions(transactionsWithDetails);
+      } else {
+        console.log('Edge function successful, transactions found:', response?.transactions?.length || 0);
+        setTransactions(response?.transactions || []);
+      }
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast.error('Failed to fetch transactions');
