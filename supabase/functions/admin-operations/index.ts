@@ -89,35 +89,46 @@ serve(async (req) => {
     if (action === 'get_all_users') {
       console.log('Fetching all user profiles for admin...')
       
-      // Fetch all user profiles using service role (bypasses RLS)
-      const { data: profiles, error: profilesError } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500)
+      try {
+        // Fetch all user profiles using service role (bypasses RLS)
+        const { data: profiles, error: profilesError } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(500)
 
-      if (profilesError) {
-        console.error('Error fetching user profiles:', profilesError)
+        if (profilesError) {
+          console.error('Error fetching user profiles:', profilesError)
+          return new Response(
+            JSON.stringify({ error: 'Failed to fetch user profiles', details: profilesError }),
+            { 
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+
+        console.log(`Found ${profiles?.length || 0} user profiles`)
+
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch user profiles' }),
+          JSON.stringify({ 
+            success: true,
+            users: profiles || []
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      } catch (error) {
+        console.error('Exception while fetching profiles:', error)
+        return new Response(
+          JSON.stringify({ error: 'Exception occurred while fetching profiles', details: error.message }),
           { 
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
         )
       }
-
-      console.log(`Found ${profiles?.length || 0} user profiles`)
-
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          users: profiles || []
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
     }
 
     return new Response(
@@ -131,7 +142,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in admin-operations:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

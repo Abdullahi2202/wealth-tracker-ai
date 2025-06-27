@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,11 +90,12 @@ const ContentManagement = () => {
         setCategories(categoriesWithCounts);
       }
 
-      // Fetch user profiles using admin-operations edge function or direct query
+      // Fetch user profiles using admin-operations edge function
+      let fetchedProfiles: UserProfile[] = [];
+      
       try {
         console.log('Fetching user profiles as admin...');
         
-        // Try using admin-operations edge function first
         const { data: response, error } = await supabase.functions.invoke('admin-operations', {
           body: { 
             action: 'get_all_users'
@@ -104,8 +104,21 @@ const ContentManagement = () => {
 
         if (error) {
           console.error('Error fetching users via edge function:', error);
-          
-          // Fallback: Try direct database query
+          throw error;
+        }
+
+        if (response && response.success && response.users) {
+          console.log('Edge function successful, users found:', response.users.length);
+          fetchedProfiles = response.users;
+        } else {
+          console.error('Edge function returned invalid response:', response);
+          throw new Error('Invalid response from edge function');
+        }
+      } catch (edgeFunctionError) {
+        console.error('Edge function failed, trying direct query:', edgeFunctionError);
+        
+        // Fallback: Try direct database query
+        try {
           console.log('Trying direct profiles query...');
           const { data: profilesData, error: directError } = await supabase
             .from('profiles')
@@ -115,26 +128,24 @@ const ContentManagement = () => {
 
           if (directError) {
             console.error('Direct profiles query also failed:', directError);
-            toast.error('Failed to fetch user profiles');
-            setUserProfiles([]);
+            throw directError;
           } else {
             console.log('Direct profiles query successful, users found:', profilesData?.length || 0);
-            setUserProfiles(profilesData || []);
+            fetchedProfiles = profilesData || [];
           }
-        } else {
-          console.log('Edge function successful, users found:', response?.users?.length || 0);
-          setUserProfiles(response?.users || []);
+        } catch (directQueryError) {
+          console.error('Both edge function and direct query failed:', directQueryError);
+          toast.error('Failed to fetch user profiles');
+          fetchedProfiles = [];
         }
-      } catch (profileError) {
-        console.error('Error fetching user profiles:', profileError);
-        toast.error('Failed to fetch user profiles');
-        setUserProfiles([]);
       }
 
+      setUserProfiles(fetchedProfiles);
+
       // Calculate content metrics
-      const totalUsers = userProfiles.length;
+      const totalUsers = fetchedProfiles.length;
       const activeCategories = categories.filter(c => c.is_active).length;
-      const recentRegistrations = userProfiles
+      const recentRegistrations = fetchedProfiles
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5);
 
