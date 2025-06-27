@@ -86,6 +86,40 @@ serve(async (req) => {
       )
     }
 
+    if (action === 'get_all_users') {
+      console.log('Fetching all user profiles for admin...')
+      
+      // Fetch all user profiles using service role (bypasses RLS)
+      const { data: profiles, error: profilesError } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500)
+
+      if (profilesError) {
+        console.error('Error fetching user profiles:', profilesError)
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch user profiles' }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+
+      console.log(`Found ${profiles?.length || 0} user profiles`)
+
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          users: profiles || []
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
     return new Response(
       JSON.stringify({ error: 'Invalid action' }),
       { 
