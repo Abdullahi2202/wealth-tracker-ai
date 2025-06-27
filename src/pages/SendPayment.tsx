@@ -55,11 +55,11 @@ const SendPayment = () => {
         category
       });
       
+      // Fixed: Remove the extra 4th argument
       await sendPayment(
         recipient.trim(),
         amountValue,
-        note,
-        'user_to_user'
+        note
       );
       
       toast.success(`Transfer of $${amountValue.toFixed(2)} completed successfully!`);
