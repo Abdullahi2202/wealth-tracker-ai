@@ -78,6 +78,7 @@ export const CardSelectionDialog = ({
       }
 
       toast.success('Redirecting to Stripe checkout...');
+      onSuccess();
 
     } catch (error: any) {
       console.error("Payment error:", error);
@@ -138,6 +139,7 @@ export const CardSelectionDialog = ({
       }
 
       toast.success('Redirecting to Stripe checkout...');
+      onSuccess();
 
     } catch (error: any) {
       console.error("Direct payment error:", error);
@@ -250,9 +252,9 @@ export const CardSelectionDialog = ({
                       <Plus className="h-5 w-5 text-green-600" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">Add New Card & Pay</p>
+                      <p className="font-medium text-gray-900">Add New Card & Save</p>
                       <p className="text-sm text-gray-500">
-                        Save a new card and complete your ${topUpAmount} topup
+                        Save a new card to your wallet for future use
                       </p>
                     </div>
                   </div>

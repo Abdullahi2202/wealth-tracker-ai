@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     console.log('User authenticated:', user.id);
 
     // Parse request body
-    const { amount, payment_method_id } = await req.json();
+    const { amount, payment_method_id, save_card = false } = await req.json();
     const amountCents = Math.round(amount * 100);
 
     if (!amount || amountCents < 100) {
@@ -86,9 +86,17 @@ Deno.serve(async (req) => {
         type: 'wallet_topup',
         user_id: user.id,
         amount_cents: amountCents.toString(),
+        save_card: save_card.toString(),
       },
-      payment_method_types: ['card'], // Always allow card payments
+      payment_method_types: ['card'],
     };
+
+    // If save_card is true, configure setup for future payments
+    if (save_card) {
+      sessionConfig.payment_intent_data = {
+        setup_future_usage: 'off_session',
+      };
+    }
 
     // If payment_method_id is provided, try to use existing payment method
     if (payment_method_id) {
@@ -103,8 +111,6 @@ Deno.serve(async (req) => {
           .single();
 
         if (paymentMethodData?.stripe_payment_method_id) {
-          // Instead of using payment_method_configuration, we'll set the customer's default payment method
-          // This is a cleaner approach that works with Stripe Checkout
           console.log('Using existing payment method:', paymentMethodData.stripe_payment_method_id);
           
           // Attach the payment method to the customer if not already attached
