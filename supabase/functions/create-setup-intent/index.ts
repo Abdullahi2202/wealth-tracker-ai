@@ -29,23 +29,23 @@ Deno.serve(async (req) => {
       throw new Error('Invalid JSON in request body')
     }
 
-    const { phoneNumber } = body
+    const { email } = body
 
-    console.log('Processing request for phone:', phoneNumber)
+    console.log('Processing request for email:', email)
 
-    if (!phoneNumber) {
-      throw new Error('Phone number is required')
+    if (!email) {
+      throw new Error('Email is required')
     }
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
     })
 
-    // Look up user by phone number in registration table
+    // Look up user by email in profiles table
     const { data: users, error: userError } = await supabase
-      .from('registration')
+      .from('profiles')
       .select('id, email, full_name, phone')
-      .eq('phone', phoneNumber)
+      .eq('email', email)
       .limit(1)
 
     if (userError) {
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     }
 
     if (!users || users.length === 0) {
-      throw new Error('User not found with this phone number. Please ensure you are registered.')
+      throw new Error('User not found with this email. Please ensure you are registered.')
     }
 
     const user = users[0]
@@ -73,10 +73,10 @@ Deno.serve(async (req) => {
       console.log('Creating new Stripe customer')
       const customer = await stripe.customers.create({ 
         email: user.email,
-        phone: phoneNumber,
+        phone: user.phone || undefined,
         metadata: {
           user_id: user.id,
-          phone: phoneNumber,
+          email: user.email,
           source: 'wallet_app'
         }
       })
@@ -94,8 +94,8 @@ Deno.serve(async (req) => {
       usage: 'off_session',
       metadata: {
         user_id: user.id,
-        user_phone: phoneNumber,
         user_email: user.email,
+        user_phone: user.phone || '',
         created_by: 'wallet_app',
         timestamp: new Date().toISOString()
       }
