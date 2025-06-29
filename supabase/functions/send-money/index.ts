@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
 
     console.log('Recipient found:', recipientProfile)
 
-    // Get recipient's wallet - try by user_id first, then by phone
+    // Get recipient's wallet - try by user_id first, then by phone, create if not found
     let { data: recipientWallet, error: recipientWalletError } = await supabase
       .from('wallets')
       .select('*')
@@ -138,13 +138,30 @@ Deno.serve(async (req) => {
         .single()
       
       if (phoneError || !phoneWallet) {
-        console.error('Recipient wallet not found:', { recipientWalletError, phoneError })
-        throw new Error('Recipient wallet not found')
+        console.log('Creating new wallet for recipient')
+        // Create wallet for recipient
+        const { data: newWallet, error: createError } = await supabase
+          .from('wallets')
+          .insert({
+            user_id: recipientProfile.id,
+            user_email: recipientProfile.email,
+            user_phone: cleanRecipientPhone,
+            balance: 0
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          console.error('Failed to create recipient wallet:', createError)
+          throw new Error('Failed to create recipient wallet')
+        }
+        recipientWallet = newWallet
+      } else {
+        recipientWallet = phoneWallet
       }
-      recipientWallet = phoneWallet
     }
 
-    console.log('Recipient wallet found:', { balance: recipientWallet.balance })
+    console.log('Recipient wallet found/created:', { balance: recipientWallet.balance })
 
     // Calculate new balances
     const newSenderBalance = Number(senderWallet.balance) - Number(amount)
