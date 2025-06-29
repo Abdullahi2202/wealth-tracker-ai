@@ -1,193 +1,113 @@
 
-import { CreditCard, Send, Wallet, ArrowUp, ArrowDown, QrCode } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
-import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface BalanceCardProps {
   totalBalance: number;
-  currency?: string;
+  currency: string;
   monthIncome: number;
   monthExpenses: number;
-  loading?: boolean;
+  loading: boolean;
+  className?: string;
 }
 
 const BalanceCard = ({
   totalBalance,
-  currency = "$",
+  currency,
   monthIncome,
   monthExpenses,
-  loading = false
+  loading,
+  className = ""
 }: BalanceCardProps) => {
-  const navigate = useNavigate();
+  const netIncome = monthIncome - monthExpenses;
+  const isPositive = netIncome >= 0;
 
-  const actionButtons = [
-    {
-      title: "Top Up",
-      icon: <ArrowUp className="h-5 w-5 text-white" />,
-      action: () => navigate("/payments/topup"),
-      description: "Add funds to your wallet balance"
-    },
-    {
-      title: "Transfer",
-      icon: <ArrowDown className="h-5 w-5 text-white" />,
-      action: () => navigate("/payments"),
-      description: "Send money to others"
-    },
-    {
-      title: "QR Code",
-      icon: <QrCode className="h-5 w-5 text-white" />,
-      action: () => navigate("/payments?mode=qr"),
-      description: "Scan or share payment QR codes"
-    },
-    {
-      title: "Wallet",
-      icon: <Wallet className="h-5 w-5 text-white" />,
-      action: () => navigate("/cards"),
-      description: "Manage your cards and accounts"
-    },
-  ];
+  if (loading) {
+    return (
+      <Card className={`${className} border-0 shadow-lg`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-gray-600">
+            Account Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-8 w-32" />
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="wallet-card text-white h-full">
-      <CardContent className="p-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="text-sm font-medium opacity-80">Total Balance</p>
-            <div className="text-3xl font-bold mt-1">
-              {loading ? (
-                <Skeleton className="h-8 w-28 bg-white/40" />
-              ) : (
-                <span>
-                  {currency}{totalBalance.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              )}
-            </div>
-            <p className="text-sm mt-4 opacity-90">Available across all accounts</p>
-          </div>
-          <div className="bg-white/20 p-3 rounded-full">
-            <CreditCard className="h-6 w-6" />
-          </div>
+    <Card className={`${className} border-0 shadow-lg bg-white`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+          <DollarSign className="h-4 w-4" />
+          Account Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Total Balance */}
+        <div className="space-y-1">
+          <p className="text-sm text-gray-500">Total Balance</p>
+          <h3 className="text-3xl font-bold text-gray-900">
+            {currency}{totalBalance.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </h3>
+          <p className="text-xs text-gray-400">Available across all accounts</p>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-white/20">
-          <div className="flex justify-between mb-4">
-            <div>
-              <p className="text-xs opacity-70">This Month's Income</p>
-              <div className="text-lg font-medium">
-                {loading ? (
-                  <Skeleton className="h-6 w-16 bg-white/40" />
-                ) : (
-                  <span>
-                    {currency}{monthIncome.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                )}
+        {/* Monthly Summary */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {/* Monthly Income */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-gray-700">Income</span>
               </div>
+              <p className="text-xl font-semibold text-green-600">
+                {currency}{monthIncome.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-xs text-gray-500">This month</p>
             </div>
-            <div>
-              <p className="text-xs opacity-70">This Month's Expenses</p>
-              <div className="text-lg font-medium">
-                {loading ? (
-                  <Skeleton className="h-6 w-16 bg-white/40" />
-                ) : (
-                  <span>
-                    {currency}{monthExpenses.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                )}
+
+            {/* Monthly Expenses */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <TrendingDown className="h-4 w-4 text-red-600" />
+                <span className="text-sm font-medium text-gray-700">Expenses</span>
               </div>
+              <p className="text-xl font-semibold text-red-600">
+                {currency}{monthExpenses.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-xs text-gray-500">This month</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <Button
-                  onClick={() => navigate("/payments")}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 hover:bg-white/20 text-white flex items-center justify-center gap-2"
-                  disabled={loading}
-                >
-                  <Send className="h-4 w-4" />
-                  Pay
-                </Button>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-80">
-                <div className="space-y-2">
-                  <h4 className="font-medium">Payment Options</h4>
-                  <p className="text-sm">Pay using your wallet balance or saved cards</p>
-                  <div className="flex gap-2 mt-1">
-                    <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                      <Wallet className="h-3 w-3" /> Wallet Balance
-                    </div>
-                    <div className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                      <CreditCard className="h-3 w-3" /> Saved Cards
-                    </div>
-                  </div>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <Button
-                  onClick={() => navigate("/payments/topup")}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 hover:bg-white/20 text-white flex items-center justify-center gap-2"
-                  disabled={loading}
-                >
-                  <ArrowUp className="h-4 w-4" />
-                  Top Up
-                </Button>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-80">
-                <div className="space-y-2">
-                  <h4 className="font-medium">Add Funds</h4>
-                  <p className="text-sm">Add money to your wallet balance</p>
-                  <div className="flex gap-2 mt-1">
-                    <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                      <Wallet className="h-3 w-3" /> Wallet Balance
-                    </div>
-                    <div className="flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                      <ArrowUp className="h-3 w-3" /> Stripe Checkout
-                    </div>
-                  </div>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          </div>
-
-          {/* Quick Action Buttons */}
-          <div className="mt-6 grid grid-cols-4 gap-2">
-            {actionButtons.map((button, index) => (
-              <HoverCard key={index} openDelay={300}>
-                <HoverCardTrigger asChild>
-                  <button
-                    onClick={button.action}
-                    className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all"
-                    disabled={loading}
-                  >
-                    <div className="p-2 rounded-full mb-1">
-                      {button.icon}
-                    </div>
-                    <span className="text-xs font-medium">{button.title}</span>
-                  </button>
-                </HoverCardTrigger>
-                <HoverCardContent side="bottom" className="w-48">
-                  <p className="text-sm">{button.description}</p>
-                </HoverCardContent>
-              </HoverCard>
-            ))}
+          {/* Net Income */}
+          <div className={`p-3 rounded-lg ${isPositive ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Net This Month</span>
+              <span className={`font-semibold ${isPositive ? 'text-green-700' : 'text-red-700'}`}>
+                {isPositive ? '+' : ''}{currency}{netIncome.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
           </div>
         </div>
       </CardContent>

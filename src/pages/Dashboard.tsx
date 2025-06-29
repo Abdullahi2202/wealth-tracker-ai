@@ -7,13 +7,16 @@ import { supabase } from "@/integrations/supabase/client";
 import TransactionDrawer from "@/components/transactions/TransactionDrawer";
 import { Button } from "@/components/ui/button";
 import { useWallet } from "@/hooks/useWallet";
+import DashboardQuickLinks from "@/components/dashboard/DashboardQuickLinks";
+import RecentTransactions from "@/components/dashboard/RecentTransactions";
 
 type Transaction = {
   id: string;
   amount: number;
   type: string;
   date: string;
-  // ...any other fields
+  name: string;
+  category?: string;
 };
 
 const Dashboard = () => {
@@ -54,7 +57,7 @@ const Dashboard = () => {
       // Fetch all user's transactions from Supabase with explicit typing
       const { data: transactionData, error } = await supabase
         .from("transactions")
-        .select("id, amount, type, date")
+        .select("id, amount, type, date, name, category")
         .eq("user_id", userEmail)
         .order("date", { ascending: false });
 
@@ -63,7 +66,9 @@ const Dashboard = () => {
           id: item.id,
           amount: Number(item.amount),
           type: String(item.type),
-          date: String(item.date)
+          date: String(item.date),
+          name: String(item.name),
+          category: item.category ? String(item.category) : undefined
         }));
         
         setTransactions(typedTransactions);
@@ -108,64 +113,117 @@ const Dashboard = () => {
     fetchTransactions();
   }, [userEmail]);
 
+  const handleRefreshData = () => {
+    if (userEmail) {
+      const fetchTransactions = async () => {
+        setLoading(true);
+        const { data: transactionData, error } = await supabase
+          .from("transactions")
+          .select("id, amount, type, date, name, category")
+          .eq("user_id", userEmail)
+          .order("date", { ascending: false });
+
+        if (!error && Array.isArray(transactionData)) {
+          const typedTransactions: Transaction[] = transactionData.map(item => ({
+            id: item.id,
+            amount: Number(item.amount),
+            type: String(item.type),
+            date: String(item.date),
+            name: String(item.name),
+            category: item.category ? String(item.category) : undefined
+          }));
+          
+          setTransactions(typedTransactions);
+        }
+        setLoading(false);
+      };
+      fetchTransactions();
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div
-        className="min-h-[100dvh] w-full flex flex-col items-center
-          bg-gradient-to-tr from-violet-100 via-blue-50 to-pink-50
-          px-0 pt-7 md:pt-12 animate-fade-in
-          overflow-x-hidden"
-        style={{
-          maxWidth: "100vw",
-          minHeight: "100dvh",
-          height: "100dvh", // force mobile browser fit
-        }}
-      >
-        {/* Greeting */}
-        <div className="w-full max-w-full text-center px-3 md:px-0 mb-4">
-          <h2 className="font-bold text-2xl md:text-3xl text-finance-purple mb-3">
-            {userName && (
-              <>
-                Welcome back,{" "}
-                <span className="font-extrabold text-finance-blue">{userName}</span>!
-              </>
-            )}
-            {!userName && (
-              <>
-                Welcome to <span className="text-finance-blue">WalletMaster</span>!
-              </>
-            )}
-          </h2>
-          <p className="text-md md:text-lg text-zinc-500/90 max-w-xs md:max-w-xl mx-auto">
-            Manage your finances with insights, analytics, and fast payments.
-          </p>
-        </div>
-
-        {/* Wallet Balance Card */}
-        <div className="w-full flex justify-center px-3 pb-3">
-          <div className="w-full max-w-[420px]">
-            <WalletBalanceCard className="mb-3" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="container mx-auto px-4 py-6 max-w-7xl">
+          {/* Header Section */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {userName ? `Welcome back, ${userName}` : "Welcome to WalletMaster"}
+                </h1>
+                <p className="text-gray-600 mt-1">
+                  {new Date().toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+              </div>
+              <Button
+                onClick={handleRefreshData}
+                variant="outline"
+                className="hidden md:flex"
+              >
+                Refresh Data
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* Main balance card */}
-        <div className="w-full flex justify-center px-0 pb-3">
-          <div className="w-full max-w-[420px] flex flex-col gap-2">
-            <BalanceCard
-              totalBalance={loading ? 0 : totalBalance}
-              currency="$"
-              monthIncome={loading ? 0 : monthIncome}
-              monthExpenses={loading ? 0 : monthExpenses}
-              loading={loading}
-            />
-            <Button onClick={() => setDrawerOpen(true)} className="mt-2 w-full">
+          {/* Balance Cards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Wallet Balance - Full width on mobile, spans 2 columns on lg */}
+            <div className="lg:col-span-2">
+              <WalletBalanceCard className="h-full" />
+            </div>
+            
+            {/* Main Balance Card */}
+            <div className="lg:col-span-1">
+              <BalanceCard
+                totalBalance={loading ? 0 : totalBalance}
+                currency="$"
+                monthIncome={loading ? 0 : monthIncome}
+                monthExpenses={loading ? 0 : monthExpenses}
+                loading={loading}
+                className="h-full"
+              />
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="mb-8">
+            <DashboardQuickLinks />
+          </div>
+
+          {/* Add Transaction Button */}
+          <div className="mb-8">
+            <Button 
+              onClick={() => setDrawerOpen(true)} 
+              className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg"
+              size="lg"
+            >
               + Add Transaction
             </Button>
-            <TransactionDrawer open={drawerOpen} onOpenChange={setDrawerOpen} onSaved={() => window.location.reload()} />
           </div>
+
+          {/* Recent Transactions */}
+          <div className="mb-8">
+            <RecentTransactions 
+              transactions={transactions.slice(0, 5)} 
+              loading={loading}
+            />
+          </div>
+
+          <TransactionDrawer 
+            open={drawerOpen} 
+            onOpenChange={setDrawerOpen} 
+            onSaved={() => {
+              handleRefreshData();
+              setDrawerOpen(false);
+            }} 
+          />
         </div>
-        {/* Optional: Empty space for bottom nav */}
-        <div className="grow" />
       </div>
     </DashboardLayout>
   );
