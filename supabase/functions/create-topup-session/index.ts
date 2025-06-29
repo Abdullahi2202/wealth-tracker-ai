@@ -61,7 +61,114 @@ Deno.serve(async (req) => {
       console.log('Created new customer:', customer.id);
     }
 
-    // Get origin for redirect URLs
+    // If payment_method_id is provided, process payment directly
+    if (payment_method_id) {
+      try {
+        console.log('Processing direct payment with existing payment method');
+        
+        // Get the payment method from our database
+        const { data: paymentMethodData } = await supabase
+          .from('payment_methods')
+          .select('stripe_payment_method_id, label')
+          .eq('id', payment_method_id)
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .single();
+
+        if (!paymentMethodData?.stripe_payment_method_id) {
+          throw new Error('Payment method not found');
+        }
+
+        console.log('Using payment method:', paymentMethodData.stripe_payment_method_id);
+
+        // Create payment intent for direct payment
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amountCents,
+          currency: 'usd',
+          customer: customer.id,
+          payment_method: paymentMethodData.stripe_payment_method_id,
+          confirm: true,
+          return_url: `${req.headers.get('origin')}/payments/topup`,
+          metadata: {
+            type: 'wallet_topup',
+            user_id: user.id,
+            payment_method_id: payment_method_id,
+          },
+        });
+
+        console.log('Payment intent created:', paymentIntent.id, 'status:', paymentIntent.status);
+
+        // Save session to database for tracking
+        const { error: dbError } = await supabase
+          .from('topup_sessions')
+          .insert({
+            user_id: user.id,
+            stripe_session_id: paymentIntent.id,
+            amount_cents: amountCents,
+            status: paymentIntent.status === 'succeeded' ? 'completed' : 'pending',
+          });
+
+        if (dbError) {
+          console.error('Database error:', dbError);
+        }
+
+        // If payment succeeded, update wallet immediately
+        if (paymentIntent.status === 'succeeded') {
+          console.log('Payment succeeded, updating wallet');
+          
+          // Update wallet balance
+          const { error: walletError } = await supabase
+            .from('wallets')
+            .update({
+              balance: supabase.sql`balance + ${amount}`,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', user.id);
+
+          if (walletError) {
+            console.error('Wallet update error:', walletError);
+          }
+
+          // Create transaction record
+          const { error: transactionError } = await supabase
+            .from('transactions')
+            .insert({
+              user_id: user.id,
+              name: 'Wallet Top-up',
+              amount: amount,
+              type: 'income',
+              category: 'Top-up',
+              date: new Date().toISOString().split('T')[0],
+              status: 'completed'
+            });
+
+          if (transactionError) {
+            console.error('Transaction record error:', transactionError);
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            direct_payment: true,
+            status: paymentIntent.status,
+            payment_intent_id: paymentIntent.id,
+            message: paymentIntent.status === 'succeeded' ? 'Payment successful! Your wallet has been updated.' : 'Payment processing...'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+
+      } catch (error: any) {
+        console.error('Direct payment error:', error);
+        // Fall back to checkout session if direct payment fails
+        console.log('Falling back to checkout session');
+      }
+    }
+
+    // For new cards or fallback, create checkout session
     const origin = req.headers.get('origin') || 'http://localhost:3000';
 
     let sessionConfig: any = {
@@ -98,36 +205,6 @@ Deno.serve(async (req) => {
       };
     }
 
-    // If payment_method_id is provided, try to use existing payment method
-    if (payment_method_id) {
-      try {
-        // Get the payment method from our database
-        const { data: paymentMethodData } = await supabase
-          .from('payment_methods')
-          .select('stripe_payment_method_id')
-          .eq('id', payment_method_id)
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .single();
-
-        if (paymentMethodData?.stripe_payment_method_id) {
-          console.log('Using existing payment method:', paymentMethodData.stripe_payment_method_id);
-          
-          // Attach the payment method to the customer if not already attached
-          try {
-            await stripe.paymentMethods.attach(paymentMethodData.stripe_payment_method_id, {
-              customer: customer.id,
-            });
-          } catch (attachError: any) {
-            // Payment method might already be attached, that's okay
-            console.log('Payment method attach note:', attachError.message);
-          }
-        }
-      } catch (error) {
-        console.log('Could not use existing payment method, falling back to default:', error);
-      }
-    }
-
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create(sessionConfig);
 
@@ -155,6 +232,7 @@ Deno.serve(async (req) => {
         success: true,
         checkout_url: session.url,
         session_id: session.id,
+        direct_payment: false,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

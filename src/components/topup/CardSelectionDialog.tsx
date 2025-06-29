@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CreditCard, Plus } from "lucide-react";
+import { CreditCard, Plus, Loader2 } from "lucide-react";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import StripeCardFormWrapper from "@/components/payments/StripeCardForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,10 +24,13 @@ export const CardSelectionDialog = ({
 }: CardSelectionDialogProps) => {
   const [showAddCard, setShowAddCard] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [processingCardId, setProcessingCardId] = useState<string | null>(null);
   const { methods, refetch } = usePaymentMethods();
 
   const handleExistingCardTopup = async (paymentMethodId: string) => {
     setLoading(true);
+    setProcessingCardId(paymentMethodId);
+    
     try {
       const amountValue = parseFloat(topUpAmount);
       if (!amountValue || amountValue < 1) {
@@ -44,7 +47,7 @@ export const CardSelectionDialog = ({
         payment_method_id: paymentMethodId 
       };
 
-      console.log("Sending topup request with details:", topupDetails);
+      console.log("Processing direct payment with existing card:", topupDetails);
 
       const response = await fetch('https://cbhtifqmlkdoevxmbjmm.supabase.co/functions/v1/create-topup-session', {
         method: 'POST',
@@ -63,28 +66,39 @@ export const CardSelectionDialog = ({
       }
 
       const data = await response.json();
-      console.log("Topup session created:", data);
+      console.log("Payment response:", data);
 
-      if (!data?.success || !data?.checkout_url) {
-        throw new Error(data?.error || 'Failed to create payment session');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to process payment');
       }
 
-      onOpenChange(false);
-      
-      const newWindow = window.open(data.checkout_url, '_blank', 'noopener,noreferrer');
-      if (!newWindow) {
-        toast.error('Please allow popups to complete payment');
-        return;
+      // Handle direct payment success
+      if (data.direct_payment) {
+        if (data.status === 'succeeded') {
+          toast.success('Payment successful! Your wallet has been updated.');
+          onOpenChange(false);
+          onSuccess();
+        } else {
+          toast.error('Payment failed. Please try again.');
+        }
+      } else if (data.checkout_url) {
+        // Fallback to checkout session
+        onOpenChange(false);
+        const newWindow = window.open(data.checkout_url, '_blank', 'noopener,noreferrer');
+        if (!newWindow) {
+          toast.error('Please allow popups to complete payment');
+          return;
+        }
+        toast.success('Redirecting to Stripe checkout...');
+        onSuccess();
       }
-
-      toast.success('Redirecting to Stripe checkout...');
-      onSuccess();
 
     } catch (error: any) {
       console.error("Payment error:", error);
       toast.error(error.message || 'Failed to process payment');
     } finally {
       setLoading(false);
+      setProcessingCardId(null);
     }
   };
 
@@ -212,9 +226,13 @@ export const CardSelectionDialog = ({
                         size="sm"
                         onClick={() => handleExistingCardTopup(method.id)}
                         disabled={loading}
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="bg-blue-600 hover:bg-blue-700 min-w-[80px]"
                       >
-                        {loading ? 'Processing...' : 'Use Card'}
+                        {processingCardId === method.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Pay Now'
+                        )}
                       </Button>
                     </div>
                   </CardContent>
