@@ -231,7 +231,7 @@ export const CardSelectionDialog = ({
                         {processingCardId === method.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          'Pay Now'
+                          'Add Funds'
                         )}
                       </Button>
                     </div>
