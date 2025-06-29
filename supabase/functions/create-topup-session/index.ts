@@ -88,7 +88,10 @@ Deno.serve(async (req) => {
           customer: customer.id,
           payment_method: paymentMethodData.stripe_payment_method_id,
           confirm: true,
-          return_url: `${req.headers.get('origin')}/payments/topup`,
+          automatic_payment_methods: {
+            enabled: true,
+            allow_redirects: 'never'
+          },
           metadata: {
             type: 'wallet_topup',
             user_id: user.id,
@@ -123,7 +126,7 @@ Deno.serve(async (req) => {
             .eq('user_id', user.id)
             .single();
 
-          const currentBalance = walletData?.balance || 0;
+          const currentBalance = Number(walletData?.balance || 0);
           const newBalance = currentBalance + amount;
 
           // Update wallet balance
@@ -137,6 +140,7 @@ Deno.serve(async (req) => {
 
           if (walletError) {
             console.error('Wallet update error:', walletError);
+            throw new Error('Failed to update wallet balance');
           }
 
           // Create transaction record
@@ -155,6 +159,8 @@ Deno.serve(async (req) => {
           if (transactionError) {
             console.error('Transaction record error:', transactionError);
           }
+
+          console.log('Wallet updated successfully. New balance:', newBalance);
         }
 
         return new Response(
@@ -163,7 +169,7 @@ Deno.serve(async (req) => {
             direct_payment: true,
             status: paymentIntent.status,
             payment_intent_id: paymentIntent.id,
-            message: paymentIntent.status === 'succeeded' ? 'Payment successful! Your wallet has been updated.' : 'Payment processing...'
+            message: paymentIntent.status === 'succeeded' ? 'Payment successful! Your wallet has been updated.' : 'Payment failed. Please try again.'
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -173,12 +179,20 @@ Deno.serve(async (req) => {
 
       } catch (error: any) {
         console.error('Direct payment error:', error);
-        // Fall back to checkout session if direct payment fails
-        console.log('Falling back to checkout session');
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: error.message || 'Payment processing failed'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          }
+        );
       }
     }
 
-    // For new cards or fallback, create checkout session
+    // For new cards, create checkout session
     const origin = req.headers.get('origin') || 'http://localhost:3000';
 
     let sessionConfig: any = {
