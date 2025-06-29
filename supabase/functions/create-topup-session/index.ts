@@ -116,11 +116,21 @@ Deno.serve(async (req) => {
         if (paymentIntent.status === 'succeeded') {
           console.log('Payment succeeded, updating wallet');
           
+          // Get current wallet balance
+          const { data: walletData } = await supabase
+            .from('wallets')
+            .select('balance')
+            .eq('user_id', user.id)
+            .single();
+
+          const currentBalance = walletData?.balance || 0;
+          const newBalance = currentBalance + amount;
+
           // Update wallet balance
           const { error: walletError } = await supabase
             .from('wallets')
             .update({
-              balance: supabase.sql`balance + ${amount}`,
+              balance: newBalance,
               updated_at: new Date().toISOString()
             })
             .eq('user_id', user.id);
