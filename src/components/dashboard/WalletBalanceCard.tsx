@@ -4,6 +4,7 @@ import { Wallet, RefreshCw, TrendingUp, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/hooks/useWallet";
+import { useWalletNumber } from "@/hooks/useWalletNumber";
 import { useState } from "react";
 
 interface WalletBalanceCardProps {
@@ -12,6 +13,7 @@ interface WalletBalanceCardProps {
 
 const WalletBalanceCard = ({ className = "" }: WalletBalanceCardProps) => {
   const { wallet, balance, loading, refetch } = useWallet();
+  const { walletNumber } = useWalletNumber();
   const [showBalance, setShowBalance] = useState(true);
 
   const handleRefresh = () => {
@@ -27,11 +29,11 @@ const WalletBalanceCard = ({ className = "" }: WalletBalanceCardProps) => {
       <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
       <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12" />
       
-      <CardContent className="p-6 relative z-10">
-        <div className="flex items-start justify-between mb-6">
+      <CardContent className="p-4 md:p-6 relative z-10">
+        <div className="flex items-start justify-between mb-4 md:mb-6">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
-              <Wallet className="h-6 w-6 text-white" />
+            <div className="p-2 md:p-3 bg-white/20 rounded-full backdrop-blur-sm">
+              <Wallet className="h-5 w-5 md:h-6 md:w-6 text-white" />
             </div>
             <div>
               <h3 className="text-sm font-medium text-blue-100">Digital Wallet</h3>
@@ -39,12 +41,12 @@ const WalletBalanceCard = ({ className = "" }: WalletBalanceCardProps) => {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleBalanceVisibility}
-              className="text-white/80 hover:text-white hover:bg-white/10 p-2"
+              className="text-white/80 hover:text-white hover:bg-white/10 p-1 md:p-2"
             >
               {showBalance ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </Button>
@@ -53,19 +55,19 @@ const WalletBalanceCard = ({ className = "" }: WalletBalanceCardProps) => {
               size="sm"
               onClick={handleRefresh}
               disabled={loading}
-              className="text-white/80 hover:text-white hover:bg-white/10 p-2"
+              className="text-white/80 hover:text-white hover:bg-white/10 p-1 md:p-2"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 md:space-y-4">
           {loading ? (
-            <Skeleton className="h-12 w-48 bg-white/20" />
+            <Skeleton className="h-10 md:h-12 w-32 md:w-48 bg-white/20" />
           ) : (
             <div className="space-y-1">
-              <h2 className="text-4xl font-bold text-white">
+              <h2 className="text-3xl md:text-4xl font-bold text-white">
                 {showBalance ? (
                   `$${balance.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
@@ -83,15 +85,15 @@ const WalletBalanceCard = ({ className = "" }: WalletBalanceCardProps) => {
           )}
 
           {wallet && (
-            <div className="pt-4 border-t border-white/20">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="pt-3 md:pt-4 border-t border-white/20">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 text-sm">
                 <div>
                   <p className="text-blue-200">Wallet ID</p>
                   <p className="text-white font-medium">
-                    {wallet.wallet_number ? `#${wallet.wallet_number}` : 'N/A'}
+                    {wallet.user_phone || walletNumber || `#${wallet.wallet_number}` || 'N/A'}
                   </p>
                 </div>
-                <div>
+                <div className="hidden md:block">
                   <p className="text-blue-200">Last Updated</p>
                   <p className="text-white font-medium">
                     {new Date(wallet.updated_at).toLocaleDateString()}

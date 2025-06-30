@@ -44,7 +44,7 @@ export function useTransactions() {
         amount: Math.abs(transaction.amount),
         type: transaction.amount >= 0 ? 'income' : 'expense',
         date: transaction.created_at,
-        name: transaction.description || 'Unknown Transaction',
+        name: transaction.name || 'Unknown Transaction',
         category: transaction.category || undefined
       }));
 

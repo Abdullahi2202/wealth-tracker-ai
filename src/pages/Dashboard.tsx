@@ -1,14 +1,13 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
-import BalanceCard from "@/components/dashboard/BalanceCard";
 import WalletBalanceCard from "@/components/dashboard/WalletBalanceCard";
+import IncomeExpenseSummary from "@/components/dashboard/IncomeExpenseSummary";
 import { supabase } from "@/integrations/supabase/client";
 import TransactionDrawer from "@/components/transactions/TransactionDrawer";
 import { Button } from "@/components/ui/button";
 import { useWallet } from "@/hooks/useWallet";
 import DashboardQuickLinks from "@/components/dashboard/DashboardQuickLinks";
-import RecentTransactions from "@/components/dashboard/RecentTransactions";
 
 type Transaction = {
   id: string;
@@ -24,9 +23,6 @@ const Dashboard = () => {
   const [userEmail, setUserEmail] = useState<string>("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Calculated values
-  const [totalBalance, setTotalBalance] = useState(0);
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpenses, setMonthExpenses] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -78,32 +74,23 @@ const Dashboard = () => {
         const month = now.getMonth();
         const year = now.getFullYear();
 
-        let balance = 0;
         let monthlyIncome = 0;
         let monthlyExpenses = 0;
 
         typedTransactions.forEach((txn) => {
           const txnDate = new Date(txn.date);
-          if (txn.type === "income") {
-            balance += Number(txn.amount);
-            if (
-              txnDate.getMonth() === month &&
-              txnDate.getFullYear() === year
-            ) {
+          if (
+            txnDate.getMonth() === month &&
+            txnDate.getFullYear() === year
+          ) {
+            if (txn.type === "income") {
               monthlyIncome += Number(txn.amount);
-            }
-          } else if (txn.type === "expense") {
-            balance -= Number(txn.amount);
-            if (
-              txnDate.getMonth() === month &&
-              txnDate.getFullYear() === year
-            ) {
+            } else if (txn.type === "expense") {
               monthlyExpenses += Number(txn.amount);
             }
           }
         });
 
-        setTotalBalance(balance);
         setMonthIncome(monthlyIncome);
         setMonthExpenses(monthlyExpenses);
       }
@@ -144,75 +131,49 @@ const Dashboard = () => {
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <div className="container mx-auto px-4 py-4 max-w-4xl">
           {/* Header Section */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {userName ? `Welcome back, ${userName}` : "Welcome to WalletMaster"}
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  {new Date().toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </p>
-              </div>
-              <Button
-                onClick={handleRefreshData}
-                variant="outline"
-                className="hidden md:flex"
-              >
-                Refresh Data
-              </Button>
-            </div>
+          <div className="mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              {userName ? `Welcome, ${userName}` : "WalletMaster"}
+            </h1>
+            <p className="text-gray-600 text-sm mt-1">
+              {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                month: 'short', 
+                day: 'numeric' 
+              })}
+            </p>
           </div>
 
-          {/* Balance Cards Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Wallet Balance - Full width on mobile, spans 2 columns on lg */}
-            <div className="lg:col-span-2">
-              <WalletBalanceCard className="h-full" />
-            </div>
-            
-            {/* Main Balance Card */}
-            <div className="lg:col-span-1">
-              <BalanceCard
-                totalBalance={loading ? 0 : totalBalance}
-                currency="$"
-                monthIncome={loading ? 0 : monthIncome}
-                monthExpenses={loading ? 0 : monthExpenses}
-                loading={loading}
-                className="h-full"
-              />
-            </div>
+          {/* Wallet Balance Card */}
+          <div className="mb-6">
+            <WalletBalanceCard />
+          </div>
+
+          {/* Income/Expense Summary */}
+          <div className="mb-6">
+            <IncomeExpenseSummary
+              monthIncome={monthIncome}
+              monthExpenses={monthExpenses}
+              loading={loading}
+            />
           </div>
 
           {/* Quick Actions */}
-          <div className="mb-8">
+          <div className="mb-6">
             <DashboardQuickLinks />
           </div>
 
           {/* Add Transaction Button */}
-          <div className="mb-8">
+          <div className="mb-6">
             <Button 
               onClick={() => setDrawerOpen(true)} 
-              className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg"
               size="lg"
             >
               + Add Transaction
             </Button>
-          </div>
-
-          {/* Recent Transactions */}
-          <div className="mb-8">
-            <RecentTransactions 
-              transactions={transactions.slice(0, 5)} 
-              loading={loading}
-            />
           </div>
 
           <TransactionDrawer 
