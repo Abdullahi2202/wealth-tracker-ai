@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { DollarSign, TrendingUp, AlertCircle, CheckCircle, Download, Search, Eye } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 
 type Transaction = {
   id: string;
@@ -71,7 +71,11 @@ const TransactionManagement = () => {
 
         if (directError) {
           console.error('Direct query also failed:', directError);
-          toast.error('Failed to fetch transactions');
+          toast({
+            title: "Error",
+            description: "Failed to fetch transactions",
+            variant: "destructive",
+          });
           return;
         }
 
@@ -110,7 +114,11 @@ const TransactionManagement = () => {
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
-      toast.error('Failed to fetch transactions');
+      toast({
+        title: "Error",
+        description: "Failed to fetch transactions",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -137,9 +145,16 @@ const TransactionManagement = () => {
 
       if (error) {
         console.error('Error updating transaction:', error);
-        toast.error('Failed to update transaction');
+        toast({
+          title: "Error",
+          description: "Failed to update transaction",
+          variant: "destructive",
+        });
       } else {
-        toast.success(`Transaction marked as ${newStatus}`);
+        toast({
+          title: "Success",
+          description: `Transaction marked as ${newStatus}`,
+        });
         fetchTransactions(); // Refresh the list
         setShowStatusModal(false);
         setStatusUpdateReason("");
@@ -147,7 +162,11 @@ const TransactionManagement = () => {
       }
     } catch (error) {
       console.error('Error updating transaction:', error);
-      toast.error('Failed to update transaction');
+      toast({
+        title: "Error",
+        description: "Failed to update transaction",
+        variant: "destructive",
+      });
     }
   };
 
@@ -174,10 +193,17 @@ const TransactionManagement = () => {
       a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
-      toast.success('Transactions exported successfully');
+      toast({
+        title: "Success", 
+        description: "Transactions exported successfully",
+      });
     } catch (error) {
       console.error('Error exporting transactions:', error);
-      toast.error('Failed to export transactions');
+      toast({
+        title: "Error",
+        description: "Failed to export transactions",
+        variant: "destructive",
+      });
     }
   };
 
