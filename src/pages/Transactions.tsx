@@ -6,12 +6,24 @@ import { ArrowUp, ArrowDown } from "lucide-react";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import TransactionDrawer from "@/components/transactions/TransactionDrawer";
 import TransactionCharts from "@/components/transactions/TransactionCharts";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { useTransactions } from "@/hooks/useTransactions";
 
 const Transactions = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  
+  const { transactions, loading, error } = useTransactions();
+
+  const incomeTransactions = useMemo(() => 
+    transactions.filter(t => t.type === 'income'), 
+    [transactions]
+  );
+
+  const expenseTransactions = useMemo(() => 
+    transactions.filter(t => t.type === 'expense'), 
+    [transactions]
+  );
+
   return (
     <DashboardLayout>
       <h1 className="text-3xl font-bold tracking-tight mb-6">Transactions</h1>
@@ -41,10 +53,10 @@ const Transactions = () => {
         <TabsContent value="all">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Transactions</CardTitle>
+              <CardTitle>All Transactions</CardTitle>
             </CardHeader>
             <CardContent>
-              <RecentTransactions />
+              <RecentTransactions transactions={transactions} loading={loading} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -55,7 +67,7 @@ const Transactions = () => {
               <CardTitle>Income Transactions</CardTitle>
             </CardHeader>
             <CardContent>
-              <RecentTransactions />
+              <RecentTransactions transactions={incomeTransactions} loading={loading} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -66,7 +78,7 @@ const Transactions = () => {
               <CardTitle>Expense Transactions</CardTitle>
             </CardHeader>
             <CardContent>
-              <RecentTransactions />
+              <RecentTransactions transactions={expenseTransactions} loading={loading} />
             </CardContent>
           </Card>
         </TabsContent>
