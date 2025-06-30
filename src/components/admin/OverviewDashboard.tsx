@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,26 +35,25 @@ const OverviewDashboard = () => {
     try {
       console.log('Fetching dashboard statistics...');
 
-      // Fetch users count
-      const { count: usersCount, error: usersError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      // Fetch users using admin-operations edge function
+      const { data: usersResponse, error: usersError } = await supabase.functions.invoke('admin-operations', {
+        body: { action: 'get_all_users' }
+      });
 
       if (usersError) {
-        console.error('Error fetching users count:', usersError);
+        console.error('Error fetching users:', usersError);
       }
 
-      // Fetch transactions data
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Fetch transactions using admin-operations edge function
+      const { data: transactionsResponse, error: transactionsError } = await supabase.functions.invoke('admin-operations', {
+        body: { action: 'get_all_transactions' }
+      });
 
       if (transactionsError) {
         console.error('Error fetching transactions:', transactionsError);
       }
 
-      // Fetch active cards count
+      // Fetch active cards count with service role permissions
       const { count: cardsCount, error: cardsError } = await supabase
         .from('payment_methods')
         .select('*', { count: 'exact', head: true })
@@ -65,15 +63,19 @@ const OverviewDashboard = () => {
         console.error('Error fetching cards count:', cardsError);
       }
 
+      // Process the data
+      const users = usersResponse?.users || [];
+      const transactions = transactionsResponse?.transactions || [];
+
       // Calculate statistics
-      const totalTransactionValue = transactionsData?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const pendingTransactions = transactionsData?.filter(t => t.status === 'pending').length || 0;
-      const failedTransactions = transactionsData?.filter(t => t.status === 'failed').length || 0;
-      const recentTransactions = transactionsData?.slice(0, 5) || [];
+      const totalTransactionValue = transactions.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
+      const pendingTransactions = transactions.filter((t: any) => t.status === 'pending').length;
+      const failedTransactions = transactions.filter((t: any) => t.status === 'failed').length;
+      const recentTransactions = transactions.slice(0, 5);
 
       setStats({
-        totalUsers: usersCount || 0,
-        totalTransactions: transactionsData?.length || 0,
+        totalUsers: users.length,
+        totalTransactions: transactions.length,
         totalTransactionValue,
         activeCards: cardsCount || 0,
         pendingTransactions,
@@ -82,8 +84,8 @@ const OverviewDashboard = () => {
       });
 
       console.log('Dashboard stats loaded:', {
-        totalUsers: usersCount,
-        totalTransactions: transactionsData?.length,
+        totalUsers: users.length,
+        totalTransactions: transactions.length,
         totalTransactionValue,
         activeCards: cardsCount
       });
@@ -204,7 +206,7 @@ const OverviewDashboard = () => {
                   <div className="flex-1">
                     <div className="font-medium">{transaction.name}</div>
                     <div className="text-sm text-gray-500">
-                      {new Date(transaction.created_at).toLocaleDateString()}
+                      {transaction.user_name || 'Unknown User'} • {new Date(transaction.created_at).toLocaleDateString()}
                     </div>
                   </div>
                   <div className="text-right">
