@@ -1,13 +1,9 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
-import WalletBalanceCard from "@/components/dashboard/WalletBalanceCard";
-import IncomeExpenseSummary from "@/components/dashboard/IncomeExpenseSummary";
 import { supabase } from "@/integrations/supabase/client";
-import TransactionDrawer from "@/components/transactions/TransactionDrawer";
-import { Button } from "@/components/ui/button";
 import { useWallet } from "@/hooks/useWallet";
-import DashboardQuickLinks from "@/components/dashboard/DashboardQuickLinks";
+import CombinedWalletCard from "@/components/dashboard/CombinedWalletCard";
 
 type Transaction = {
   id: string;
@@ -25,7 +21,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpenses, setMonthExpenses] = useState(0);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { wallet } = useWallet();
 
@@ -100,34 +95,6 @@ const Dashboard = () => {
     fetchTransactions();
   }, [userEmail]);
 
-  const handleRefreshData = () => {
-    if (userEmail) {
-      const fetchTransactions = async () => {
-        setLoading(true);
-        const { data: transactionData, error } = await supabase
-          .from("transactions")
-          .select("id, amount, type, date, name, category")
-          .eq("user_id", userEmail)
-          .order("date", { ascending: false });
-
-        if (!error && Array.isArray(transactionData)) {
-          const typedTransactions: Transaction[] = transactionData.map(item => ({
-            id: item.id,
-            amount: Number(item.amount),
-            type: String(item.type),
-            date: String(item.date),
-            name: String(item.name),
-            category: item.category ? String(item.category) : undefined
-          }));
-          
-          setTransactions(typedTransactions);
-        }
-        setLoading(false);
-      };
-      fetchTransactions();
-    }
-  };
-
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -146,43 +113,11 @@ const Dashboard = () => {
             </p>
           </div>
 
-          {/* Wallet Balance Card */}
-          <div className="mb-6">
-            <WalletBalanceCard />
-          </div>
-
-          {/* Income/Expense Summary */}
-          <div className="mb-6">
-            <IncomeExpenseSummary
-              monthIncome={monthIncome}
-              monthExpenses={monthExpenses}
-              loading={loading}
-            />
-          </div>
-
-          {/* Quick Actions */}
-          <div className="mb-6">
-            <DashboardQuickLinks />
-          </div>
-
-          {/* Add Transaction Button */}
-          <div className="mb-6">
-            <Button 
-              onClick={() => setDrawerOpen(true)} 
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg"
-              size="lg"
-            >
-              + Add Transaction
-            </Button>
-          </div>
-
-          <TransactionDrawer 
-            open={drawerOpen} 
-            onOpenChange={setDrawerOpen} 
-            onSaved={() => {
-              handleRefreshData();
-              setDrawerOpen(false);
-            }} 
+          {/* Combined Wallet Card */}
+          <CombinedWalletCard
+            monthIncome={monthIncome}
+            monthExpenses={monthExpenses}
+            loading={loading}
           />
         </div>
       </div>
