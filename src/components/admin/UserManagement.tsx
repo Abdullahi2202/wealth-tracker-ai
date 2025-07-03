@@ -122,6 +122,11 @@ const UserManagement = () => {
         )
       );
       
+      // Update selected user if it's the same user
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser(prev => prev ? { ...prev, verification_status: status } : null);
+      }
+      
       // Also refresh the users list
       await fetchUsers();
     } catch (error) {
@@ -512,7 +517,7 @@ const UserManagement = () => {
           <DialogHeader>
             <DialogTitle>User Details</DialogTitle>
             <DialogDescription>
-              View detailed information about this user
+              View detailed information about this user and manage their verification status
             </DialogDescription>
           </DialogHeader>
           {selectedUser && (
@@ -552,7 +557,7 @@ const UserManagement = () => {
                   <label className="text-sm font-medium">Verification Documents</label>
                   <div className="space-y-2">
                     {selectedUser.documents.map((doc, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 border rounded">
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
                         <div>
                           <p className="font-medium">{doc.type.replace('_', ' ').toUpperCase()}</p>
                           <p className="text-sm text-gray-600">Number: {doc.number}</p>
@@ -576,12 +581,12 @@ const UserManagement = () => {
                 </div>
               )}
               
-              {/* Quick action buttons in modal */}
-              <div className="flex gap-2 pt-4 border-t">
+              {/* Action Buttons Section - Enhanced */}
+              <div className="flex gap-3 pt-4 border-t">
                 {selectedUser.verification_status === 'pending' && (
                   <>
                     <Button
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-green-600 hover:bg-green-700 flex-1"
                       onClick={() => {
                         updateUserVerification(selectedUser.id, 'verified', selectedUser.email);
                         setShowDetailsModal(false);
@@ -597,6 +602,7 @@ const UserManagement = () => {
                     </Button>
                     <Button
                       variant="destructive"
+                      className="flex-1"
                       onClick={() => {
                         updateUserVerification(selectedUser.id, 'rejected', selectedUser.email);
                         setShowDetailsModal(false);
@@ -616,6 +622,7 @@ const UserManagement = () => {
                 {selectedUser.verification_status === 'verified' && (
                   <Button
                     variant="destructive"
+                    className="flex-1"
                     onClick={() => {
                       updateUserVerification(selectedUser.id, 'rejected', selectedUser.email);
                       setShowDetailsModal(false);
@@ -633,7 +640,7 @@ const UserManagement = () => {
                 
                 {selectedUser.verification_status === 'rejected' && (
                   <Button
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 flex-1"
                     onClick={() => {
                       updateUserVerification(selectedUser.id, 'verified', selectedUser.email);
                       setShowDetailsModal(false);
@@ -648,6 +655,13 @@ const UserManagement = () => {
                     Approve User
                   </Button>
                 )}
+                
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDetailsModal(false)}
+                >
+                  Close
+                </Button>
               </div>
             </div>
           )}
