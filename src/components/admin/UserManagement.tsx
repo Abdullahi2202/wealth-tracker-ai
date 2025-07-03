@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, UserCheck, UserX, Search, Plus, Eye, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Users, UserCheck, UserX, Search, Plus, Eye, Trash2, CheckCircle, XCircle, FileText, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface User {
@@ -18,6 +18,13 @@ interface User {
   created_at: string;
   verification_status: string;
   identity_verification_requests?: any[];
+  documents?: Array<{
+    type: string;
+    number: string;
+    image_url: string;
+    status: string;
+    created_at: string;
+  }>;
 }
 
 const UserManagement = () => {
@@ -46,8 +53,8 @@ const UserManagement = () => {
     try {
       console.log('Fetching users for admin...');
       
-      const { data: response, error } = await supabase.functions.invoke('admin-operations', {
-        body: { action: 'get_all_users' }
+      const { data: response, error } = await supabase.functions.invoke('user-management', {
+        method: 'GET'
       });
 
       if (error) {
@@ -60,10 +67,10 @@ const UserManagement = () => {
         return;
       }
 
-      console.log('Users fetched successfully:', response?.users?.length || 0);
+      console.log('Users fetched successfully:', response?.length || 0);
       
       // Ensure all users have a verification_status, defaulting to 'pending' if not set
-      const usersWithStatus = (response?.users || []).map(user => ({
+      const usersWithStatus = (response || []).map(user => ({
         ...user,
         verification_status: user.verification_status || 'pending'
       }));
@@ -87,6 +94,7 @@ const UserManagement = () => {
       console.log('Updating user verification:', { userId, status, userEmail });
       
       const { data, error } = await supabase.functions.invoke('user-management', {
+        method: 'PUT',
         body: {
           id: userId,
           verification_status: status,
@@ -213,6 +221,10 @@ const UserManagement = () => {
     }
   };
 
+  const viewDocument = (imageUrl: string) => {
+    window.open(imageUrl, '_blank');
+  };
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -337,6 +349,7 @@ const UserManagement = () => {
               <TableHead>User</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Documents</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -359,6 +372,26 @@ const UserManagement = () => {
                   <Badge className={getStatusColor(user.verification_status)}>
                     {user.verification_status}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {user.documents && user.documents.length > 0 ? (
+                    <div className="flex gap-1">
+                      {user.documents.map((doc, index) => (
+                        <Button
+                          key={index}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => viewDocument(doc.image_url)}
+                          className="flex items-center gap-1"
+                        >
+                          <FileText className="h-3 w-3" />
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No documents</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {new Date(user.created_at).toLocaleDateString()}
@@ -510,6 +543,36 @@ const UserManagement = () => {
                   <p className="font-mono text-sm">{selectedUser.id}</p>
                 </div>
               </div>
+              
+              {/* Documents Section */}
+              {selectedUser.documents && selectedUser.documents.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Verification Documents</label>
+                  <div className="space-y-2">
+                    {selectedUser.documents.map((doc, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 border rounded">
+                        <div>
+                          <p className="font-medium">{doc.type.replace('_', ' ').toUpperCase()}</p>
+                          <p className="text-sm text-gray-600">Number: {doc.number}</p>
+                          <p className="text-sm text-gray-500">
+                            Submitted: {new Date(doc.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => viewDocument(doc.image_url)}
+                          className="flex items-center gap-2"
+                        >
+                          <FileText className="h-4 w-4" />
+                          View Document
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {/* Quick action buttons in modal */}
               <div className="flex gap-2 pt-4 border-t">

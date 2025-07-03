@@ -10,6 +10,8 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 Deno.serve(async (req) => {
+  console.log(`Processing ${req.method} request to user-management`)
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -17,7 +19,6 @@ Deno.serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    console.log(`Processing ${req.method} request`)
 
     switch (req.method) {
       case 'GET':
@@ -31,17 +32,17 @@ Deno.serve(async (req) => {
       default:
         return new Response(JSON.stringify({ error: 'Method not allowed' }), {
           status: 405,
-          headers: corsHeaders
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
     }
   } catch (error) {
-    console.error('Unhandled error:', error)
+    console.error('Unhandled error in user-management:', error)
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
       message: error.message 
     }), {
       status: 500,
-      headers: corsHeaders
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 })
@@ -70,7 +71,7 @@ async function handleGetUsers(supabase: any) {
       console.error('Profiles error:', profilesError)
     }
 
-    // Fetch verification requests
+    // Fetch verification requests with document URLs
     const { data: verificationRequests, error: verificationError } = await supabase
       .from('identity_verification_requests')
       .select('*')
@@ -107,6 +108,7 @@ async function handleGetUsers(supabase: any) {
       })
     }
 
+    // Attach verification requests and documents to users
     if (verificationRequests) {
       verificationRequests.forEach(request => {
         const user = allUsers.find(u => u.email === request.user_email || u.id === request.user_id)
@@ -115,6 +117,17 @@ async function handleGetUsers(supabase: any) {
             user.identity_verification_requests = []
           }
           user.identity_verification_requests.push(request)
+          // Also add document info directly to user for easy access
+          if (!user.documents) {
+            user.documents = []
+          }
+          user.documents.push({
+            type: request.document_type,
+            number: request.document_number,
+            image_url: request.image_url,
+            status: request.status,
+            created_at: request.created_at
+          })
         }
       })
     }
@@ -125,9 +138,12 @@ async function handleGetUsers(supabase: any) {
     })
   } catch (error) {
     console.error('Error in handleGetUsers:', error)
-    return new Response(JSON.stringify({ error: 'Failed to fetch users' }), {
+    return new Response(JSON.stringify({ 
+      error: 'Failed to fetch users',
+      message: error.message 
+    }), {
       status: 500,
-      headers: corsHeaders
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 }
@@ -140,7 +156,7 @@ async function handleCreateUser(req: Request, supabase: any) {
     if (!email || !full_name) {
       return new Response(JSON.stringify({ error: 'Email and full name are required' }), {
         status: 400,
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -156,7 +172,7 @@ async function handleCreateUser(req: Request, supabase: any) {
       console.error('Auth error:', authError)
       return new Response(JSON.stringify({ error: authError.message }), {
         status: 500,
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -219,13 +235,16 @@ async function handleCreateUser(req: Request, supabase: any) {
       user_id: userId,
       wallet_number: walletData?.wallet_number 
     }), {
-      headers: corsHeaders
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (error) {
     console.error('Error in handleCreateUser:', error)
-    return new Response(JSON.stringify({ error: 'Failed to create user' }), {
+    return new Response(JSON.stringify({ 
+      error: 'Failed to create user',
+      message: error.message 
+    }), {
       status: 500,
-      headers: corsHeaders
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 }
@@ -233,14 +252,14 @@ async function handleCreateUser(req: Request, supabase: any) {
 async function handleUpdateUser(req: Request, supabase: any) {
   try {
     const body = await req.json()
-    console.log('Update request:', body)
+    console.log('Update request body:', body)
     
     const { id, verification_status, email: userEmail, action } = body
     
     if (!id) {
       return new Response(JSON.stringify({ error: 'User ID is required' }), {
         status: 400,
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -260,14 +279,41 @@ async function handleUpdateUser(req: Request, supabase: any) {
         .single()
 
       if (updateError) {
-        console.error('Update error:', updateError)
-        return new Response(JSON.stringify({ 
-          error: 'Failed to update verification status',
-          details: updateError.message 
-        }), {
-          status: 500,
-          headers: corsHeaders
-        })
+        console.error('Registration update error:', updateError)
+        
+        // If registration update fails, try updating by email
+        if (userEmail) {
+          const { data: updatedByEmail, error: emailUpdateError } = await supabase
+            .from('registration')
+            .update({ 
+              verification_status,
+              updated_at: new Date().toISOString() 
+            })
+            .eq('email', userEmail)
+            .select()
+            .single()
+
+          if (emailUpdateError) {
+            console.error('Email-based update also failed:', emailUpdateError)
+            return new Response(JSON.stringify({ 
+              error: 'Failed to update verification status',
+              details: emailUpdateError.message 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+          
+          updatedUser = updatedByEmail
+        } else {
+          return new Response(JSON.stringify({ 
+            error: 'Failed to update verification status',
+            details: updateError.message 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
       }
 
       // Update verification requests if email provided
@@ -282,7 +328,8 @@ async function handleUpdateUser(req: Request, supabase: any) {
           .eq('user_email', userEmail)
 
         if (verifyError) {
-          console.error('Verification request update error:', verifyError)
+          console.error('Verification request update warning:', verifyError)
+          // Don't fail the main request if this fails
         }
       }
 
@@ -292,7 +339,7 @@ async function handleUpdateUser(req: Request, supabase: any) {
         message: `User ${verification_status} successfully`,
         data: updatedUser 
       }), {
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -309,20 +356,23 @@ async function handleUpdateUser(req: Request, supabase: any) {
 
       if (updateError) {
         console.error('General update error:', updateError)
-        return new Response(JSON.stringify({ error: 'Failed to update user' }), {
+        return new Response(JSON.stringify({ 
+          error: 'Failed to update user',
+          message: updateError.message 
+        }), {
           status: 500,
-          headers: corsHeaders
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
 
       return new Response(JSON.stringify(updatedUser), {
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     return new Response(JSON.stringify({ error: 'No valid updates provided' }), {
       status: 400,
-      headers: corsHeaders
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (error) {
     console.error('Error in handleUpdateUser:', error)
@@ -331,7 +381,7 @@ async function handleUpdateUser(req: Request, supabase: any) {
       message: error.message 
     }), {
       status: 500,
-      headers: corsHeaders
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 }
@@ -344,7 +394,7 @@ async function handleDeleteUser(req: Request, supabase: any) {
     if (!deleteId) {
       return new Response(JSON.stringify({ error: 'User ID is required' }), {
         status: 400,
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -363,18 +413,21 @@ async function handleDeleteUser(req: Request, supabase: any) {
       console.error('Auth delete error:', authDeleteError)
       return new Response(JSON.stringify({ error: authDeleteError.message }), {
         status: 500,
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     return new Response(JSON.stringify({ success: true }), {
-      headers: corsHeaders
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (error) {
     console.error('Error in handleDeleteUser:', error)
-    return new Response(JSON.stringify({ error: 'Failed to delete user' }), {
+    return new Response(JSON.stringify({ 
+      error: 'Failed to delete user',
+      message: error.message 
+    }), {
       status: 500,
-      headers: corsHeaders
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 }
