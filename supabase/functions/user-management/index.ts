@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const corsHeaders = {
@@ -254,66 +255,67 @@ async function handleUpdateUser(req: Request, supabase: any) {
     const body = await req.json()
     console.log('Update request body:', body)
     
-    const { id, verification_status, email: userEmail, action } = body
+    const { id, verification_status, email: userEmail } = body
     
-    if (!id) {
-      return new Response(JSON.stringify({ error: 'User ID is required' }), {
+    if (!id && !userEmail) {
+      return new Response(JSON.stringify({ error: 'User ID or email is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     // Handle verification status updates
-    if (verification_status && (action === 'update_verification' || !action)) {
-      console.log(`Updating verification status for user ${id} to ${verification_status}`)
+    if (verification_status) {
+      console.log(`Updating verification status to ${verification_status}`)
       
-      // Update registration table
-      const { data: updatedUser, error: updateError } = await supabase
-        .from('registration')
-        .update({ 
-          verification_status,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', id)
-        .select()
-        .single()
-
-      if (updateError) {
-        console.error('Registration update error:', updateError)
-        
-        // If registration update fails, try updating by email
-        if (userEmail) {
-          const { data: updatedByEmail, error: emailUpdateError } = await supabase
-            .from('registration')
-            .update({ 
-              verification_status,
-              updated_at: new Date().toISOString() 
-            })
-            .eq('email', userEmail)
-            .select()
-            .single()
-
-          if (emailUpdateError) {
-            console.error('Email-based update also failed:', emailUpdateError)
-            return new Response(JSON.stringify({ 
-              error: 'Failed to update verification status',
-              details: emailUpdateError.message 
-            }), {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
-          }
-          
-          updatedUser = updatedByEmail
-        } else {
-          return new Response(JSON.stringify({ 
-            error: 'Failed to update verification status',
-            details: updateError.message 
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      let updatedUser = null
+      
+      // Try to update by ID first
+      if (id) {
+        const { data, error } = await supabase
+          .from('registration')
+          .update({ 
+            verification_status,
+            updated_at: new Date().toISOString() 
           })
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (!error && data) {
+          updatedUser = data
+        } else {
+          console.log('Update by ID failed:', error)
         }
+      }
+      
+      // If update by ID failed or no ID provided, try by email
+      if (!updatedUser && userEmail) {
+        const { data, error } = await supabase
+          .from('registration')
+          .update({ 
+            verification_status,
+            updated_at: new Date().toISOString() 
+          })
+          .eq('email', userEmail)
+          .select()
+          .single()
+
+        if (!error && data) {
+          updatedUser = data
+        } else {
+          console.log('Update by email failed:', error)
+        }
+      }
+
+      if (!updatedUser) {
+        return new Response(JSON.stringify({ 
+          error: 'Failed to update user verification status',
+          details: 'User not found or update failed'
+        }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
       // Update verification requests if email provided
@@ -344,13 +346,15 @@ async function handleUpdateUser(req: Request, supabase: any) {
     }
 
     // Handle other updates
-    const { verification_status: _, action: __, ...otherUpdates } = body
+    const { verification_status: _, ...otherUpdates } = body
     
     if (Object.keys(otherUpdates).length > 1) {
+      const whereClause = id ? { id } : { email: userEmail }
+      
       const { data: updatedUser, error: updateError } = await supabase
         .from('registration')
         .update({ ...otherUpdates, updated_at: new Date().toISOString() })
-        .eq('id', id)
+        .match(whereClause)
         .select()
         .single()
 

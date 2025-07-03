@@ -97,9 +97,8 @@ const UserManagement = () => {
         method: 'PUT',
         body: {
           id: userId,
-          verification_status: status,
           email: userEmail,
-          action: 'update_verification'
+          verification_status: status
         }
       });
 
@@ -383,6 +382,7 @@ const UserManagement = () => {
                           variant="outline"
                           onClick={() => viewDocument(doc.image_url)}
                           className="flex items-center gap-1"
+                          title={`View ${doc.type} document`}
                         >
                           <FileText className="h-3 w-3" />
                           <ExternalLink className="h-3 w-3" />
@@ -418,6 +418,7 @@ const UserManagement = () => {
                           className="text-green-600 hover:bg-green-50 border-green-200"
                           onClick={() => updateUserVerification(user.id, 'verified', user.email)}
                           disabled={actionLoading === `${user.id}-verified`}
+                          title="Approve User"
                         >
                           {actionLoading === `${user.id}-verified` ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
@@ -431,6 +432,7 @@ const UserManagement = () => {
                           className="text-red-600 hover:bg-red-50 border-red-200"
                           onClick={() => updateUserVerification(user.id, 'rejected', user.email)}
                           disabled={actionLoading === `${user.id}-rejected`}
+                          title="Reject User"
                         >
                           {actionLoading === `${user.id}-rejected` ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
