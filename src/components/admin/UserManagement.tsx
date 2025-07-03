@@ -61,7 +61,14 @@ const UserManagement = () => {
       }
 
       console.log('Users fetched successfully:', response?.users?.length || 0);
-      setUsers(response?.users || []);
+      
+      // Ensure all users have a verification_status, defaulting to 'pending' if not set
+      const usersWithStatus = (response?.users || []).map(user => ({
+        ...user,
+        verification_status: user.verification_status || 'pending'
+      }));
+      
+      setUsers(usersWithStatus);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -80,7 +87,6 @@ const UserManagement = () => {
       console.log('Updating user verification:', { userId, status, userEmail });
       
       const { data, error } = await supabase.functions.invoke('user-management', {
-        method: 'PUT',
         body: {
           id: userId,
           verification_status: status,
@@ -100,7 +106,16 @@ const UserManagement = () => {
         description: `User ${status === 'verified' ? 'approved' : 'rejected'} successfully`,
       });
       
-      // Refresh the users list
+      // Update the user in the local state immediately
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId 
+            ? { ...user, verification_status: status }
+            : user
+        )
+      );
+      
+      // Also refresh the users list
       await fetchUsers();
     } catch (error) {
       console.error('Error updating user verification:', error);
@@ -360,12 +375,14 @@ const UserManagement = () => {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
+                    
+                    {/* Show approve/reject buttons for pending users */}
                     {user.verification_status === 'pending' && (
                       <>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-green-600 hover:bg-green-50"
+                          className="text-green-600 hover:bg-green-50 border-green-200"
                           onClick={() => updateUserVerification(user.id, 'verified', user.email)}
                           disabled={actionLoading === `${user.id}-verified`}
                         >
@@ -378,7 +395,7 @@ const UserManagement = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-red-600 hover:bg-red-50"
+                          className="text-red-600 hover:bg-red-50 border-red-200"
                           onClick={() => updateUserVerification(user.id, 'rejected', user.email)}
                           disabled={actionLoading === `${user.id}-rejected`}
                         >
@@ -390,12 +407,49 @@ const UserManagement = () => {
                         </Button>
                       </>
                     )}
+                    
+                    {/* Show status change buttons for verified/rejected users */}
+                    {user.verification_status === 'verified' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 hover:bg-red-50 border-red-200"
+                        onClick={() => updateUserVerification(user.id, 'rejected', user.email)}
+                        disabled={actionLoading === `${user.id}-rejected`}
+                        title="Reject User"
+                      >
+                        {actionLoading === `${user.id}-rejected` ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                        ) : (
+                          <XCircle className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                    
+                    {user.verification_status === 'rejected' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-600 hover:bg-green-50 border-green-200"
+                        onClick={() => updateUserVerification(user.id, 'verified', user.email)}
+                        disabled={actionLoading === `${user.id}-verified`}
+                        title="Approve User"
+                      >
+                        {actionLoading === `${user.id}-verified` ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                    
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-red-600 hover:bg-red-50"
+                      className="text-red-600 hover:bg-red-50 border-red-200"
                       onClick={() => deleteUser(user.id, user.email)}
                       disabled={actionLoading === `delete-${user.id}`}
+                      title="Delete User"
                     >
                       {actionLoading === `delete-${user.id}` ? (
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
@@ -455,6 +509,80 @@ const UserManagement = () => {
                   <label className="text-sm font-medium">User ID</label>
                   <p className="font-mono text-sm">{selectedUser.id}</p>
                 </div>
+              </div>
+              
+              {/* Quick action buttons in modal */}
+              <div className="flex gap-2 pt-4 border-t">
+                {selectedUser.verification_status === 'pending' && (
+                  <>
+                    <Button
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => {
+                        updateUserVerification(selectedUser.id, 'verified', selectedUser.email);
+                        setShowDetailsModal(false);
+                      }}
+                      disabled={actionLoading === `${selectedUser.id}-verified`}
+                    >
+                      {actionLoading === `${selectedUser.id}-verified` ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Approve User
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        updateUserVerification(selectedUser.id, 'rejected', selectedUser.email);
+                        setShowDetailsModal(false);
+                      }}
+                      disabled={actionLoading === `${selectedUser.id}-rejected`}
+                    >
+                      {actionLoading === `${selectedUser.id}-rejected` ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Reject User
+                    </Button>
+                  </>
+                )}
+                
+                {selectedUser.verification_status === 'verified' && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      updateUserVerification(selectedUser.id, 'rejected', selectedUser.email);
+                      setShowDetailsModal(false);
+                    }}
+                    disabled={actionLoading === `${selectedUser.id}-rejected`}
+                  >
+                    {actionLoading === `${selectedUser.id}-rejected` ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                    ) : (
+                      <XCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Reject User
+                  </Button>
+                )}
+                
+                {selectedUser.verification_status === 'rejected' && (
+                  <Button
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      updateUserVerification(selectedUser.id, 'verified', selectedUser.email);
+                      setShowDetailsModal(false);
+                    }}
+                    disabled={actionLoading === `${selectedUser.id}-verified`}
+                  >
+                    {actionLoading === `${selectedUser.id}-verified` ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Approve User
+                  </Button>
+                )}
               </div>
             </div>
           )}
