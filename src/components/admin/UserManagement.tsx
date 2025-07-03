@@ -1,14 +1,13 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, UserCheck, UserX, Search, Plus, Eye, Edit, Trash2 } from "lucide-react";
+import { Users, UserCheck, UserX, Search, Plus, Eye, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface User {
@@ -29,6 +28,7 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [newUser, setNewUser] = useState({
     email: "",
     full_name: "",
@@ -46,63 +46,22 @@ const UserManagement = () => {
     try {
       console.log('Fetching users for admin...');
       
-      // Try to use the admin-operations edge function first
       const { data: response, error } = await supabase.functions.invoke('admin-operations', {
         body: { action: 'get_all_users' }
       });
 
       if (error) {
         console.error('Error fetching users via edge function:', error);
-        
-        // Fallback: Direct database query
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-          toast({
-            title: "Error",
-            description: "Failed to fetch users",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Also fetch registration data
-        const { data: registrationData, error: registrationError } = await supabase
-          .from('registration')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (registrationError) {
-          console.error('Error fetching registration data:', registrationError);
-        }
-
-        // Combine data
-        const combinedUsers: User[] = [];
-        
-        if (profilesData) {
-          profilesData.forEach(profile => {
-            const registrationRecord = registrationData?.find(r => r.email === profile.email);
-            combinedUsers.push({
-              id: profile.id,
-              email: profile.email || '',
-              full_name: profile.full_name || '',
-              phone: profile.phone,
-              created_at: profile.created_at,
-              verification_status: registrationRecord?.verification_status || 'pending',
-              identity_verification_requests: []
-            });
-          });
-        }
-
-        setUsers(combinedUsers);
-      } else {
-        console.log('Edge function successful, users found:', response?.users?.length || 0);
-        setUsers(response?.users || []);
+        toast({
+          title: "Error",
+          description: "Failed to fetch users",
+          variant: "destructive",
+        });
+        return;
       }
+
+      console.log('Users fetched successfully:', response?.users?.length || 0);
+      setUsers(response?.users || []);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -116,9 +75,11 @@ const UserManagement = () => {
   };
 
   const updateUserVerification = async (userId: string, status: string, userEmail: string) => {
+    setActionLoading(`${userId}-${status}`);
     try {
-      // Use the user-management edge function
-      const { error } = await supabase.functions.invoke('user-management', {
+      console.log('Updating user verification:', { userId, status, userEmail });
+      
+      const { data, error } = await supabase.functions.invoke('user-management', {
         method: 'PUT',
         body: {
           id: userId,
@@ -130,64 +91,75 @@ const UserManagement = () => {
 
       if (error) {
         console.error('Error updating user verification:', error);
-        toast({
-          title: "Error",
-          description: "Failed to update user verification status",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: `User ${status} successfully`,
-        });
-        fetchUsers(); // Refresh the list
+        throw new Error(error.message || 'Failed to update verification status');
       }
+
+      console.log('Verification update successful:', data);
+      toast({
+        title: "Success",
+        description: `User ${status === 'verified' ? 'approved' : 'rejected'} successfully`,
+      });
+      
+      // Refresh the users list
+      await fetchUsers();
     } catch (error) {
       console.error('Error updating user verification:', error);
       toast({
         title: "Error",
-        description: "Failed to update user verification status",
+        description: error.message || "Failed to update user verification status",
         variant: "destructive",
       });
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const createUser = async () => {
+    if (!newUser.email || !newUser.full_name) {
+      toast({
+        title: "Error",
+        description: "Email and full name are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setActionLoading('create-user');
     try {
-      const { error } = await supabase.functions.invoke('user-management', {
+      const { data, error } = await supabase.functions.invoke('user-management', {
         method: 'POST',
         body: newUser
       });
 
       if (error) {
         console.error('Error creating user:', error);
-        toast({
-          title: "Error",
-          description: "Failed to create user",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "User created successfully",
-        });
-        setShowCreateModal(false);
-        setNewUser({
-          email: "",
-          full_name: "",
-          phone: "",
-          passport_number: "",
-          document_type: "passport"
-        });
-        fetchUsers(); // Refresh the list
+        throw new Error(error.message || 'Failed to create user');
       }
+
+      toast({
+        title: "Success",
+        description: "User created successfully",
+      });
+      
+      setShowCreateModal(false);
+      setNewUser({
+        email: "",
+        full_name: "",
+        phone: "",
+        passport_number: "",
+        document_type: "passport"
+      });
+      
+      await fetchUsers();
     } catch (error) {
       console.error('Error creating user:', error);
       toast({
         title: "Error",
-        description: "Failed to create user",
+        description: error.message || "Failed to create user",
         variant: "destructive",
       });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -196,6 +168,7 @@ const UserManagement = () => {
       return;
     }
 
+    setActionLoading(`delete-${userId}`);
     try {
       const { error } = await supabase.functions.invoke('user-management', {
         method: 'DELETE',
@@ -204,25 +177,24 @@ const UserManagement = () => {
 
       if (error) {
         console.error('Error deleting user:', error);
-        toast({
-          title: "Error",
-          description: "Failed to delete user",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "User deleted successfully",
-        });
-        fetchUsers(); // Refresh the list
+        throw new Error(error.message || 'Failed to delete user');
       }
+
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+      
+      await fetchUsers();
     } catch (error) {
       console.error('Error deleting user:', error);
       toast({
         title: "Error",
-        description: "Failed to delete user",
+        description: error.message || "Failed to delete user",
         variant: "destructive",
       });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -258,7 +230,12 @@ const UserManagement = () => {
   const stats = calculateStats();
 
   if (loading) {
-    return <div className="text-center py-8">Loading users...</div>;
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-slate-600">Loading users...</p>
+      </div>
+    );
   }
 
   return (
@@ -390,16 +367,26 @@ const UserManagement = () => {
                           variant="outline"
                           className="text-green-600 hover:bg-green-50"
                           onClick={() => updateUserVerification(user.id, 'verified', user.email)}
+                          disabled={actionLoading === `${user.id}-verified`}
                         >
-                          Approve
+                          {actionLoading === `${user.id}-verified` ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4" />
+                          )}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           className="text-red-600 hover:bg-red-50"
                           onClick={() => updateUserVerification(user.id, 'rejected', user.email)}
+                          disabled={actionLoading === `${user.id}-rejected`}
                         >
-                          Reject
+                          {actionLoading === `${user.id}-rejected` ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                          ) : (
+                            <XCircle className="h-4 w-4" />
+                          )}
                         </Button>
                       </>
                     )}
@@ -408,8 +395,13 @@ const UserManagement = () => {
                       variant="outline"
                       className="text-red-600 hover:bg-red-50"
                       onClick={() => deleteUser(user.id, user.email)}
+                      disabled={actionLoading === `delete-${user.id}`}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {actionLoading === `delete-${user.id}` ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </TableCell>
@@ -430,6 +422,9 @@ const UserManagement = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>User Details</DialogTitle>
+            <DialogDescription>
+              View detailed information about this user
+            </DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4">
@@ -471,6 +466,9 @@ const UserManagement = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New User</DialogTitle>
+            <DialogDescription>
+              Add a new user to the system
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -522,8 +520,11 @@ const UserManagement = () => {
             <div className="flex gap-2">
               <Button 
                 onClick={createUser}
-                disabled={!newUser.email || !newUser.full_name}
+                disabled={!newUser.email || !newUser.full_name || actionLoading === 'create-user'}
               >
+                {actionLoading === 'create-user' ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                ) : null}
                 Create User
               </Button>
               <Button 

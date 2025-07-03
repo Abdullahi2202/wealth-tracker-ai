@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { DollarSign, TrendingUp, AlertCircle, CheckCircle, Download, Search, Eye } from "lucide-react";
+import { DollarSign, TrendingUp, AlertCircle, CheckCircle, Download, Search, Eye, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 type Transaction = {
@@ -41,6 +41,7 @@ const TransactionManagement = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [newStatus, setNewStatus] = useState("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -51,7 +52,6 @@ const TransactionManagement = () => {
     try {
       console.log('Fetching transactions as admin...');
       
-      // Use the admin-operations edge function to fetch all transactions
       const { data: response, error } = await supabase.functions.invoke('admin-operations', {
         body: { 
           action: 'get_all_transactions'
@@ -60,58 +60,16 @@ const TransactionManagement = () => {
 
       if (error) {
         console.error('Error fetching transactions via edge function:', error);
-        
-        // Fallback: Try direct database query
-        console.log('Trying direct database query...');
-        const { data: transactionsData, error: directError } = await supabase
-          .from('transactions')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(500);
-
-        if (directError) {
-          console.error('Direct query also failed:', directError);
-          toast({
-            title: "Error",
-            description: "Failed to fetch transactions",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        console.log('Direct query successful, transactions found:', transactionsData?.length || 0);
-        
-        // Fetch user details for each transaction
-        const transactionsWithDetails: TransactionWithDetails[] = [];
-        
-        if (transactionsData) {
-          for (const transaction of transactionsData) {
-            let userDetails = null;
-            
-            if (transaction.user_id) {
-              const { data: profileData } = await supabase
-                .from('profiles')
-                .select('email, full_name, phone')
-                .eq('id', transaction.user_id)
-                .maybeSingle();
-              
-              userDetails = profileData;
-            }
-
-            transactionsWithDetails.push({
-              ...transaction,
-              user_email: userDetails?.email,
-              user_name: userDetails?.full_name,
-              user_phone: userDetails?.phone
-            });
-          }
-        }
-
-        setTransactions(transactionsWithDetails);
-      } else {
-        console.log('Edge function successful, transactions found:', response?.transactions?.length || 0);
-        setTransactions(response?.transactions || []);
+        toast({
+          title: "Error",
+          description: "Failed to fetch transactions",
+          variant: "destructive",
+        });
+        return;
       }
+
+      console.log('Edge function successful, transactions found:', response?.transactions?.length || 0);
+      setTransactions(response?.transactions || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
@@ -125,16 +83,24 @@ const TransactionManagement = () => {
   };
 
   const updateTransactionStatus = async (transactionId: string, newStatus: string, reason?: string) => {
+    setActionLoading(`update-${transactionId}`);
     try {
+      console.log('Updating transaction status:', { transactionId, newStatus, reason });
+
+      // If approving a pending transaction, we need to update wallet balances
+      const transaction = transactions.find(t => t.id === transactionId);
+      if (transaction && transaction.status === 'pending' && newStatus === 'completed') {
+        // This requires special handling for transfers over $100
+        await handlePendingTransferApproval(transaction);
+      }
+      
       const updateData: any = { 
         status: newStatus,
         updated_at: new Date().toISOString()
       };
 
       if (reason) {
-        // Get the current transaction to append to existing notes
-        const currentTransaction = transactions.find(t => t.id === transactionId);
-        const existingNote = currentTransaction?.note || '';
+        const existingNote = transaction?.note || '';
         updateData.note = `${existingNote}\n[Admin Update: ${reason}]`.trim();
       }
 
@@ -145,28 +111,95 @@ const TransactionManagement = () => {
 
       if (error) {
         console.error('Error updating transaction:', error);
-        toast({
-          title: "Error",
-          description: "Failed to update transaction",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: `Transaction marked as ${newStatus}`,
-        });
-        fetchTransactions(); // Refresh the list
-        setShowStatusModal(false);
-        setStatusUpdateReason("");
-        setNewStatus("");
+        throw new Error(error.message || 'Failed to update transaction');
       }
+
+      toast({
+        title: "Success",
+        description: `Transaction ${newStatus === 'completed' ? 'approved' : newStatus}`,
+      });
+      
+      await fetchTransactions();
+      setShowStatusModal(false);
+      setStatusUpdateReason("");
+      setNewStatus("");
     } catch (error) {
       console.error('Error updating transaction:', error);
       toast({
         title: "Error",
-        description: "Failed to update transaction",
+        description: error.message || "Failed to update transaction",
         variant: "destructive",
       });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handlePendingTransferApproval = async (transaction: TransactionWithDetails) => {
+    try {
+      console.log('Handling pending transfer approval for transaction:', transaction.id);
+      
+      // Find the corresponding transfer record
+      const { data: transfers, error: transferError } = await supabase
+        .from('money_transfers')
+        .select('*')
+        .eq('amount', Math.round(transaction.amount * 100))
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (transferError || !transfers || transfers.length === 0) {
+        console.error('Transfer record not found:', transferError);
+        return;
+      }
+
+      const transfer = transfers[0];
+
+      // Get sender and recipient wallets
+      const { data: senderWallet } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', transfer.sender_id)
+        .single();
+
+      const { data: recipientWallet } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', transfer.recipient_id)
+        .single();
+
+      if (!senderWallet || !recipientWallet) {
+        throw new Error('Sender or recipient wallet not found');
+      }
+
+      // Check if sender still has sufficient balance
+      if (Number(senderWallet.balance) < Number(transaction.amount)) {
+        throw new Error('Sender no longer has sufficient balance');
+      }
+
+      // Update wallet balances
+      const newSenderBalance = Number(senderWallet.balance) - Number(transaction.amount);
+      const newRecipientBalance = Number(recipientWallet.balance) + Number(transaction.amount);
+
+      await Promise.all([
+        supabase
+          .from('wallets')
+          .update({ balance: newSenderBalance, updated_at: new Date().toISOString() })
+          .eq('id', senderWallet.id),
+        supabase
+          .from('wallets')
+          .update({ balance: newRecipientBalance, updated_at: new Date().toISOString() })
+          .eq('id', recipientWallet.id),
+        supabase
+          .from('money_transfers')
+          .update({ status: 'completed', updated_at: new Date().toISOString() })
+          .eq('id', transfer.id)
+      ]);
+
+      console.log('Transfer approved and balances updated');
+    } catch (error) {
+      console.error('Error handling pending transfer approval:', error);
+      throw error;
     }
   };
 
@@ -255,7 +288,12 @@ const TransactionManagement = () => {
   const stats = calculateStats();
 
   if (loading) {
-    return <div className="text-center py-8">Loading transactions...</div>;
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-slate-600">Loading transactions...</p>
+      </div>
+    );
   }
 
   return (
@@ -284,12 +322,12 @@ const TransactionManagement = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <TrendingUp className="h-4 w-4 text-yellow-500" />
+            <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">{stats.pendingTransactions}</div>
-            <p className="text-xs text-muted-foreground">Awaiting processing</p>
+            <p className="text-xs text-muted-foreground">Awaiting admin approval</p>
           </CardContent>
         </Card>
         <Card>
@@ -379,7 +417,7 @@ const TransactionManagement = () => {
           </TableHeader>
           <TableBody>
             {filteredTransactions.map((transaction) => (
-              <TableRow key={transaction.id}>
+              <TableRow key={transaction.id} className={transaction.status === 'pending' ? 'bg-yellow-50' : ''}>
                 <TableCell>
                   {new Date(transaction.created_at).toLocaleDateString()}
                 </TableCell>
@@ -410,6 +448,9 @@ const TransactionManagement = () => {
                 </TableCell>
                 <TableCell className="font-mono">
                   ${transaction.amount.toFixed(2)}
+                  {transaction.amount > 100 && transaction.status === 'pending' && (
+                    <div className="text-xs text-yellow-600 mt-1">Requires approval</div>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(transaction.status)}>
@@ -428,6 +469,21 @@ const TransactionManagement = () => {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
+                    {transaction.status === 'pending' && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="text-green-600 hover:bg-green-50"
+                        onClick={() => updateTransactionStatus(transaction.id, 'completed', 'Admin approved')}
+                        disabled={actionLoading === `update-${transaction.id}`}
+                      >
+                        {actionLoading === `update-${transaction.id}` ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                        ) : (
+                          'Approve'
+                        )}
+                      </Button>
+                    )}
                     <Button 
                       size="sm" 
                       variant="outline"
@@ -435,6 +491,7 @@ const TransactionManagement = () => {
                         setSelectedTransaction(transaction);
                         setShowStatusModal(true);
                       }}
+                      disabled={actionLoading === `update-${transaction.id}`}
                     >
                       Update Status
                     </Button>
@@ -457,6 +514,9 @@ const TransactionManagement = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Transaction Details</DialogTitle>
+            <DialogDescription>
+              View detailed information about this transaction
+            </DialogDescription>
           </DialogHeader>
           {selectedTransaction && (
             <div className="space-y-4">
@@ -508,6 +568,9 @@ const TransactionManagement = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Update Transaction Status</DialogTitle>
+            <DialogDescription>
+              Change the status of this transaction
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -539,8 +602,11 @@ const TransactionManagement = () => {
                   newStatus, 
                   statusUpdateReason
                 )}
-                disabled={!newStatus}
+                disabled={!newStatus || actionLoading === `update-${selectedTransaction?.id}`}
               >
+                {actionLoading === `update-${selectedTransaction?.id}` ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                ) : null}
                 Update Status
               </Button>
               <Button 

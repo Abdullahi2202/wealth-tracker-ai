@@ -66,6 +66,12 @@ Deno.serve(async (req) => {
       throw new Error('Valid phone number required for user transfers')
     }
 
+    // Check if amount is above $100 - if so, make it pending
+    const requiresApproval = Number(amount) > 100
+    const transferStatus = requiresApproval ? 'pending' : 'completed'
+
+    console.log('Transfer requires approval:', requiresApproval, 'Status:', transferStatus)
+
     // Get sender's profile and wallet
     const { data: senderProfile } = await supabase
       .from('profiles')
@@ -163,48 +169,56 @@ Deno.serve(async (req) => {
 
     console.log('Recipient wallet found/created:', { balance: recipientWallet.balance })
 
-    // Calculate new balances
-    const newSenderBalance = Number(senderWallet.balance) - Number(amount)
-    const newRecipientBalance = Number(recipientWallet.balance) + Number(amount)
+    // If transfer requires approval, don't update balances yet
+    let newSenderBalance = Number(senderWallet.balance)
+    let newRecipientBalance = Number(recipientWallet.balance)
 
-    console.log('Balance calculations:', {
-      senderOld: senderWallet.balance,
-      senderNew: newSenderBalance,
-      recipientOld: recipientWallet.balance,
-      recipientNew: newRecipientBalance
-    })
+    if (!requiresApproval) {
+      // Only update balances if transfer doesn't require approval
+      newSenderBalance = Number(senderWallet.balance) - Number(amount)
+      newRecipientBalance = Number(recipientWallet.balance) + Number(amount)
 
-    // Update sender wallet
-    const { error: senderUpdateError } = await supabase
-      .from('wallets')
-      .update({ 
-        balance: newSenderBalance, 
-        updated_at: new Date().toISOString() 
+      console.log('Balance calculations (immediate transfer):', {
+        senderOld: senderWallet.balance,
+        senderNew: newSenderBalance,
+        recipientOld: recipientWallet.balance,
+        recipientNew: newRecipientBalance
       })
-      .eq('id', senderWallet.id)
 
-    if (senderUpdateError) {
-      console.error('Failed to update sender wallet:', senderUpdateError)
-      throw new Error('Failed to update sender wallet')
-    }
-
-    // Update recipient wallet
-    const { error: recipientUpdateError } = await supabase
-      .from('wallets')
-      .update({ 
-        balance: newRecipientBalance, 
-        updated_at: new Date().toISOString() 
-      })
-      .eq('id', recipientWallet.id)
-
-    if (recipientUpdateError) {
-      console.error('Failed to update recipient wallet:', recipientUpdateError)
-      // Rollback sender wallet
-      await supabase
+      // Update sender wallet
+      const { error: senderUpdateError } = await supabase
         .from('wallets')
-        .update({ balance: senderWallet.balance })
+        .update({ 
+          balance: newSenderBalance, 
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', senderWallet.id)
-      throw new Error('Failed to update recipient wallet')
+
+      if (senderUpdateError) {
+        console.error('Failed to update sender wallet:', senderUpdateError)
+        throw new Error('Failed to update sender wallet')
+      }
+
+      // Update recipient wallet
+      const { error: recipientUpdateError } = await supabase
+        .from('wallets')
+        .update({ 
+          balance: newRecipientBalance, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', recipientWallet.id)
+
+      if (recipientUpdateError) {
+        console.error('Failed to update recipient wallet:', recipientUpdateError)
+        // Rollback sender wallet
+        await supabase
+          .from('wallets')
+          .update({ balance: senderWallet.balance })
+          .eq('id', senderWallet.id)
+        throw new Error('Failed to update recipient wallet')
+      }
+    } else {
+      console.log('Transfer requires approval - balances not updated yet')
     }
 
     // Record transfer in money_transfers table
@@ -215,7 +229,7 @@ Deno.serve(async (req) => {
         recipient_id: recipientProfile.id,
         amount: Math.round(Number(amount) * 100), // Store in cents
         currency: 'usd',
-        status: 'completed',
+        status: transferStatus,
         description: description || `Transfer to ${cleanRecipientPhone}`
       })
       .select()
@@ -225,7 +239,7 @@ Deno.serve(async (req) => {
       console.error('Failed to record transfer:', transferError)
     }
 
-    // Create transaction records
+    // Create transaction records with appropriate status
     await Promise.all([
       supabase.from('transactions').insert({
         user_id: user.id,
@@ -234,8 +248,8 @@ Deno.serve(async (req) => {
         type: 'expense',
         category: 'Transfer',
         date: new Date().toISOString().split('T')[0],
-        status: 'completed',
-        note: description
+        status: transferStatus,
+        note: requiresApproval ? `${description} - Pending admin approval (amount > $100)` : description
       }),
       supabase.from('transactions').insert({
         user_id: recipientProfile.id,
@@ -244,12 +258,16 @@ Deno.serve(async (req) => {
         type: 'income',
         category: 'Transfer',
         date: new Date().toISOString().split('T')[0],
-        status: 'completed',
-        note: description
+        status: transferStatus,
+        note: requiresApproval ? `${description} - Pending admin approval (amount > $100)` : description
       })
     ])
 
-    console.log('=== TRANSFER COMPLETED SUCCESSFULLY ===')
+    const responseMessage = requiresApproval 
+      ? `Transfer of $${amount} is pending admin approval (amounts over $100 require approval)`
+      : `Transfer of $${amount} completed successfully to ${cleanRecipientPhone}`
+
+    console.log('=== TRANSFER PROCESSED ===', { requiresApproval, status: transferStatus })
     return new Response(JSON.stringify({
       success: true,
       transfer_id: transfer?.id,
@@ -257,7 +275,9 @@ Deno.serve(async (req) => {
       sender_new_balance: newSenderBalance,
       recipient_new_balance: newRecipientBalance,
       amount_transferred: Number(amount),
-      message: `Transfer of $${amount} completed successfully to ${cleanRecipientPhone}`
+      status: transferStatus,
+      requires_approval: requiresApproval,
+      message: responseMessage
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
