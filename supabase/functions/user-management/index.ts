@@ -13,7 +13,6 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 Deno.serve(async (req) => {
   console.log(`Processing ${req.method} request to user-management`)
   
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -52,7 +51,6 @@ async function handleGetUsers(supabase: any) {
   try {
     console.log('Fetching all users...')
     
-    // Fetch users from registration table
     const { data: registrationUsers, error: registrationError } = await supabase
       .from('registration')
       .select('*')
@@ -62,7 +60,6 @@ async function handleGetUsers(supabase: any) {
       console.error('Registration error:', registrationError)
     }
 
-    // Fetch users from profiles table
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
@@ -72,7 +69,6 @@ async function handleGetUsers(supabase: any) {
       console.error('Profiles error:', profilesError)
     }
 
-    // Fetch verification requests with document URLs
     const { data: verificationRequests, error: verificationError } = await supabase
       .from('identity_verification_requests')
       .select('*')
@@ -82,7 +78,6 @@ async function handleGetUsers(supabase: any) {
       console.error('Verification error:', verificationError)
     }
 
-    // Combine data
     let allUsers: any[] = []
 
     if (registrationUsers) {
@@ -109,7 +104,6 @@ async function handleGetUsers(supabase: any) {
       })
     }
 
-    // Attach verification requests and documents to users
     if (verificationRequests) {
       verificationRequests.forEach(request => {
         const user = allUsers.find(u => u.email === request.user_email || u.id === request.user_id)
@@ -118,7 +112,6 @@ async function handleGetUsers(supabase: any) {
             user.identity_verification_requests = []
           }
           user.identity_verification_requests.push(request)
-          // Also add document info directly to user for easy access
           if (!user.documents) {
             user.documents = []
           }
@@ -161,7 +154,8 @@ async function handleCreateUser(req: Request, supabase: any) {
       })
     }
 
-    // Create user in auth
+    console.log('Creating new user:', { email, full_name })
+
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email,
       password: Math.random().toString(36).slice(-8),
@@ -179,7 +173,6 @@ async function handleCreateUser(req: Request, supabase: any) {
 
     const userId = authUser.user.id
 
-    // Create in registration table
     const { data: regUser, error: regError } = await supabase
       .from('registration')
       .insert({
@@ -199,7 +192,6 @@ async function handleCreateUser(req: Request, supabase: any) {
       console.error('Registration error:', regError)
     }
 
-    // Create profile
     const { error: profileError } = await supabase
       .from('profiles')
       .insert({
@@ -213,7 +205,6 @@ async function handleCreateUser(req: Request, supabase: any) {
       console.error('Profile error:', profileError)
     }
 
-    // Create wallet with automatic wallet number assignment
     const { data: walletData, error: walletError } = await supabase
       .from('wallets')
       .insert({
@@ -227,10 +218,9 @@ async function handleCreateUser(req: Request, supabase: any) {
 
     if (walletError) {
       console.error('Wallet error:', walletError)
-    } else {
-      console.log('Wallet created with number:', walletData?.wallet_number)
     }
 
+    console.log('User created successfully')
     return new Response(JSON.stringify({ 
       user: regUser || { id: userId, email, full_name }, 
       user_id: userId,
@@ -255,7 +245,7 @@ async function handleUpdateUser(req: Request, supabase: any) {
     const body = await req.json()
     console.log('Update request body:', body)
     
-    const { id, verification_status, email: userEmail } = body
+    const { id, verification_status, email: userEmail, action } = body
     
     if (!id && !userEmail) {
       return new Response(JSON.stringify({ error: 'User ID or email is required' }), {
@@ -264,13 +254,11 @@ async function handleUpdateUser(req: Request, supabase: any) {
       })
     }
 
-    // Handle verification status updates
-    if (verification_status) {
-      console.log(`Updating verification status to ${verification_status}`)
+    if (action === 'update_verification' && verification_status) {
+      console.log(`Updating verification status to ${verification_status} for user: ${userEmail}`)
       
       let updatedUser = null
       
-      // Try to update by ID first
       if (id) {
         const { data, error } = await supabase
           .from('registration')
@@ -284,12 +272,9 @@ async function handleUpdateUser(req: Request, supabase: any) {
 
         if (!error && data) {
           updatedUser = data
-        } else {
-          console.log('Update by ID failed:', error)
         }
       }
       
-      // If update by ID failed or no ID provided, try by email
       if (!updatedUser && userEmail) {
         const { data, error } = await supabase
           .from('registration')
@@ -303,8 +288,21 @@ async function handleUpdateUser(req: Request, supabase: any) {
 
         if (!error && data) {
           updatedUser = data
-        } else {
-          console.log('Update by email failed:', error)
+        }
+      }
+
+      if (userEmail) {
+        const { error: verifyError } = await supabase
+          .from('identity_verification_requests')
+          .update({ 
+            status: verification_status,
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: 'Admin'
+          })
+          .eq('user_email', userEmail)
+
+        if (verifyError) {
+          console.error('Verification request update warning:', verifyError)
         }
       }
 
@@ -318,23 +316,6 @@ async function handleUpdateUser(req: Request, supabase: any) {
         })
       }
 
-      // Update verification requests if email provided
-      if (userEmail) {
-        const { error: verifyError } = await supabase
-          .from('identity_verification_requests')
-          .update({ 
-            status: verification_status,
-            reviewed_at: new Date().toISOString(),
-            reviewed_by: 'Admin'
-          })
-          .eq('user_email', userEmail)
-
-        if (verifyError) {
-          console.error('Verification request update warning:', verifyError)
-          // Don't fail the main request if this fails
-        }
-      }
-
       console.log('Verification status updated successfully')
       return new Response(JSON.stringify({ 
         success: true, 
@@ -345,36 +326,7 @@ async function handleUpdateUser(req: Request, supabase: any) {
       })
     }
 
-    // Handle other updates
-    const { verification_status: _, ...otherUpdates } = body
-    
-    if (Object.keys(otherUpdates).length > 1) {
-      const whereClause = id ? { id } : { email: userEmail }
-      
-      const { data: updatedUser, error: updateError } = await supabase
-        .from('registration')
-        .update({ ...otherUpdates, updated_at: new Date().toISOString() })
-        .match(whereClause)
-        .select()
-        .single()
-
-      if (updateError) {
-        console.error('General update error:', updateError)
-        return new Response(JSON.stringify({ 
-          error: 'Failed to update user',
-          message: updateError.message 
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-
-      return new Response(JSON.stringify(updatedUser), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    return new Response(JSON.stringify({ error: 'No valid updates provided' }), {
+    return new Response(JSON.stringify({ error: 'Invalid action or missing parameters' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -393,7 +345,7 @@ async function handleUpdateUser(req: Request, supabase: any) {
 async function handleDeleteUser(req: Request, supabase: any) {
   try {
     const body = await req.json()
-    const { id: deleteId, email } = body
+    const { id: deleteId, email, action } = body
     
     if (!deleteId) {
       return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -402,26 +354,35 @@ async function handleDeleteUser(req: Request, supabase: any) {
       })
     }
 
-    // Delete from registration
-    await supabase.from('registration').delete().eq('id', deleteId)
+    if (action === 'delete_user') {
+      console.log(`Deleting user: ${deleteId}`)
 
-    // Delete verification requests
-    if (email) {
-      await supabase.from('identity_verification_requests').delete().eq('user_email', email)
-    }
+      await supabase.from('registration').delete().eq('id', deleteId)
+      await supabase.from('profiles').delete().eq('id', deleteId)
+      await supabase.from('wallets').delete().eq('user_id', deleteId)
 
-    // Delete from auth
-    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(deleteId)
-    
-    if (authDeleteError) {
-      console.error('Auth delete error:', authDeleteError)
-      return new Response(JSON.stringify({ error: authDeleteError.message }), {
-        status: 500,
+      if (email) {
+        await supabase.from('identity_verification_requests').delete().eq('user_email', email)
+      }
+
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(deleteId)
+      
+      if (authDeleteError) {
+        console.error('Auth delete error:', authDeleteError)
+        return new Response(JSON.stringify({ error: authDeleteError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      console.log('User deleted successfully')
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (error) {

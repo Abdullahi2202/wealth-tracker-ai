@@ -58,7 +58,8 @@ export const useUserManagement = () => {
         body: {
           id: userId,
           email: userEmail,
-          verification_status: status
+          verification_status: status,
+          action: 'update_verification'
         }
       });
 
@@ -68,6 +69,10 @@ export const useUserManagement = () => {
       }
 
       console.log('Verification update successful:', data);
+      
+      // Send notification to user
+      await sendNotification(userEmail, status);
+      
       toast({
         title: "Success",
         description: `User ${status === 'verified' ? 'approved' : 'rejected'} successfully`,
@@ -81,7 +86,6 @@ export const useUserManagement = () => {
         )
       );
       
-      await fetchUsers();
       return true;
     } catch (error) {
       console.error('Error updating user verification:', error);
@@ -110,7 +114,7 @@ export const useUserManagement = () => {
     try {
       const { data, error } = await supabase.functions.invoke('user-management', {
         method: 'POST',
-        body: newUser
+        body: { ...newUser, action: 'create_user' }
       });
 
       if (error) {
@@ -147,7 +151,11 @@ export const useUserManagement = () => {
     try {
       const { error } = await supabase.functions.invoke('user-management', {
         method: 'DELETE',
-        body: { id: userId, email: userEmail }
+        body: { 
+          id: userId, 
+          email: userEmail,
+          action: 'delete_user'
+        }
       });
 
       if (error) {
@@ -175,6 +183,27 @@ export const useUserManagement = () => {
     }
   };
 
+  const sendNotification = async (userEmail: string, status: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          email: userEmail,
+          type: 'verification_update',
+          status: status,
+          message: status === 'verified' 
+            ? 'Your account has been approved and verified!' 
+            : 'Your account verification has been rejected. Please contact support for more information.'
+        }
+      });
+
+      if (error) {
+        console.error('Error sending notification:', error);
+      }
+    } catch (error) {
+      console.error('Failed to send notification:', error);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -186,6 +215,7 @@ export const useUserManagement = () => {
     fetchUsers,
     updateUserVerification,
     createUser,
-    deleteUser
+    deleteUser,
+    sendNotification
   };
 };

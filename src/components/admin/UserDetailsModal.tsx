@@ -31,9 +31,19 @@ export const UserDetailsModal = ({
     }
   };
 
-  const handleUpdateVerification = async (status: string) => {
+  const handleApprove = async () => {
     if (!user) return;
-    const success = await onUpdateVerification(user.id, status, user.email);
+    console.log('Approving user:', user.id, user.email);
+    const success = await onUpdateVerification(user.id, 'verified', user.email);
+    if (success) {
+      onClose();
+    }
+  };
+
+  const handleReject = async () => {
+    if (!user) return;
+    console.log('Rejecting user:', user.id, user.email);
+    const success = await onUpdateVerification(user.id, 'rejected', user.email);
     if (success) {
       onClose();
     }
@@ -110,68 +120,34 @@ export const UserDetailsModal = ({
           )}
           
           <div className="flex gap-3 pt-4 border-t">
-            {user.verification_status === 'pending' && (
-              <>
-                <Button
-                  className="bg-green-600 hover:bg-green-700 flex-1"
-                  onClick={() => handleUpdateVerification('verified')}
-                  disabled={actionLoading === `${user.id}-verified`}
-                >
-                  {actionLoading === `${user.id}-verified` ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Approve User
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={() => handleUpdateVerification('rejected')}
-                  disabled={actionLoading === `${user.id}-rejected`}
-                >
-                  {actionLoading === `${user.id}-rejected` ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                  ) : (
-                    <XCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Reject User
-                </Button>
-              </>
-            )}
+            <Button
+              className="bg-green-600 hover:bg-green-700 flex-1"
+              onClick={handleApprove}
+              disabled={actionLoading === `${user.id}-verified`}
+            >
+              {actionLoading === `${user.id}-verified` ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              Approve User
+            </Button>
             
-            {user.verification_status === 'verified' && (
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={() => handleUpdateVerification('rejected')}
-                disabled={actionLoading === `${user.id}-rejected`}
-              >
-                {actionLoading === `${user.id}-rejected` ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                ) : (
-                  <XCircle className="h-4 w-4 mr-2" />
-                )}
-                Reject User
-              </Button>
-            )}
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={handleReject}
+              disabled={actionLoading === `${user.id}-rejected`}
+            >
+              {actionLoading === `${user.id}-rejected` ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+              ) : (
+                <XCircle className="h-4 w-4 mr-2" />
+              )}
+              Reject User
+            </Button>
             
-            {user.verification_status === 'rejected' && (
-              <Button
-                className="bg-green-600 hover:bg-green-700 flex-1"
-                onClick={() => handleUpdateVerification('verified')}
-                disabled={actionLoading === `${user.id}-verified`}
-              >
-                {actionLoading === `${user.id}-verified` ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                ) : (
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                )}
-                Approve User
-              </Button>
-            )}
-            
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} className="flex-1">
               Close
             </Button>
           </div>
