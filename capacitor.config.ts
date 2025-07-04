@@ -2,7 +2,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.6dc5bf1aeee84949bf574e4cd1c08af7',
+  appId: 'com.lovable.wealthtracker',
   appName: 'wealth-tracker-ai',
   webDir: 'dist',
   server: {
