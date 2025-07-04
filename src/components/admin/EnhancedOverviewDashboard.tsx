@@ -103,6 +103,14 @@ const EnhancedOverviewDashboard = () => {
     }
   };
 
+  const handleApproveUser = async (userId: string, email: string) => {
+    await updateUserVerification(userId, 'verified', email);
+  };
+
+  const handleRejectUser = async (userId: string, email: string) => {
+    await updateUserVerification(userId, 'rejected', email);
+  };
+
   const viewDocument = (imageUrl: string) => {
     window.open(imageUrl, '_blank');
   };
@@ -127,8 +135,8 @@ const EnhancedOverviewDashboard = () => {
       <PendingActionsPanel
         pendingUsers={pendingUsers}
         pendingTransactions={pendingTransactions}
-        onApproveUser={updateUserVerification}
-        onRejectUser={(userId, email) => updateUserVerification(userId, 'rejected', email)}
+        onApproveUser={handleApproveUser}
+        onRejectUser={handleRejectUser}
         onApproveTransaction={handleApproveTransaction}
         onRejectTransaction={handleRejectTransaction}
         onViewUser={(user) => {

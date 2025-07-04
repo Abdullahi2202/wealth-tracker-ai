@@ -1,6 +1,5 @@
+
 import { useState, useEffect } from "react";
-import { useRouter } from 'next/router';
-import { useSession, signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
@@ -17,26 +16,21 @@ import {
   Radar,
 } from "lucide-react";
 
-import { MainNav } from "@/components/main-nav";
-import { Sidebar } from "@/components/sidebar";
-import { MobileSidebar } from "@/components/mobile-sidebar";
-import { AppSettings } from "@/components/admin/AppSettings";
-import { UserManagement } from "@/components/admin/UserManagement";
-import { TransactionManagement } from "@/components/admin/TransactionManagement";
-import { SupportTickets } from "@/components/admin/SupportTickets";
-import { SystemMetrics } from "@/components/admin/SystemMetrics";
-import { ActivityLogs } from "@/components/admin/ActivityLogs";
-import { FraudAlerts } from "@/components/admin/FraudAlerts";
-import { ContentManagement } from "@/components/admin/ContentManagement";
-import { UserRestrictions } from "@/components/admin/UserRestrictions";
-import { TransactionMonitoring } from "@/components/admin/TransactionMonitoring";
-import { ChatbotLogs } from "@/components/admin/ChatbotLogs";
-import { ActivityTracking } from "@/components/admin/ActivityTracking";
+import AppSettings from "@/components/admin/AppSettings";
+import UserManagement from "@/components/admin/UserManagement";
+import TransactionManagement from "@/components/admin/TransactionManagement";
+import SupportTickets from "@/components/admin/SupportTickets";
+import SystemMetrics from "@/components/admin/SystemMetrics";
+import ActivityLogs from "@/components/admin/ActivityLogs";
+import FraudAlerts from "@/components/admin/FraudAlerts";
+import ContentManagement from "@/components/admin/ContentManagement";
+import UserRestrictions from "@/components/admin/UserRestrictions";
+import TransactionMonitoring from "@/components/admin/TransactionMonitoring";
+import ChatbotLogs from "@/components/admin/ChatbotLogs";
+import ActivityTracking from "@/components/admin/ActivityTracking";
 import EnhancedOverviewDashboard from "@/components/admin/EnhancedOverviewDashboard";
 
 const AdminDashboard = () => {
-  const { data: session, status } = useSession();
-  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
 
@@ -44,27 +38,8 @@ const AdminDashboard = () => {
     setIsMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/");
-    }
-  }, [status, router]);
-
   if (!isMounted) {
     return null;
-  }
-
-  if (!session || session.user?.email !== "admin@example.com") {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-          <p className="text-gray-600">
-            You do not have permission to access this page.
-          </p>
-        </div>
-      </div>
-    );
   }
 
   const routes = [
@@ -137,14 +112,33 @@ const AdminDashboard = () => {
 
   return (
     <div className="h-full">
-      <MainNav className="md:hidden" />
-      <MobileSidebar routes={routes} onNavigate={setActiveSection} />
-      <div className="hidden md:flex h-full w-64 flex-col fixed inset-y-0">
-        <Sidebar routes={routes} onNavigate={setActiveSection} />
-      </div>
-      <div className="md:pl-64">
+      <div className="flex">
+        {/* Sidebar */}
+        <div className="w-64 bg-white border-r border-gray-200 h-screen overflow-y-auto">
+          <div className="p-4">
+            <h1 className="text-xl font-bold text-gray-800">Admin Dashboard</h1>
+          </div>
+          <nav className="mt-4">
+            {routes.map((route) => {
+              const Icon = route.icon;
+              return (
+                <button
+                  key={route.value}
+                  onClick={() => setActiveSection(route.value)}
+                  className={`w-full flex items-center px-4 py-2 text-left hover:bg-gray-100 ${
+                    activeSection === route.value ? "bg-blue-50 text-blue-600" : "text-gray-700"
+                  }`}
+                >
+                  <Icon className="h-5 w-5 mr-3" />
+                  {route.label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
         {/* Main Content */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto p-6">
           {activeSection === "overview" && <EnhancedOverviewDashboard />}
           {activeSection === "users" && <UserManagement />}
           {activeSection === "transactions" && <TransactionManagement />}
