@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DollarSign, TrendingUp, AlertCircle, CheckCircle, Download, Search, Eye, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-type Transaction = {
+type TransactionWithDetails = {
   id: string;
   user_id: string;
   amount: number;
@@ -21,9 +22,6 @@ type Transaction = {
   category: string | null;
   note: string | null;
   created_at: string;
-};
-
-type TransactionWithDetails = Transaction & {
   user_email?: string;
   user_name?: string;
   user_phone?: string;
@@ -35,7 +33,6 @@ const TransactionManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithDetails | null>(null);
   const [statusUpdateReason, setStatusUpdateReason] = useState("");
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -87,10 +84,8 @@ const TransactionManagement = () => {
     try {
       console.log('Updating transaction status:', { transactionId, newStatus, reason });
 
-      // If approving a pending transaction, we need to update wallet balances
       const transaction = transactions.find(t => t.id === transactionId);
       if (transaction && transaction.status === 'pending' && newStatus === 'completed') {
-        // This requires special handling for transfers over $100
         await handlePendingTransferApproval(transaction);
       }
       
@@ -139,7 +134,6 @@ const TransactionManagement = () => {
     try {
       console.log('Handling pending transfer approval for transaction:', transaction.id);
       
-      // Find the corresponding transfer record
       const { data: transfers, error: transferError } = await supabase
         .from('money_transfers')
         .select('*')
@@ -155,7 +149,6 @@ const TransactionManagement = () => {
 
       const transfer = transfers[0];
 
-      // Get sender and recipient wallets
       const { data: senderWallet } = await supabase
         .from('wallets')
         .select('*')
@@ -172,20 +165,9 @@ const TransactionManagement = () => {
         throw new Error('Sender or recipient wallet not found');
       }
 
-      // Check if sender still has sufficient balance
-      if (Number(senderWallet.balance) < Number(transaction.amount)) {
-        throw new Error('Sender no longer has sufficient balance');
-      }
-
-      // Update wallet balances
-      const newSenderBalance = Number(senderWallet.balance) - Number(transaction.amount);
       const newRecipientBalance = Number(recipientWallet.balance) + Number(transaction.amount);
 
       await Promise.all([
-        supabase
-          .from('wallets')
-          .update({ balance: newSenderBalance, updated_at: new Date().toISOString() })
-          .eq('id', senderWallet.id),
         supabase
           .from('wallets')
           .update({ balance: newRecipientBalance, updated_at: new Date().toISOString() })
@@ -251,10 +233,7 @@ const TransactionManagement = () => {
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
     const matchesType = typeFilter === "all" || transaction.type === typeFilter;
     
-    const matchesDateRange = (!dateRange.from || new Date(transaction.created_at) >= new Date(dateRange.from)) &&
-                           (!dateRange.to || new Date(transaction.created_at) <= new Date(dateRange.to));
-    
-    return matchesSearch && matchesStatus && matchesType && matchesDateRange;
+    return matchesSearch && matchesStatus && matchesType;
   });
 
   const getStatusColor = (status: string) => {
@@ -343,7 +322,7 @@ const TransactionManagement = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -378,21 +357,6 @@ const TransactionManagement = () => {
             <SelectItem value="transfer">Transfer</SelectItem>
           </SelectContent>
         </Select>
-
-        <div className="flex gap-2">
-          <Input
-            type="date"
-            value={dateRange.from}
-            onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
-            placeholder="From date"
-          />
-          <Input
-            type="date"
-            value={dateRange.to}
-            onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
-            placeholder="To date"
-          />
-        </div>
 
         <Button onClick={exportTransactions} variant="outline" className="flex items-center gap-2">
           <Download className="h-4 w-4" />
