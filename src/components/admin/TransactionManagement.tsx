@@ -7,37 +7,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { DollarSign, TrendingUp, AlertCircle, CheckCircle, Download, Search, Eye, Clock } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-type TransactionWithDetails = {
+type Transaction = {
   id: string;
   user_id: string;
   amount: number;
   type: string;
-  status: string;
   name: string;
-  category: string | null;
-  note: string | null;
+  status: string;
   created_at: string;
-  user_email?: string;
-  user_name?: string;
-  user_phone?: string;
+  updated_at: string;
+  category: string;
+  note: string;
 };
 
 const TransactionManagement = () => {
-  const [transactions, setTransactions] = useState<TransactionWithDetails[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithDetails | null>(null);
-  const [statusUpdateReason, setStatusUpdateReason] = useState("");
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,16 +38,14 @@ const TransactionManagement = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      console.log('Fetching transactions as admin...');
-      
-      const { data: response, error } = await supabase.functions.invoke('admin-operations', {
-        body: { 
-          action: 'get_all_transactions'
-        }
-      });
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) {
-        console.error('Error fetching transactions via edge function:', error);
+        console.error('Error fetching transactions:', error);
         toast({
           title: "Error",
           description: "Failed to fetch transactions",
@@ -65,8 +54,7 @@ const TransactionManagement = () => {
         return;
       }
 
-      console.log('Edge function successful, transactions found:', response?.transactions?.length || 0);
-      setTransactions(response?.transactions || []);
+      setTransactions(data || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
@@ -79,50 +67,30 @@ const TransactionManagement = () => {
     }
   };
 
-  const updateTransactionStatus = async (transactionId: string, newStatus: string, reason?: string) => {
-    setActionLoading(`update-${transactionId}`);
+  const updateTransactionStatus = async (transactionId: string, newStatus: string) => {
+    setActionLoading(`status-${transactionId}`);
     try {
-      console.log('Updating transaction status:', { transactionId, newStatus, reason });
-
-      const transaction = transactions.find(t => t.id === transactionId);
-      if (transaction && transaction.status === 'pending' && newStatus === 'completed') {
-        await handlePendingTransferApproval(transaction);
-      }
-      
-      const updateData: any = { 
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      };
-
-      if (reason) {
-        const existingNote = transaction?.note || '';
-        updateData.note = `${existingNote}\n[Admin Update: ${reason}]`.trim();
-      }
-
       const { error } = await supabase
         .from('transactions')
-        .update(updateData)
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', transactionId);
 
-      if (error) {
-        console.error('Error updating transaction:', error);
-        throw new Error(error.message || 'Failed to update transaction');
-      }
+      if (error) throw error;
 
       toast({
         title: "Success",
-        description: `Transaction ${newStatus === 'completed' ? 'approved' : newStatus}`,
+        description: `Transaction status updated to ${newStatus}`,
       });
       
       await fetchTransactions();
-      setShowStatusModal(false);
-      setStatusUpdateReason("");
-      setNewStatus("");
     } catch (error) {
-      console.error('Error updating transaction:', error);
+      console.error('Error updating transaction status:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update transaction",
+        description: "Failed to update transaction status",
         variant: "destructive",
       });
     } finally {
@@ -130,105 +98,40 @@ const TransactionManagement = () => {
     }
   };
 
-  const handlePendingTransferApproval = async (transaction: TransactionWithDetails) => {
+  const deleteTransaction = async (transactionId: string) => {
+    if (!confirm('Are you sure you want to delete this transaction?')) return;
+
+    setActionLoading(`delete-${transactionId}`);
     try {
-      console.log('Handling pending transfer approval for transaction:', transaction.id);
-      
-      const { data: transfers, error: transferError } = await supabase
-        .from('money_transfers')
-        .select('*')
-        .eq('amount', Math.round(transaction.amount * 100))
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1);
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', transactionId);
 
-      if (transferError || !transfers || transfers.length === 0) {
-        console.error('Transfer record not found:', transferError);
-        return;
-      }
+      if (error) throw error;
 
-      const transfer = transfers[0];
-
-      const { data: senderWallet } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', transfer.sender_id)
-        .single();
-
-      const { data: recipientWallet } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', transfer.recipient_id)
-        .single();
-
-      if (!senderWallet || !recipientWallet) {
-        throw new Error('Sender or recipient wallet not found');
-      }
-
-      const newRecipientBalance = Number(recipientWallet.balance) + Number(transaction.amount);
-
-      await Promise.all([
-        supabase
-          .from('wallets')
-          .update({ balance: newRecipientBalance, updated_at: new Date().toISOString() })
-          .eq('id', recipientWallet.id),
-        supabase
-          .from('money_transfers')
-          .update({ status: 'completed', updated_at: new Date().toISOString() })
-          .eq('id', transfer.id)
-      ]);
-
-      console.log('Transfer approved and balances updated');
-    } catch (error) {
-      console.error('Error handling pending transfer approval:', error);
-      throw error;
-    }
-  };
-
-  const exportTransactions = async () => {
-    try {
-      const csvContent = [
-        ['Date', 'Transaction ID', 'User', 'Type', 'Amount', 'Status', 'Category', 'Note'].join(','),
-        ...filteredTransactions.map(t => [
-          new Date(t.created_at).toLocaleDateString(),
-          t.id,
-          t.user_name || t.user_email || 'Unknown',
-          t.type,
-          t.amount,
-          t.status,
-          t.category || '',
-          t.note || ''
-        ].map(field => `"${field}"`).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
       toast({
-        title: "Success", 
-        description: "Transactions exported successfully",
+        title: "Success",
+        description: "Transaction deleted successfully",
       });
+      
+      await fetchTransactions();
     } catch (error) {
-      console.error('Error exporting transactions:', error);
+      console.error('Error deleting transaction:', error);
       toast({
         title: "Error",
-        description: "Failed to export transactions",
+        description: "Failed to delete transaction",
         variant: "destructive",
       });
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = 
-      transaction.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.user_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.user_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      transaction.user_id.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
     const matchesType = typeFilter === "all" || transaction.type === typeFilter;
@@ -240,8 +143,7 @@ const TransactionManagement = () => {
     switch (status) {
       case "completed": return "bg-green-100 text-green-800";
       case "pending": return "bg-yellow-100 text-yellow-800";
-      case "failed": return "bg-red-100 text-red-800";
-      case "cancelled": return "bg-gray-100 text-gray-800";
+      case "rejected": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -250,18 +152,17 @@ const TransactionManagement = () => {
     switch (type) {
       case "income": return "bg-green-100 text-green-800";
       case "expense": return "bg-red-100 text-red-800";
-      case "transfer": return "bg-blue-100 text-blue-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };
 
   const calculateStats = () => {
-    const totalAmount = filteredTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const completedTransactions = filteredTransactions.filter(t => t.status === "completed").length;
-    const pendingTransactions = filteredTransactions.filter(t => t.status === "pending").length;
-    const failedTransactions = filteredTransactions.filter(t => t.status === "failed").length;
+    const totalAmount = filteredTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const incomeAmount = filteredTransactions.filter(t => t.type === "income").reduce((sum, t) => sum + Number(t.amount), 0);
+    const expenseAmount = filteredTransactions.filter(t => t.type === "expense").reduce((sum, t) => sum + Number(t.amount), 0);
+    const pendingCount = filteredTransactions.filter(t => t.status === "pending").length;
     
-    return { totalAmount, completedTransactions, pendingTransactions, failedTransactions };
+    return { totalAmount, incomeAmount, expenseAmount, pendingCount };
   };
 
   const stats = calculateStats();
@@ -281,8 +182,8 @@ const TransactionManagement = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
+            <DollarSign className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${stats.totalAmount.toFixed(2)}</div>
@@ -291,47 +192,43 @@ const TransactionManagement = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.completedTransactions}</div>
-            <p className="text-xs text-muted-foreground">Successful transactions</p>
+            <div className="text-2xl font-bold text-green-600">${stats.incomeAmount.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">Incoming funds</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">${stats.expenseAmount.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">Outgoing funds</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
             <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendingTransactions}</div>
-            <p className="text-xs text-muted-foreground">Awaiting admin approval</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.failedTransactions}</div>
-            <p className="text-xs text-muted-foreground">Failed transactions</p>
+            <div className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</div>
+            <p className="text-xs text-muted-foreground">Awaiting approval</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Search and Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search transactions..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Input
+          placeholder="Search transactions..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
         
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger>
@@ -341,8 +238,7 @@ const TransactionManagement = () => {
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
 
@@ -354,14 +250,8 @@ const TransactionManagement = () => {
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="income">Income</SelectItem>
             <SelectItem value="expense">Expense</SelectItem>
-            <SelectItem value="transfer">Transfer</SelectItem>
           </SelectContent>
         </Select>
-
-        <Button onClick={exportTransactions} variant="outline" className="flex items-center gap-2">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
       </div>
 
       {/* Transactions Table */}
@@ -370,9 +260,8 @@ const TransactionManagement = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Transaction ID</TableHead>
-              <TableHead>User Details</TableHead>
-              <TableHead>Transaction</TableHead>
+              <TableHead>User ID</TableHead>
+              <TableHead>Name</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Status</TableHead>
@@ -381,40 +270,21 @@ const TransactionManagement = () => {
           </TableHeader>
           <TableBody>
             {filteredTransactions.map((transaction) => (
-              <TableRow key={transaction.id} className={transaction.status === 'pending' ? 'bg-yellow-50' : ''}>
+              <TableRow key={transaction.id}>
                 <TableCell>
                   {new Date(transaction.created_at).toLocaleDateString()}
                 </TableCell>
-                <TableCell>
-                  <div className="font-mono text-sm">{transaction.id.substring(0, 8)}...</div>
+                <TableCell className="font-mono text-sm">
+                  {transaction.user_id.substring(0, 8)}...
                 </TableCell>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{transaction.user_name || "Unknown"}</div>
-                    <div className="text-sm text-muted-foreground">{transaction.user_email}</div>
-                    {transaction.user_phone && (
-                      <div className="text-sm text-muted-foreground">{transaction.user_phone}</div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{transaction.name}</div>
-                    {transaction.category && (
-                      <div className="text-sm text-muted-foreground">{transaction.category}</div>
-                    )}
-                  </div>
-                </TableCell>
+                <TableCell className="font-medium">{transaction.name}</TableCell>
                 <TableCell>
                   <Badge className={getTypeColor(transaction.type)}>
                     {transaction.type}
                   </Badge>
                 </TableCell>
-                <TableCell className="font-mono">
-                  ${transaction.amount.toFixed(2)}
-                  {transaction.amount > 100 && transaction.status === 'pending' && (
-                    <div className="text-xs text-yellow-600 mt-1">Requires approval</div>
-                  )}
+                <TableCell className="font-medium">
+                  ${Number(transaction.amount).toFixed(2)}
                 </TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(transaction.status)}>
@@ -423,41 +293,33 @@ const TransactionManagement = () => {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedTransaction(transaction);
-                        setShowDetailsModal(true);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
                     {transaction.status === 'pending' && (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="text-green-600 hover:bg-green-50"
-                        onClick={() => updateTransactionStatus(transaction.id, 'completed', 'Admin approved')}
-                        disabled={actionLoading === `update-${transaction.id}`}
-                      >
-                        {actionLoading === `update-${transaction.id}` ? (
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
-                        ) : (
-                          'Approve'
-                        )}
-                      </Button>
+                      <>
+                        <Button 
+                          size="sm" 
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => updateTransactionStatus(transaction.id, 'completed')}
+                          disabled={actionLoading === `status-${transaction.id}`}
+                        >
+                          {actionLoading === `status-${transaction.id}` ? 'Loading...' : 'Approve'}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={() => updateTransactionStatus(transaction.id, 'rejected')}
+                          disabled={actionLoading === `status-${transaction.id}`}
+                        >
+                          {actionLoading === `status-${transaction.id}` ? 'Loading...' : 'Reject'}
+                        </Button>
+                      </>
                     )}
                     <Button 
                       size="sm" 
                       variant="outline"
-                      onClick={() => {
-                        setSelectedTransaction(transaction);
-                        setShowStatusModal(true);
-                      }}
-                      disabled={actionLoading === `update-${transaction.id}`}
+                      onClick={() => deleteTransaction(transaction.id)}
+                      disabled={actionLoading === `delete-${transaction.id}`}
                     >
-                      Update Status
+                      {actionLoading === `delete-${transaction.id}` ? 'Loading...' : 'Delete'}
                     </Button>
                   </div>
                 </TableCell>
@@ -467,126 +329,11 @@ const TransactionManagement = () => {
         </Table>
       </div>
 
-      {filteredTransactions.length === 0 && !loading && (
+      {filteredTransactions.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           No transactions found matching your criteria.
         </div>
       )}
-
-      {/* Transaction Details Modal */}
-      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Transaction Details</DialogTitle>
-            <DialogDescription>
-              View detailed information about this transaction
-            </DialogDescription>
-          </DialogHeader>
-          {selectedTransaction && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Transaction ID</label>
-                  <p className="font-mono text-sm">{selectedTransaction.id}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Date</label>
-                  <p>{new Date(selectedTransaction.created_at).toLocaleString()}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">User</label>
-                  <p>{selectedTransaction.user_name || selectedTransaction.user_email}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Amount</label>
-                  <p className="font-mono">${selectedTransaction.amount.toFixed(2)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Type</label>
-                  <Badge className={getTypeColor(selectedTransaction.type)}>
-                    {selectedTransaction.type}
-                  </Badge>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Status</label>
-                  <Badge className={getStatusColor(selectedTransaction.status)}>
-                    {selectedTransaction.status}
-                  </Badge>
-                </div>
-              </div>
-              {selectedTransaction.note && (
-                <div>
-                  <label className="text-sm font-medium">Notes</label>
-                  <p className="text-sm bg-gray-50 p-3 rounded-md whitespace-pre-wrap">
-                    {selectedTransaction.note}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Status Update Modal */}
-      <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Transaction Status</DialogTitle>
-            <DialogDescription>
-              Change the status of this transaction
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">New Status</label>
-              <Select value={newStatus} onValueChange={setNewStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select new status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Reason (Optional)</label>
-              <Textarea
-                value={statusUpdateReason}
-                onChange={(e) => setStatusUpdateReason(e.target.value)}
-                placeholder="Enter reason for status change..."
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => selectedTransaction && updateTransactionStatus(
-                  selectedTransaction.id, 
-                  newStatus, 
-                  statusUpdateReason
-                )}
-                disabled={!newStatus || actionLoading === `update-${selectedTransaction?.id}`}
-              >
-                {actionLoading === `update-${selectedTransaction?.id}` ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                ) : null}
-                Update Status
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setShowStatusModal(false);
-                  setNewStatus("");
-                  setStatusUpdateReason("");
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

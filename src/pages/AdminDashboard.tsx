@@ -4,32 +4,14 @@ import {
   LayoutDashboard,
   Users,
   ListChecks,
-  Settings,
   Headphones,
-  Activity,
-  TrendingUp,
-  AlertTriangle,
-  FileText,
-  UserX,
-  Monitor,
-  MessageSquare,
-  Radar,
   Menu,
   X,
 } from "lucide-react";
 
-import AppSettings from "@/components/admin/AppSettings";
 import UserManagement from "@/components/admin/UserManagement";
 import TransactionManagement from "@/components/admin/TransactionManagement";
 import SupportTickets from "@/components/admin/SupportTickets";
-import SystemMetrics from "@/components/admin/SystemMetrics";
-import ActivityLogs from "@/components/admin/ActivityLogs";
-import FraudAlerts from "@/components/admin/FraudAlerts";
-import ContentManagement from "@/components/admin/ContentManagement";
-import UserRestrictions from "@/components/admin/UserRestrictions";
-import TransactionMonitoring from "@/components/admin/TransactionMonitoring";
-import ChatbotLogs from "@/components/admin/ChatbotLogs";
-import ActivityTracking from "@/components/admin/ActivityTracking";
 import EnhancedOverviewDashboard from "@/components/admin/EnhancedOverviewDashboard";
 
 const AdminDashboard = () => {
@@ -62,54 +44,9 @@ const AdminDashboard = () => {
       value: "transactions",
     },
     {
-      icon: Settings,
-      label: "App Settings",
-      value: "settings",
-    },
-    {
       icon: Headphones,
       label: "Support Tickets",
       value: "support",
-    },
-    {
-      icon: TrendingUp,
-      label: "System Metrics",
-      value: "metrics",
-    },
-    {
-      icon: Activity,
-      label: "Activity Logs",
-      value: "activity",
-    },
-    {
-      icon: AlertTriangle,
-      label: "Fraud Alerts",
-      value: "fraud",
-    },
-    {
-      icon: FileText,
-      label: "Content Management",
-      value: "content",
-    },
-    {
-      icon: UserX,
-      label: "User Restrictions",
-      value: "restrictions",
-    },
-    {
-      icon: Monitor,
-      label: "Transaction Monitoring",
-      value: "monitoring",
-    },
-    {
-      icon: MessageSquare,
-      label: "Chatbot Logs",
-      value: "chatbot",
-    },
-    {
-      icon: Radar,
-      label: "Activity Tracking",
-      value: "tracking",
     },
   ];
 
@@ -164,16 +101,7 @@ const AdminDashboard = () => {
             {activeSection === "overview" && <EnhancedOverviewDashboard />}
             {activeSection === "users" && <UserManagement />}
             {activeSection === "transactions" && <TransactionManagement />}
-            {activeSection === "settings" && <AppSettings />}
             {activeSection === "support" && <SupportTickets />}
-            {activeSection === "metrics" && <SystemMetrics />}
-            {activeSection === "activity" && <ActivityLogs />}
-            {activeSection === "fraud" && <FraudAlerts />}
-            {activeSection === "content" && <ContentManagement />}
-            {activeSection === "restrictions" && <UserRestrictions />}
-            {activeSection === "monitoring" && <TransactionMonitoring />}
-            {activeSection === "chatbot" && <ChatbotLogs />}
-            {activeSection === "tracking" && <ActivityTracking />}
           </div>
         </div>
       </div>

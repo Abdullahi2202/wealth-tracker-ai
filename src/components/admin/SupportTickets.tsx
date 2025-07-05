@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Headphones, AlertTriangle, CheckCircle, Clock, MessageCircle, Plus } from "lucide-react";
+import { MessageCircle, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 type SupportTicket = {
@@ -19,10 +17,8 @@ type SupportTicket = {
   description: string;
   status: string;
   priority: string;
-  assigned_to?: string;
   created_at: string;
   updated_at: string;
-  resolved_at?: string;
 };
 
 const SupportTickets = () => {
@@ -31,15 +27,7 @@ const SupportTickets = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
-  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [newTicket, setNewTicket] = useState({
-    subject: "",
-    description: "",
-    priority: "medium"
-  });
 
   useEffect(() => {
     fetchTickets();
@@ -113,37 +101,6 @@ const SupportTickets = () => {
     }
   };
 
-  const updateTicketPriority = async (ticketId: string, newPriority: string) => {
-    setActionLoading(`priority-${ticketId}`);
-    try {
-      const { error } = await supabase
-        .from('support_tickets')
-        .update({ 
-          priority: newPriority,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', ticketId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: `Ticket priority updated to ${newPriority}`,
-      });
-      
-      await fetchTickets();
-    } catch (error) {
-      console.error('Error updating ticket priority:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update ticket priority",
-        variant: "destructive",
-      });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const deleteTicket = async (ticketId: string) => {
     if (!confirm('Are you sure you want to delete this ticket?')) return;
 
@@ -167,52 +124,6 @@ const SupportTickets = () => {
       toast({
         title: "Error",
         description: "Failed to delete ticket",
-        variant: "destructive",
-      });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const createTicket = async () => {
-    if (!newTicket.subject || !newTicket.description) {
-      toast({
-        title: "Error",
-        description: "Subject and description are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setActionLoading('create');
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const { error } = await supabase
-        .from('support_tickets')
-        .insert({
-          user_id: user?.id,
-          subject: newTicket.subject,
-          description: newTicket.description,
-          priority: newTicket.priority,
-          status: 'open'
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Support ticket created successfully",
-      });
-      
-      setNewTicket({ subject: "", description: "", priority: "medium" });
-      setShowCreateModal(false);
-      await fetchTickets();
-    } catch (error) {
-      console.error('Error creating ticket:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create ticket",
         variant: "destructive",
       });
     } finally {
@@ -317,7 +228,7 @@ const SupportTickets = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Input
           placeholder="Search tickets..."
           value={searchTerm}
@@ -348,11 +259,6 @@ const SupportTickets = () => {
             <SelectItem value="low">Low</SelectItem>
           </SelectContent>
         </Select>
-
-        <Button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Create Ticket
-        </Button>
       </div>
 
       {/* Tickets Table */}
@@ -390,16 +296,6 @@ const SupportTickets = () => {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedTicket(ticket);
-                        setShowDetailsModal(true);
-                      }}
-                    >
-                      View
-                    </Button>
                     {ticket.status !== 'resolved' && (
                       <Button 
                         size="sm" 
@@ -426,130 +322,11 @@ const SupportTickets = () => {
         </Table>
       </div>
 
-      {/* Create Ticket Modal */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Support Ticket</DialogTitle>
-            <DialogDescription>Create a new support ticket</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Subject</label>
-              <Input
-                value={newTicket.subject}
-                onChange={(e) => setNewTicket(prev => ({ ...prev, subject: e.target.value }))}
-                placeholder="Enter ticket subject..."
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Priority</label>
-              <Select value={newTicket.priority} onValueChange={(value) => setNewTicket(prev => ({ ...prev, priority: value }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <Textarea
-                value={newTicket.description}
-                onChange={(e) => setNewTicket(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Describe the issue..."
-                rows={4}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={createTicket}
-                disabled={actionLoading === 'create'}
-              >
-                {actionLoading === 'create' ? 'Creating...' : 'Create Ticket'}
-              </Button>
-              <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Ticket Details Modal */}
-      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Ticket Details</DialogTitle>
-          </DialogHeader>
-          {selectedTicket && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Subject</label>
-                  <p>{selectedTicket.subject}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Created</label>
-                  <p>{new Date(selectedTicket.created_at).toLocaleString()}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Status</label>
-                  <div className="flex gap-2 items-center">
-                    <Badge className={getStatusColor(selectedTicket.status)}>
-                      {selectedTicket.status.replace('_', ' ')}
-                    </Badge>
-                    <Select 
-                      value={selectedTicket.status} 
-                      onValueChange={(value) => updateTicketStatus(selectedTicket.id, value)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="open">Open</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="resolved">Resolved</SelectItem>
-                        <SelectItem value="closed">Closed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Priority</label>
-                  <div className="flex gap-2 items-center">
-                    <Badge className={getPriorityColor(selectedTicket.priority)}>
-                      {selectedTicket.priority}
-                    </Badge>
-                    <Select 
-                      value={selectedTicket.priority} 
-                      onValueChange={(value) => updateTicketPriority(selectedTicket.id, value)}
-                    >
-                      <SelectTrigger className="w-24">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Description</label>
-                <p className="text-sm bg-gray-50 p-3 rounded-md whitespace-pre-wrap">
-                  {selectedTicket.description}
-                </p>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {filteredTickets.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No support tickets found matching your criteria.
+        </div>
+      )}
     </div>
   );
 };
