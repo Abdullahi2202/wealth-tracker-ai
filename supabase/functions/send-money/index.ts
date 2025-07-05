@@ -169,12 +169,12 @@ Deno.serve(async (req) => {
 
     console.log('Recipient wallet found/created:', { balance: recipientWallet.balance })
 
-    // If transfer requires approval, don't update balances yet
+    // Balance updates - ONLY for completed transfers (under $100)
     let newSenderBalance = Number(senderWallet.balance)
     let newRecipientBalance = Number(recipientWallet.balance)
 
     if (!requiresApproval) {
-      // Only update balances if transfer doesn't require approval
+      // Only update balances if transfer doesn't require approval (under $100)
       newSenderBalance = Number(senderWallet.balance) - Number(amount)
       newRecipientBalance = Number(recipientWallet.balance) + Number(amount)
 
@@ -219,6 +219,17 @@ Deno.serve(async (req) => {
       }
     } else {
       console.log('Transfer requires approval - balances not updated yet')
+      // For pending transfers, temporarily deduct from sender to prevent double spending
+      const tempBalance = Number(senderWallet.balance) - Number(amount)
+      await supabase
+        .from('wallets')
+        .update({ 
+          balance: tempBalance, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', senderWallet.id)
+      
+      newSenderBalance = tempBalance
     }
 
     // Record transfer in money_transfers table
@@ -240,6 +251,14 @@ Deno.serve(async (req) => {
     }
 
     // Create transaction records with appropriate status
+    const senderNote = requiresApproval 
+      ? `${description} - Pending admin approval (amount > $100)` 
+      : description
+
+    const recipientNote = requiresApproval 
+      ? `${description} - Pending admin approval (amount > $100)` 
+      : description
+
     await Promise.all([
       supabase.from('transactions').insert({
         user_id: user.id,
@@ -249,7 +268,7 @@ Deno.serve(async (req) => {
         category: 'Transfer',
         date: new Date().toISOString().split('T')[0],
         status: transferStatus,
-        note: requiresApproval ? `${description} - Pending admin approval (amount > $100)` : description
+        note: senderNote
       }),
       supabase.from('transactions').insert({
         user_id: recipientProfile.id,
@@ -259,12 +278,12 @@ Deno.serve(async (req) => {
         category: 'Transfer',
         date: new Date().toISOString().split('T')[0],
         status: transferStatus,
-        note: requiresApproval ? `${description} - Pending admin approval (amount > $100)` : description
+        note: recipientNote
       })
     ])
 
     const responseMessage = requiresApproval 
-      ? `Transfer of $${amount} is pending admin approval (amounts over $100 require approval)`
+      ? `Transfer of $${amount} is pending admin approval. You will be notified once reviewed.`
       : `Transfer of $${amount} completed successfully to ${cleanRecipientPhone}`
 
     console.log('=== TRANSFER PROCESSED ===', { requiresApproval, status: transferStatus })

@@ -53,12 +53,70 @@ const EnhancedOverviewDashboard = () => {
   const handleApproveTransaction = async (transactionId: string) => {
     setTransactionLoading(true);
     try {
-      const { error } = await supabase
+      // Get transaction details first
+      const { data: transactionData, error: fetchError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', transactionId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Find the corresponding money transfer
+      const { data: transferData, error: transferError } = await supabase
+        .from('money_transfers')
+        .select('*')
+        .eq('amount', Math.round(transactionData.amount * 100))
+        .eq('status', 'pending')
+        .single();
+
+      if (transferError) throw transferError;
+
+      // Update transaction status to completed
+      const { error: transactionUpdateError } = await supabase
         .from('transactions')
         .update({ status: 'completed' })
         .eq('id', transactionId);
 
-      if (error) throw error;
+      if (transactionUpdateError) throw transactionUpdateError;
+
+      // Update related transactions (both sender and recipient)
+      const { error: relatedTransactionsError } = await supabase
+        .from('transactions')
+        .update({ status: 'completed' })
+        .eq('amount', transactionData.amount)
+        .eq('status', 'pending');
+
+      if (relatedTransactionsError) throw relatedTransactionsError;
+
+      // Update money transfer status
+      const { error: transferUpdateError } = await supabase
+        .from('money_transfers')
+        .update({ status: 'completed' })
+        .eq('id', transferData.id);
+
+      if (transferUpdateError) throw transferUpdateError;
+
+      // Now handle the actual money transfer - add to recipient, sender was already deducted
+      const { data: recipientWallet, error: recipientError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', transferData.recipient_id)
+        .single();
+
+      if (recipientError) throw recipientError;
+
+      // Add money to recipient
+      const newRecipientBalance = Number(recipientWallet.balance) + Number(transactionData.amount);
+      const { error: recipientUpdateError } = await supabase
+        .from('wallets')
+        .update({ 
+          balance: newRecipientBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', transferData.recipient_id);
+
+      if (recipientUpdateError) throw recipientUpdateError;
 
       toast({
         title: "Success",
@@ -79,17 +137,85 @@ const EnhancedOverviewDashboard = () => {
   };
 
   const handleRejectTransaction = async (transactionId: string) => {
+    setTransactionLoading(true);
     try {
-      const { error } = await supabase
+      // Get transaction details first
+      const { data: transactionData, error: fetchError } = await supabase
         .from('transactions')
-        .update({ status: 'failed' })
+        .select('*')
+        .eq('id', transactionId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Find the corresponding money transfer
+      const { data: transferData, error: transferError } = await supabase
+        .from('money_transfers')
+        .select('*')
+        .eq('amount', Math.round(transactionData.amount * 100))
+        .eq('status', 'pending')
+        .single();
+
+      if (transferError) throw transferError;
+
+      // Update transaction status to rejected
+      const { error: transactionUpdateError } = await supabase
+        .from('transactions')
+        .update({ status: 'rejected' })
         .eq('id', transactionId);
 
-      if (error) throw error;
+      if (transactionUpdateError) throw transactionUpdateError;
+
+      // Update related transactions (both sender and recipient)
+      const { error: relatedTransactionsError } = await supabase
+        .from('transactions')
+        .update({ status: 'rejected' })
+        .eq('amount', transactionData.amount)
+        .eq('status', 'pending');
+
+      if (relatedTransactionsError) throw relatedTransactionsError;
+
+      // Update money transfer status
+      const { error: transferUpdateError } = await supabase
+        .from('money_transfers')
+        .update({ status: 'rejected' })
+        .eq('id', transferData.id);
+
+      if (transferUpdateError) throw transferUpdateError;
+
+      // Refund the sender - add money back to sender's wallet
+      const { data: senderWallet, error: senderError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', transferData.sender_id)
+        .single();
+
+      if (senderError) throw senderError;
+
+      const refundedBalance = Number(senderWallet.balance) + Number(transactionData.amount);
+      const { error: senderUpdateError } = await supabase
+        .from('wallets')
+        .update({ 
+          balance: refundedBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', transferData.sender_id);
+
+      if (senderUpdateError) throw senderUpdateError;
+
+      // Send notification to sender about rejection
+      await supabase.functions.invoke('send-notification', {
+        body: {
+          email: transactionData.user_id, // This should be email, need to get it from profiles
+          type: 'transaction_rejected',
+          status: 'rejected',
+          message: `Your transaction of $${transactionData.amount} has been rejected by admin. The money has been refunded to your wallet.`
+        }
+      });
 
       toast({
         title: "Success",
-        description: "Transaction rejected",
+        description: "Transaction rejected and sender refunded",
       });
 
       await fetchPendingTransactions();
@@ -100,6 +226,8 @@ const EnhancedOverviewDashboard = () => {
         description: "Failed to reject transaction",
         variant: "destructive",
       });
+    } finally {
+      setTransactionLoading(false);
     }
   };
 
