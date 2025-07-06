@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ReceivedPayment {
   id: string;
@@ -24,6 +25,7 @@ const ReceivedPaymentsMobile = () => {
   const navigate = useNavigate();
   const [received, setReceived] = useState<ReceivedPayment[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const fetchReceived = async () => {
@@ -61,19 +63,19 @@ const ReceivedPaymentsMobile = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-muted pt-3 px-2 animate-fade-in">
+    <div className="min-h-screen bg-muted pt-3 px-2 animate-fade-in safe-area-top">
       <div className="flex items-center gap-2 mb-3">
         <Button variant="ghost" size="sm" onClick={() => navigate("/payments")}>
           &larr; Payments
         </Button>
-        <h2 className="text-xl font-bold text-green-600">Received Payments</h2>
+        <h2 className={`font-bold text-green-600 ${isMobile ? 'text-lg' : 'text-xl'}`}>Received Payments</h2>
       </div>
-      <Card className="max-w-md mx-auto shadow-lg rounded-2xl animate-scale-in">
-        <CardHeader>
-          <CardTitle>Received</CardTitle>
-          <CardDescription>View your payment history.</CardDescription>
+      <Card className={`shadow-lg rounded-2xl animate-scale-in ${isMobile ? 'mx-auto max-w-full' : 'max-w-md mx-auto'}`}>
+        <CardHeader className={isMobile ? 'pb-3' : ''}>
+          <CardTitle className={isMobile ? 'text-lg' : ''}>Received</CardTitle>
+          <CardDescription className={isMobile ? 'text-sm' : ''}>View your payment history.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className={isMobile ? 'pt-0' : ''}>
           <div className="divide-y">
             {loading ? (
               <div className="text-center text-muted-foreground py-4">Loading…</div>
@@ -81,18 +83,20 @@ const ReceivedPaymentsMobile = () => {
               <p className="text-muted-foreground">No payments yet.</p>
             ) : (
               received.map((pay) => (
-                <div key={pay.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <div className="font-semibold">
+                <div key={pay.id} className={`flex items-center justify-between ${isMobile ? 'py-2' : 'py-3'}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className={`font-semibold truncate ${isMobile ? 'text-sm' : ''}`}>
                       {pay.name || "Payment"}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {pay.note && shortLabel(pay.note)}
-                    </div>
+                    {pay.note && (
+                      <div className={`text-muted-foreground truncate ${isMobile ? 'text-xs' : 'text-xs'}`}>
+                        {shortLabel(pay.note, isMobile ? 20 : 12)}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Wallet className="text-green-500" size={18} />
-                    <span className="font-bold text-base">${Number(pay.amount).toFixed(2)}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Wallet className="text-green-500" size={isMobile ? 16 : 18} />
+                    <span className={`font-bold ${isMobile ? 'text-sm' : 'text-base'}`}>${Number(pay.amount).toFixed(2)}</span>
                   </div>
                 </div>
               ))

@@ -17,7 +17,13 @@ const MobileNavigation = () => {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-16 flex items-center justify-around z-50 md:hidden shadow-lg">
+    <nav 
+      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex items-center justify-around z-50 md:hidden shadow-lg safe-area-bottom"
+      style={{
+        height: 'calc(4rem + env(safe-area-inset-bottom))',
+        paddingBottom: 'env(safe-area-inset-bottom)'
+      }}
+    >
       {NAV_ITEMS.map((item) => {
         const isActive = item.path === "/dashboard"
           ? location.pathname === "/dashboard"
@@ -25,7 +31,7 @@ const MobileNavigation = () => {
         return (
           <button
             key={item.name}
-            className="flex flex-col items-center justify-center flex-1 p-1 group focus:outline-none transition-all duration-200"
+            className="flex flex-col items-center justify-center flex-1 p-2 group focus:outline-none transition-all duration-200 min-h-0"
             onClick={() => navigate(item.path)}
             aria-current={isActive ? "page" : undefined}
           >
@@ -42,7 +48,7 @@ const MobileNavigation = () => {
             >
               <item.icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
             </div>
-            <span className={`mt-1 text-xs font-medium transition-colors ${
+            <span className={`mt-1 text-xs font-medium transition-colors truncate max-w-full ${
               isActive ? "text-blue-600" : "text-gray-500 group-hover:text-blue-600"
             }`}>
               {item.name}

@@ -1,8 +1,10 @@
+
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CreditCard, Download, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AddCardDrawer from "@/components/payments/AddCardDrawer";
 import { useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Action cards for Payments Home
 const actionCards = [
@@ -32,34 +34,33 @@ const actionCards = [
 const PaymentsHome = () => {
   const navigate = useNavigate();
   const [addCardOpen, setAddCardOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   return (
     <DashboardLayout>
-      <div className="w-full max-w-md mx-auto pt-8 pb-20 px-3 animate-fade-in">
-        <h1 className="text-center text-3xl font-extrabold mb-8 text-finance-purple">
+      <div className={`w-full pt-4 pb-20 px-3 animate-fade-in ${isMobile ? 'max-w-full' : 'max-w-md mx-auto pt-8'}`}>
+        <h1 className={`text-center font-extrabold mb-6 text-finance-purple ${isMobile ? 'text-2xl' : 'text-3xl mb-8'}`}>
           Payments
         </h1>
-        <div className="space-y-7">
+        <div className={`space-y-5 ${isMobile ? 'space-y-4' : 'space-y-7'}`}>
           {actionCards.map(({ title, description, Icon, route, bg }) => (
             <button
               key={title}
               onClick={() => navigate(route)}
-              className={`${bg} w-full flex items-center gap-5 rounded-2xl shadow-lg p-6 mb-3 active:scale-95 transition-transform focus:outline-none`}
-              style={{ minHeight: 110 }}
+              className={`${bg} w-full flex items-center gap-4 rounded-2xl shadow-lg p-5 mb-3 active:scale-95 transition-transform focus:outline-none ${isMobile ? 'min-h-[90px] gap-3 p-4' : 'min-h-[110px] gap-5 p-6'}`}
             >
-              <span className="flex items-center justify-center bg-white/20 rounded-full p-5 mr-2">
-                <Icon size={34} className="text-white drop-shadow" />
+              <span className={`flex items-center justify-center bg-white/20 rounded-full ${isMobile ? 'p-3 mr-1' : 'p-5 mr-2'}`}>
+                <Icon size={isMobile ? 28 : 34} className="text-white drop-shadow" />
               </span>
               <div className="text-left flex-1">
-                <div className="text-lg font-bold text-white mb-1">{title}</div>
-                <div className="text-xs text-white/90 leading-snug">{description}</div>
+                <div className={`font-bold text-white mb-1 ${isMobile ? 'text-base' : 'text-lg'}`}>{title}</div>
+                <div className={`text-white/90 leading-snug ${isMobile ? 'text-xs' : 'text-xs'}`}>{description}</div>
               </div>
             </button>
           ))}
           <button
             onClick={() => setAddCardOpen(true)}
-            className="border w-full flex items-center justify-center rounded-2xl shadow-sm p-5 text-finance-purple text-lg gap-3 bg-background hover:bg-muted mt-3 transition"
-            style={{ minHeight: 54 }}
+            className={`border w-full flex items-center justify-center rounded-2xl shadow-sm text-finance-purple gap-3 bg-background hover:bg-muted transition ${isMobile ? 'min-h-[50px] p-4 text-base' : 'min-h-[54px] p-5 text-lg mt-3'}`}
           >
             <span className="font-bold">＋ Add Card</span>
           </button>

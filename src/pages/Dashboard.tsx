@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
 import CombinedWalletCard from "@/components/dashboard/CombinedWalletCard";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Transaction = {
   id: string;
@@ -21,6 +22,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpenses, setMonthExpenses] = useState(0);
+  const isMobile = useIsMobile();
 
   const { wallet } = useWallet();
 
@@ -98,10 +100,10 @@ const Dashboard = () => {
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="container mx-auto px-4 py-4 max-w-4xl">
-          {/* Header Section */}
-          <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+        <div className={`container mx-auto px-2 py-2 ${isMobile ? 'max-w-full' : 'max-w-4xl'}`}>
+          {/* Header Section - Mobile Optimized */}
+          <div className="mb-4">
+            <h1 className={`font-bold text-gray-900 ${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'}`}>
               {userName ? `Welcome, ${userName}` : "WalletMaster"}
             </h1>
             <p className="text-gray-600 text-sm mt-1">
@@ -113,12 +115,14 @@ const Dashboard = () => {
             </p>
           </div>
 
-          {/* Combined Wallet Card */}
-          <CombinedWalletCard
-            monthIncome={monthIncome}
-            monthExpenses={monthExpenses}
-            loading={loading}
-          />
+          {/* Combined Wallet Card - Mobile Optimized */}
+          <div className="w-full">
+            <CombinedWalletCard
+              monthIncome={monthIncome}
+              monthExpenses={monthExpenses}
+              loading={loading}
+            />
+          </div>
         </div>
       </div>
     </DashboardLayout>
