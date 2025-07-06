@@ -46,6 +46,10 @@ const TransactionTable = ({
     }
   };
 
+  const formatUserId = (userId: string) => {
+    return userId ? userId.substring(0, 8) + '...' : 'N/A';
+  };
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -57,66 +61,76 @@ const TransactionTable = ({
             <TableHead>Type</TableHead>
             <TableHead>Amount</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Category</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {transactions.map((transaction) => (
-            <TableRow key={transaction.id}>
-              <TableCell>
-                {new Date(transaction.created_at).toLocaleDateString()}
-              </TableCell>
-              <TableCell className="font-mono text-sm">
-                {transaction.user_id.substring(0, 8)}...
-              </TableCell>
-              <TableCell className="font-medium">{transaction.name}</TableCell>
-              <TableCell>
-                <Badge className={getTypeColor(transaction.type)}>
-                  {transaction.type}
-                </Badge>
-              </TableCell>
-              <TableCell className="font-medium">
-                ${Number(transaction.amount).toFixed(2)}
-              </TableCell>
-              <TableCell>
-                <Badge className={getStatusColor(transaction.status)}>
-                  {transaction.status}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  {transaction.status === 'pending' && (
-                    <>
-                      <Button 
-                        size="sm" 
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => onUpdateStatus(transaction.id, 'completed')}
-                        disabled={actionLoading === `status-${transaction.id}`}
-                      >
-                        {actionLoading === `status-${transaction.id}` ? 'Loading...' : 'Approve'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive"
-                        onClick={() => onUpdateStatus(transaction.id, 'rejected')}
-                        disabled={actionLoading === `status-${transaction.id}`}
-                      >
-                        {actionLoading === `status-${transaction.id}` ? 'Loading...' : 'Reject'}
-                      </Button>
-                    </>
-                  )}
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => onDelete(transaction.id)}
-                    disabled={actionLoading === `delete-${transaction.id}`}
-                  >
-                    {actionLoading === `delete-${transaction.id}` ? 'Loading...' : 'Delete'}
-                  </Button>
-                </div>
+          {transactions.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                No transactions available
               </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            transactions.map((transaction) => (
+              <TableRow key={transaction.id}>
+                <TableCell>
+                  {new Date(transaction.created_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell className="font-mono text-sm">
+                  {formatUserId(transaction.user_id)}
+                </TableCell>
+                <TableCell className="font-medium">{transaction.name}</TableCell>
+                <TableCell>
+                  <Badge className={getTypeColor(transaction.type)}>
+                    {transaction.type}
+                  </Badge>
+                </TableCell>
+                <TableCell className="font-medium">
+                  ${Number(transaction.amount).toFixed(2)}
+                </TableCell>
+                <TableCell>
+                  <Badge className={getStatusColor(transaction.status)}>
+                    {transaction.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>{transaction.category || 'N/A'}</TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    {transaction.status === 'pending' && (
+                      <>
+                        <Button 
+                          size="sm" 
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => onUpdateStatus(transaction.id, 'completed')}
+                          disabled={actionLoading === `status-${transaction.id}`}
+                        >
+                          {actionLoading === `status-${transaction.id}` ? 'Loading...' : 'Approve'}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={() => onUpdateStatus(transaction.id, 'rejected')}
+                          disabled={actionLoading === `status-${transaction.id}`}
+                        >
+                          {actionLoading === `status-${transaction.id}` ? 'Loading...' : 'Reject'}
+                        </Button>
+                      </>
+                    )}
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => onDelete(transaction.id)}
+                      disabled={actionLoading === `delete-${transaction.id}`}
+                    >
+                      {actionLoading === `delete-${transaction.id}` ? 'Loading...' : 'Delete'}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
     </div>

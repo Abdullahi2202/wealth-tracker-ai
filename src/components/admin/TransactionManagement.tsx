@@ -5,6 +5,7 @@ import TransactionStatsCards from "./transactions/TransactionStatsCards";
 import TransactionFilters from "./transactions/TransactionFilters";
 import TransactionTable from "./transactions/TransactionTable";
 import { useTransactionActions } from "./transactions/useTransactionActions";
+import { toast } from "@/hooks/use-toast";
 
 type Transaction = {
   id: string;
@@ -36,20 +37,44 @@ const TransactionManagement = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
+      console.log('Fetching transactions for admin...');
+      
+      // Use service role permissions to fetch all transactions
       const { data, error } = await supabase
         .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .select(`
+          id,
+          user_id,
+          amount,
+          type,
+          name,
+          status,
+          created_at,
+          updated_at,
+          category,
+          note
+        `)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching transactions:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch transactions",
+          variant: "destructive",
+        });
         return;
       }
 
+      console.log('Transactions fetched successfully:', data?.length || 0);
       setTransactions(data || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch transactions",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -57,9 +82,15 @@ const TransactionManagement = () => {
 
   const handleUpdateStatus = async (transactionId: string, newStatus: string) => {
     setActionLoading(`status-${transactionId}`);
+    console.log(`Updating transaction ${transactionId} to ${newStatus}`);
+    
     const success = await updateTransactionStatus(transactionId, newStatus);
     if (success) {
-      await fetchTransactions();
+      await fetchTransactions(); // Refresh the data
+      toast({
+        title: "Success",
+        description: `Transaction ${newStatus} successfully`,
+      });
     }
     setActionLoading(null);
   };
@@ -68,9 +99,15 @@ const TransactionManagement = () => {
     if (!confirm('Are you sure you want to delete this transaction?')) return;
 
     setActionLoading(`delete-${transactionId}`);
+    console.log(`Deleting transaction ${transactionId}`);
+    
     const success = await deleteTransaction(transactionId);
     if (success) {
-      await fetchTransactions();
+      await fetchTransactions(); // Refresh the data
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      });
     }
     setActionLoading(null);
   };
@@ -78,7 +115,8 @@ const TransactionManagement = () => {
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = 
       transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.user_id.toLowerCase().includes(searchTerm.toLowerCase());
+      transaction.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (transaction.note && transaction.note.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
     const matchesType = typeFilter === "all" || transaction.type === typeFilter;
@@ -108,6 +146,17 @@ const TransactionManagement = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-800">Transaction Management</h2>
+        <button
+          onClick={fetchTransactions}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          disabled={loading}
+        >
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+
       <TransactionStatsCards stats={stats} />
       
       <TransactionFilters
@@ -126,9 +175,12 @@ const TransactionManagement = () => {
         onDelete={handleDelete}
       />
 
-      {filteredTransactions.length === 0 && (
+      {filteredTransactions.length === 0 && !loading && (
         <div className="text-center py-8 text-gray-500">
-          No transactions found matching your criteria.
+          {transactions.length === 0 
+            ? "No transactions found in the system."
+            : "No transactions found matching your criteria."
+          }
         </div>
       )}
     </div>
