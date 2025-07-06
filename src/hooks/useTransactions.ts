@@ -9,6 +9,7 @@ interface Transaction {
   date: string;
   name: string;
   category?: string;
+  status?: string;
 }
 
 export function useTransactions() {
@@ -45,7 +46,8 @@ export function useTransactions() {
         type: transaction.amount >= 0 ? 'income' : 'expense',
         date: transaction.created_at,
         name: transaction.name || 'Unknown Transaction',
-        category: transaction.category || undefined
+        category: transaction.category || undefined,
+        status: transaction.status || 'completed'
       }));
 
       setTransactions(formattedTransactions);

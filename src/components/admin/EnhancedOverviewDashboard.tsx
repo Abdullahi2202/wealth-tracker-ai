@@ -37,14 +37,16 @@ const EnhancedOverviewDashboard = () => {
 
   const fetchPendingTransactions = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('admin-operations', {
-        body: { action: 'get_all_transactions' }
-      });
+      // Fetch all pending transactions directly
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const pending = (data?.transactions || []).filter((t: any) => t.status === 'pending');
-      setPendingTransactions(pending);
+      setPendingTransactions(data || []);
     } catch (error) {
       console.error('Error fetching pending transactions:', error);
     }
@@ -118,10 +120,17 @@ const EnhancedOverviewDashboard = () => {
 
       if (recipientUpdateError) throw recipientUpdateError;
 
+      // Get sender's email for notification
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', transferData.sender_id)
+        .single();
+
       // Send notification to sender
       await supabase.functions.invoke('send-notification', {
         body: {
-          email: transactionData.user_id, // This should be email, need to get it from profiles
+          email: senderProfile?.email || transactionData.user_id,
           type: 'transaction_approved',
           status: 'completed',
           message: `Your transaction of $${transactionData.amount} has been approved and completed successfully.`
@@ -213,10 +222,17 @@ const EnhancedOverviewDashboard = () => {
 
       if (senderUpdateError) throw senderUpdateError;
 
+      // Get sender's email for notification
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', transferData.sender_id)
+        .single();
+
       // Send notification to sender about rejection
       await supabase.functions.invoke('send-notification', {
         body: {
-          email: transactionData.user_id, // This should be email, need to get it from profiles
+          email: senderProfile?.email || transactionData.user_id,
           type: 'transaction_rejected',
           status: 'rejected',
           message: `Your transaction of $${transactionData.amount} has been rejected by admin. The money has been refunded to your wallet.`

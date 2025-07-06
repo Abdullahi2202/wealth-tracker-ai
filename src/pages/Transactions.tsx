@@ -24,6 +24,11 @@ const Transactions = () => {
     [transactions]
   );
 
+  const pendingTransactions = useMemo(() => 
+    transactions.filter(t => t.status === 'pending'), 
+    [transactions]
+  );
+
   return (
     <DashboardLayout>
       <h1 className="text-3xl font-bold tracking-tight mb-6">Transactions</h1>
@@ -40,6 +45,9 @@ const Transactions = () => {
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="pending">
+            Pending ({pendingTransactions.length})
+          </TabsTrigger>
           <TabsTrigger value="income">
             <ArrowUp className="mr-1 h-4 w-4 text-finance-income" />
             Income
@@ -57,6 +65,20 @@ const Transactions = () => {
             </CardHeader>
             <CardContent>
               <RecentTransactions transactions={transactions} loading={loading} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="pending">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Transactions</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                These transactions are awaiting admin approval
+              </p>
+            </CardHeader>
+            <CardContent>
+              <RecentTransactions transactions={pendingTransactions} loading={loading} />
             </CardContent>
           </Card>
         </TabsContent>

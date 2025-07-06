@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
-import { Loader2, Phone, ArrowLeft } from "lucide-react";
+import { Loader2, Phone, ArrowLeft, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const CATEGORY_OPTIONS = [
   "Transfer", "Food", "Bills", "Shopping", "Transport", "Entertainment", "Utilities", "Other"
@@ -55,14 +56,13 @@ const SendPayment = () => {
         category
       });
       
-      // Fixed: Remove the extra 4th argument
       await sendPayment(
         recipient.trim(),
         amountValue,
         note
       );
       
-      toast.success(`Transfer of $${amountValue.toFixed(2)} completed successfully!`);
+      toast.success(`Transfer of $${amountValue.toFixed(2)} is pending admin approval. You will be notified once processed!`);
       
       // Reset form
       setAmount("");
@@ -73,7 +73,7 @@ const SendPayment = () => {
       await refetch();
       
       setTimeout(() => {
-        navigate("/payments");
+        navigate("/transactions");
       }, 2000);
       
     } catch (error: any) {
@@ -104,6 +104,14 @@ const SendPayment = () => {
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">Send Money</h1>
         </div>
+
+        {/* Admin Approval Notice */}
+        <Alert className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            All transactions require admin approval. Your transfer will be pending until reviewed and approved by an administrator.
+          </AlertDescription>
+        </Alert>
 
         <Card className="shadow-lg">
           <CardHeader>
@@ -225,7 +233,7 @@ const SendPayment = () => {
                     Processing...
                   </>
                 ) : (
-                  `Send $${amount || '0.00'}`
+                  `Send $${amount || '0.00'} (Pending Approval)`
                 )}
               </Button>
             </form>

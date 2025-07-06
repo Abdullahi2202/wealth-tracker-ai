@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -66,11 +65,10 @@ Deno.serve(async (req) => {
       throw new Error('Valid phone number required for user transfers')
     }
 
-    // Check if amount is above $100 - if so, make it pending
-    const requiresApproval = Number(amount) > 100
-    const transferStatus = requiresApproval ? 'pending' : 'completed'
+    // ALL TRANSACTIONS ARE NOW PENDING - require admin approval
+    const transferStatus = 'pending'
 
-    console.log('Transfer requires approval:', requiresApproval, 'Status:', transferStatus)
+    console.log('All transfers require admin approval. Status:', transferStatus)
 
     // Get sender's profile and wallet
     const { data: senderProfile } = await supabase
@@ -169,68 +167,22 @@ Deno.serve(async (req) => {
 
     console.log('Recipient wallet found/created:', { balance: recipientWallet.balance })
 
-    // Balance updates - ONLY for completed transfers (under $100)
+    // Balance updates - ONLY deduct from sender temporarily for pending transfers
     let newSenderBalance = Number(senderWallet.balance)
     let newRecipientBalance = Number(recipientWallet.balance)
 
-    if (!requiresApproval) {
-      // Only update balances if transfer doesn't require approval (under $100)
-      newSenderBalance = Number(senderWallet.balance) - Number(amount)
-      newRecipientBalance = Number(recipientWallet.balance) + Number(amount)
-
-      console.log('Balance calculations (immediate transfer):', {
-        senderOld: senderWallet.balance,
-        senderNew: newSenderBalance,
-        recipientOld: recipientWallet.balance,
-        recipientNew: newRecipientBalance
+    console.log('Transfer requires approval - temporarily deducting from sender')
+    // For pending transfers, temporarily deduct from sender to prevent double spending
+    const tempBalance = Number(senderWallet.balance) - Number(amount)
+    await supabase
+      .from('wallets')
+      .update({ 
+        balance: tempBalance, 
+        updated_at: new Date().toISOString() 
       })
-
-      // Update sender wallet
-      const { error: senderUpdateError } = await supabase
-        .from('wallets')
-        .update({ 
-          balance: newSenderBalance, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', senderWallet.id)
-
-      if (senderUpdateError) {
-        console.error('Failed to update sender wallet:', senderUpdateError)
-        throw new Error('Failed to update sender wallet')
-      }
-
-      // Update recipient wallet
-      const { error: recipientUpdateError } = await supabase
-        .from('wallets')
-        .update({ 
-          balance: newRecipientBalance, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', recipientWallet.id)
-
-      if (recipientUpdateError) {
-        console.error('Failed to update recipient wallet:', recipientUpdateError)
-        // Rollback sender wallet
-        await supabase
-          .from('wallets')
-          .update({ balance: senderWallet.balance })
-          .eq('id', senderWallet.id)
-        throw new Error('Failed to update recipient wallet')
-      }
-    } else {
-      console.log('Transfer requires approval - balances not updated yet')
-      // For pending transfers, temporarily deduct from sender to prevent double spending
-      const tempBalance = Number(senderWallet.balance) - Number(amount)
-      await supabase
-        .from('wallets')
-        .update({ 
-          balance: tempBalance, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', senderWallet.id)
-      
-      newSenderBalance = tempBalance
-    }
+      .eq('id', senderWallet.id)
+    
+    newSenderBalance = tempBalance
 
     // Record transfer in money_transfers table
     const { data: transfer, error: transferError } = await supabase
@@ -250,14 +202,9 @@ Deno.serve(async (req) => {
       console.error('Failed to record transfer:', transferError)
     }
 
-    // Create transaction records with appropriate status
-    const senderNote = requiresApproval 
-      ? `${description} - Pending admin approval (amount > $100)` 
-      : description
-
-    const recipientNote = requiresApproval 
-      ? `${description} - Pending admin approval (amount > $100)` 
-      : description
+    // Create transaction records - ALL PENDING
+    const senderNote = `${description} - Pending admin approval`
+    const recipientNote = `${description} - Pending admin approval`
 
     await Promise.all([
       supabase.from('transactions').insert({
@@ -282,23 +229,19 @@ Deno.serve(async (req) => {
       })
     ])
 
-    // Send notification if pending
-    if (requiresApproval) {
-      await supabase.functions.invoke('send-notification', {
-        body: {
-          email: user.email,
-          type: 'transaction_pending',
-          status: 'pending',
-          message: `Your transfer of $${amount} to ${cleanRecipientPhone} is pending admin approval and will be processed within 24 hours.`
-        }
-      })
-    }
+    // Send notification - ALL transfers are pending
+    await supabase.functions.invoke('send-notification', {
+      body: {
+        email: user.email,
+        type: 'transaction_pending',
+        status: 'pending',
+        message: `Your transfer of $${amount} to ${cleanRecipientPhone} is pending admin approval and will be processed within 24 hours.`
+      }
+    })
 
-    const responseMessage = requiresApproval 
-      ? `Transfer of $${amount} is pending admin approval. You will be notified once reviewed.`
-      : `Transfer of $${amount} completed successfully to ${cleanRecipientPhone}`
+    const responseMessage = `Transfer of $${amount} is pending admin approval. You will be notified once reviewed.`
 
-    console.log('=== TRANSFER PROCESSED ===', { requiresApproval, status: transferStatus })
+    console.log('=== TRANSFER PROCESSED ===', { status: transferStatus })
     return new Response(JSON.stringify({
       success: true,
       transfer_id: transfer?.id,
@@ -307,7 +250,7 @@ Deno.serve(async (req) => {
       recipient_new_balance: newRecipientBalance,
       amount_transferred: Number(amount),
       status: transferStatus,
-      requires_approval: requiresApproval,
+      requires_approval: true,
       message: responseMessage
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
