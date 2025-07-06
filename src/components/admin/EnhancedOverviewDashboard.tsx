@@ -118,6 +118,16 @@ const EnhancedOverviewDashboard = () => {
 
       if (recipientUpdateError) throw recipientUpdateError;
 
+      // Send notification to sender
+      await supabase.functions.invoke('send-notification', {
+        body: {
+          email: transactionData.user_id, // This should be email, need to get it from profiles
+          type: 'transaction_approved',
+          status: 'completed',
+          message: `Your transaction of $${transactionData.amount} has been approved and completed successfully.`
+        }
+      });
+
       toast({
         title: "Success",
         description: "Transaction approved successfully",

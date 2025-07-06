@@ -282,6 +282,18 @@ Deno.serve(async (req) => {
       })
     ])
 
+    // Send notification if pending
+    if (requiresApproval) {
+      await supabase.functions.invoke('send-notification', {
+        body: {
+          email: user.email,
+          type: 'transaction_pending',
+          status: 'pending',
+          message: `Your transfer of $${amount} to ${cleanRecipientPhone} is pending admin approval and will be processed within 24 hours.`
+        }
+      })
+    }
+
     const responseMessage = requiresApproval 
       ? `Transfer of $${amount} is pending admin approval. You will be notified once reviewed.`
       : `Transfer of $${amount} completed successfully to ${cleanRecipientPhone}`

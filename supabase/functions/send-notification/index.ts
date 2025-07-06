@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in send-notification:', error)
     return new Response(JSON.stringify({ 
       error: 'Failed to send notification',

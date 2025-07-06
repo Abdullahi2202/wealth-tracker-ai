@@ -329,6 +329,36 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          sent_at: string | null
+          status: string | null
+          type: string
+          user_email: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          sent_at?: string | null
+          status?: string | null
+          type: string
+          user_email: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          sent_at?: string | null
+          status?: string | null
+          type?: string
+          user_email?: string
+        }
+        Relationships: []
+      }
       payment_methods: {
         Row: {
           brand: string | null
