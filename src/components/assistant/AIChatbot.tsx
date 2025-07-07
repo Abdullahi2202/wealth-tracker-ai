@@ -3,10 +3,9 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Bot, User, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import FinancialInsights from "./FinancialInsights";
 
 interface Message {
   id: string;
@@ -19,14 +18,13 @@ interface UserContext {
   email?: string;
   full_name?: string;
   id?: string;
-  isAdmin?: boolean;
 }
 
 export default function AIChatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
-      content: "👋 Hello! I'm your enhanced WalletMaster AI assistant with access to your real financial data. I can help you:\n\n• Analyze your spending patterns and trends\n• Provide personalized budget recommendations\n• Suggest investment strategies based on your finances\n• Answer questions about your transactions\n• Help with financial planning and goals\n\nYour data is updated in real-time! How can I assist you today?",
+      content: "👋 Hello! I'm your WalletMaster AI assistant. I can help you with:\n\n• Financial advice and budgeting tips\n• Investment strategies and portfolio management\n• Spending analysis and recommendations\n• General financial questions\n• Wallet and payment assistance\n\nHow can I help you today?",
       role: "assistant",
       timestamp: new Date(),
     },
@@ -34,7 +32,6 @@ export default function AIChatbot() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [userContext, setUserContext] = useState<UserContext>({});
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -46,12 +43,10 @@ export default function AIChatbot() {
   }, [messages]);
 
   useEffect(() => {
-    // Get user context
     const fetchUserContext = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          // Get additional user info from profiles
           const { data: profile } = await supabase
             .from('profiles')
             .select('full_name, phone')
@@ -62,7 +57,6 @@ export default function AIChatbot() {
             email: session.user.email,
             full_name: profile?.full_name || session.user.user_metadata?.full_name,
             id: session.user.id,
-            isAdmin: false // You can check admin status here
           });
         }
       } catch (error) {
@@ -71,36 +65,10 @@ export default function AIChatbot() {
     };
 
     fetchUserContext();
-
-    // Check online status
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
   }, []);
-
-  const refreshData = async () => {
-    try {
-      // Trigger a refresh of financial insights
-      window.location.reload();
-    } catch (error) {
-      toast.error("Failed to refresh data");
-    }
-  };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
-
-    if (!isOnline) {
-      toast.error("You're offline. Please check your internet connection.");
-      return;
-    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -114,57 +82,59 @@ export default function AIChatbot() {
     setIsLoading(true);
 
     try {
-      const enhancedContext = `
-        User Information:
-        - Name: ${userContext.full_name || 'Unknown'}
-        - Email: ${userContext.email || 'Unknown'}
-        - User Type: ${userContext.isAdmin ? 'Admin' : 'Regular User'}
-        
-        Context: Enhanced financial assistant for WalletMaster app with access to real user financial data including spending patterns, income, expenses, investment opportunities, and budget analysis. Provide detailed, actionable advice based on their actual financial data. Use emojis and formatting to make responses engaging and easy to read.
-      `;
-
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
-        body: { 
-          prompt: input.trim(),
-          context: enhancedContext,
-          userInfo: {
-            name: userContext.full_name,
-            email: userContext.email,
-            isAdmin: userContext.isAdmin
-          }
-        },
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
-      }
-
+      // Simulate AI response for now - you can replace this with actual AI integration
+      const aiResponse = generateAIResponse(input.trim());
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.response || "I apologize, but I'm having trouble processing your request right now. Please try again later.",
+        content: aiResponse,
         role: "assistant",
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // Add a small delay to simulate processing
+      setTimeout(() => {
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsLoading(false);
+      }, 1000);
+
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("Failed to send message. Please try again.");
       
       const fallbackMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "🚫 I'm sorry, I'm currently experiencing technical difficulties. Please try again later or contact support if the issue persists.\n\n💡 **Tip**: Make sure you're connected to the internet and your session hasn't expired.",
+        content: "🚫 I'm sorry, I'm currently experiencing technical difficulties. Please try again later.\n\n💡 **Tip**: Make sure you're connected to the internet.",
         role: "assistant",
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, fallbackMessage]);
-    } finally {
       setIsLoading(false);
     }
+  };
+
+  const generateAIResponse = (userInput: string): string => {
+    const input = userInput.toLowerCase();
+    
+    // Simple response logic - replace with actual AI integration
+    if (input.includes('balance') || input.includes('money') || input.includes('wallet')) {
+      return `💰 **Wallet & Balance Help**\n\nI can help you with wallet-related questions! Here are some things I can assist with:\n\n• Check your current balance\n• Understand transaction history\n• Set up payment methods\n• Manage your financial goals\n\nWhat specific wallet feature would you like help with?`;
+    }
+    
+    if (input.includes('budget') || input.includes('spend') || input.includes('save')) {
+      return `📊 **Budgeting & Savings Advice**\n\nGreat question about budgeting! Here are some personalized tips:\n\n• **50/30/20 Rule**: 50% needs, 30% wants, 20% savings\n• **Track your expenses** regularly\n• **Set specific savings goals**\n• **Review and adjust** monthly\n\nWould you like me to help you create a specific budget plan?`;
+    }
+    
+    if (input.includes('invest') || input.includes('stock') || input.includes('portfolio')) {
+      return `📈 **Investment Guidance**\n\nInvestment advice tailored for you:\n\n• **Start with emergency fund** (3-6 months expenses)\n• **Diversify your portfolio** across asset classes\n• **Consider low-cost index funds** for beginners\n• **Invest regularly** (dollar-cost averaging)\n\nRemember: Never invest more than you can afford to lose. Would you like specific investment recommendations based on your risk tolerance?`;
+    }
+    
+    if (input.includes('hello') || input.includes('hi') || input.includes('hey')) {
+      return `👋 **Hello ${userContext.full_name || 'there'}!**\n\nI'm your WalletMaster AI assistant, ready to help with all your financial needs!\n\nYou can ask me about:\n• Budgeting and savings strategies\n• Investment advice\n• Expense tracking\n• Financial planning\n• Wallet management\n\nWhat would you like to explore today?`;
+    }
+    
+    // Default response
+    return `🤖 **AI Assistant Response**\n\nThank you for your question! I'm here to help with financial advice and wallet management.\n\n**Popular topics I can help with:**\n• Personal budgeting strategies\n• Investment and savings advice\n• Expense tracking and analysis\n• Financial goal setting\n• Payment and wallet features\n\nCould you provide more details about what you'd like assistance with? The more specific your question, the better I can help!`;
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -175,43 +145,24 @@ export default function AIChatbot() {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-      {/* Enhanced Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Bot className="w-8 h-8" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                WalletMaster AI Assistant
-                <Sparkles className="w-4 h-4 text-yellow-300" />
-              </h2>
-              <p className="text-blue-100 text-sm">
-                {userContext.full_name ? `Hello ${userContext.full_name}! ` : ''}
-                {isOnline ? 'Connected & Ready' : 'Offline - Limited functionality'}
-              </p>
-            </div>
+    <div className="flex flex-col h-full max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white p-4">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Bot className="w-8 h-8" />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`}></div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={refreshData}
-              className="text-white hover:bg-white/20"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
+          <div>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              WalletMaster AI Assistant
+              <Sparkles className="w-4 h-4 text-yellow-300" />
+            </h2>
+            <p className="text-blue-100 text-sm">
+              {userContext.full_name ? `Hello ${userContext.full_name}! ` : ''}Ready to help with your finances
+            </p>
           </div>
         </div>
-      </div>
-
-      {/* Financial Insights */}
-      <div className="p-4 bg-gray-50 border-b">
-        <FinancialInsights />
       </div>
 
       {/* Messages */}
@@ -224,7 +175,7 @@ export default function AIChatbot() {
             } animate-fade-in`}
           >
             {message.role === "assistant" && (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-md">
                 <Bot className="w-5 h-5 text-white" />
               </div>
             )}
@@ -259,13 +210,13 @@ export default function AIChatbot() {
 
         {isLoading && (
           <div className="flex gap-3 animate-pulse">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center flex-shrink-0">
               <Bot className="w-5 h-5 text-white" />
             </div>
             <Card className="bg-white border border-gray-200 p-4 max-w-xs">
               <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <span className="text-sm text-gray-600">Analyzing your financial data...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                <span className="text-sm text-gray-600">Thinking...</span>
               </div>
             </Card>
           </div>
@@ -274,22 +225,22 @@ export default function AIChatbot() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Enhanced Input */}
+      {/* Input */}
       <div className="border-t border-gray-200 p-4 bg-white">
         <div className="flex gap-3">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask about your spending, investments, budget optimization, or financial goals..."
-            disabled={isLoading || !isOnline}
-            className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+            placeholder="Ask me anything about finances, budgeting, investments..."
+            disabled={isLoading}
+            className="flex-1 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
           />
           <Button 
             onClick={sendMessage} 
-            disabled={!input.trim() || isLoading || !isOnline}
+            disabled={!input.trim() || isLoading}
             size="icon"
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-md"
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-md"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -298,15 +249,9 @@ export default function AIChatbot() {
             )}
           </Button>
         </div>
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-gray-500">
-            Press Enter to send • Ask about spending patterns, investment advice, or budget optimization
-          </p>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            {isOnline ? 'Online' : 'Offline'}
-          </div>
-        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Press Enter to send • Ask about budgeting, investments, or financial advice
+        </p>
       </div>
     </div>
   );
