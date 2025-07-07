@@ -1,6 +1,5 @@
-
 import { Card, CardContent } from "@/components/ui/card";
-import { Wallet, RefreshCw, TrendingUp, TrendingDown, Eye, EyeOff, ArrowDownLeft, Send, CreditCard } from "lucide-react";
+import { Wallet, RefreshCw, TrendingUp, TrendingDown, Eye, EyeOff, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/hooks/useWallet";
@@ -32,18 +31,6 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
   };
 
   const quickActions = [
-    {
-      title: "Top Up",
-      icon: ArrowDownLeft,
-      color: "bg-green-500 hover:bg-green-600",
-      action: () => navigate("/topup-wallet"),
-    },
-    {
-      title: "Send Money",
-      icon: Send,
-      color: "bg-blue-500 hover:bg-blue-600",
-      action: () => navigate("/send-payment"),
-    },
     {
       title: "Cards",
       icon: CreditCard,
@@ -198,7 +185,7 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
         {/* Quick Actions Section */}
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             {quickActions.map((action, index) => (
               <Button
                 key={index}
