@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletNumber } from "@/hooks/useWalletNumber";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CombinedWalletCardProps {
   monthIncome: number;
@@ -17,13 +18,106 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
   const { wallet, balance, loading: walletLoading, refetch } = useWallet();
   const { walletNumber } = useWalletNumber();
   const [showBalance, setShowBalance] = useState(true);
+  const [financialData, setFinancialData] = useState({
+    monthIncome: 0,
+    monthExpenses: 0,
+    loading: true
+  });
   const navigate = useNavigate();
 
-  const netIncome = monthIncome - monthExpenses;
+  // Fetch financial data from backend
+  useEffect(() => {
+    const fetchFinancialData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get current month transactions
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+        const { data: transactions, error } = await supabase
+          .from('transactions')
+          .select('amount, type')
+          .eq('user_id', user.id)
+          .gte('date', startOfMonth)
+          .lte('date', endOfMonth);
+
+        if (error) {
+          console.error('Error fetching transactions:', error);
+          return;
+        }
+
+        const income = transactions
+          ?.filter(t => t.type === 'income')
+          .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+
+        const expenses = transactions
+          ?.filter(t => t.type === 'expense')
+          .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+
+        setFinancialData({
+          monthIncome: income,
+          monthExpenses: expenses,
+          loading: false
+        });
+      } catch (error) {
+        console.error('Error in fetchFinancialData:', error);
+        setFinancialData(prev => ({ ...prev, loading: false }));
+      }
+    };
+
+    fetchFinancialData();
+  }, []);
+
+  // Use fetched data instead of props
+  const actualMonthIncome = financialData.monthIncome;
+  const actualMonthExpenses = financialData.monthExpenses;
+  const netIncome = actualMonthIncome - actualMonthExpenses;
   const isPositive = netIncome >= 0;
 
   const handleRefresh = () => {
     refetch();
+    // Refetch financial data as well
+    setFinancialData(prev => ({ ...prev, loading: true }));
+    const fetchFinancialData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+        const { data: transactions, error } = await supabase
+          .from('transactions')
+          .select('amount, type')
+          .eq('user_id', user.id)
+          .gte('date', startOfMonth)
+          .lte('date', endOfMonth);
+
+        if (!error && transactions) {
+          const income = transactions
+            .filter(t => t.type === 'income')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+
+          const expenses = transactions
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+
+          setFinancialData({
+            monthIncome: income,
+            monthExpenses: expenses,
+            loading: false
+          });
+        }
+      } catch (error) {
+        console.error('Error refreshing financial data:', error);
+        setFinancialData(prev => ({ ...prev, loading: false }));
+      }
+    };
+    fetchFinancialData();
   };
 
   const toggleBalanceVisibility = () => {
@@ -39,16 +133,14 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
     },
   ];
 
-  if (walletLoading || loading) {
+  if (walletLoading || financialData.loading) {
     return (
       <Card className="border-0 shadow-xl">
         <CardContent className="p-6 space-y-6">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-24 w-full" />
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full" />
-            ))}
+          <div className="grid grid-cols-1 gap-4">
+            <Skeleton className="h-20 w-full" />
           </div>
         </CardContent>
       </Card>
@@ -88,10 +180,10 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
                   variant="ghost"
                   size="sm"
                   onClick={handleRefresh}
-                  disabled={walletLoading}
+                  disabled={walletLoading || financialData.loading}
                   className="text-white/80 hover:text-white hover:bg-white/10 p-2"
                 >
-                  <RefreshCw className={`h-4 w-4 ${walletLoading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 ${(walletLoading || financialData.loading) ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
             </div>
@@ -148,7 +240,7 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
                 <span className="text-sm font-medium text-green-700">Income</span>
               </div>
               <p className="text-xl font-bold text-green-600">
-                ${monthIncome.toLocaleString("en-US", {
+                ${actualMonthIncome.toLocaleString("en-US", {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}
@@ -162,7 +254,7 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
                 <span className="text-sm font-medium text-red-700">Expenses</span>
               </div>
               <p className="text-xl font-bold text-red-600">
-                ${monthExpenses.toLocaleString("en-US", {
+                ${actualMonthExpenses.toLocaleString("en-US", {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}
