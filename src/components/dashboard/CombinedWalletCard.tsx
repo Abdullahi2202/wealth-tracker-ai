@@ -204,7 +204,7 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
                 key={index}
                 variant="ghost"
                 onClick={action.action}
-                className="h-auto p-4 flex flex-col items-center gap-3 hover:bg-gray-50 border border-gray-100 hover:border-gray-200 transition-all duration-200"
+                className="h-auto p-4 flex flex-col items-center gap-3 hover:bg-gray-50 border border-gray-100 hover:border-gray-200 transition-all duration-200 active:scale-95"
               >
                 <div className={`p-3 rounded-full text-white ${action.color} transition-colors duration-200`}>
                   <action.icon className="h-5 w-5" />
