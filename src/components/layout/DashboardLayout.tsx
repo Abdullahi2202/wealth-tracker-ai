@@ -21,7 +21,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     const setupMobileApp = () => {
       // Prevent bounce effect on iOS
       document.body.style.overscrollBehavior = "none";
-      document.body.style.webkitOverflowScrolling = "touch";
+      // Fix TypeScript error by using type assertion
+      (document.body.style as any).webkitOverflowScrolling = "touch";
       
       // Set viewport meta for better mobile display
       const viewport = document.querySelector('meta[name="viewport"]');
