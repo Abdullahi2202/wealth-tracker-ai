@@ -1,6 +1,6 @@
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Wallet, RefreshCw, TrendingUp, TrendingDown, Eye, EyeOff, ArrowDownLeft, Send, QrCode, CreditCard } from "lucide-react";
+import { Wallet, RefreshCw, TrendingUp, TrendingDown, Eye, EyeOff, ArrowDownLeft, Send, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/hooks/useWallet";
@@ -45,12 +45,6 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
       action: () => navigate("/send-payment"),
     },
     {
-      title: "QR Code",
-      icon: QrCode,
-      color: "bg-purple-500 hover:bg-purple-600",
-      action: () => navigate("/payments"),
-    },
-    {
       title: "Cards",
       icon: CreditCard,
       color: "bg-indigo-500 hover:bg-indigo-600",
@@ -64,8 +58,8 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
         <CardContent className="p-6 space-y-6">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-24 w-full" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
               <Skeleton key={i} className="h-20 w-full" />
             ))}
           </div>
@@ -204,7 +198,7 @@ const CombinedWalletCard = ({ monthIncome, monthExpenses, loading }: CombinedWal
         {/* Quick Actions Section */}
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {quickActions.map((action, index) => (
               <Button
                 key={index}

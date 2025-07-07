@@ -1,7 +1,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, ArrowDownLeft, QrCode, CreditCard, PlusCircle, Send } from "lucide-react";
+import { ArrowDownLeft, CreditCard, PlusCircle, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const DashboardQuickLinks = () => {
@@ -23,13 +23,6 @@ const DashboardQuickLinks = () => {
       action: () => navigate("/send-payment"),
     },
     {
-      title: "QR Code",
-      description: "Scan or share",
-      icon: QrCode,
-      color: "bg-purple-500 hover:bg-purple-600",
-      action: () => navigate("/payments"),
-    },
-    {
       title: "Cards",
       description: "Manage cards",
       icon: CreditCard,
@@ -47,7 +40,7 @@ const DashboardQuickLinks = () => {
             Quick Actions
           </h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {quickActions.map((action, index) => (
             <Button
               key={index}
