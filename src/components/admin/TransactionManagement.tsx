@@ -39,22 +39,10 @@ const TransactionManagement = () => {
     try {
       console.log('Fetching transactions for admin...');
       
-      // Use service role permissions to fetch all transactions
-      const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-          id,
-          user_id,
-          amount,
-          type,
-          name,
-          status,
-          created_at,
-          updated_at,
-          category,
-          note
-        `)
-        .order('created_at', { ascending: false });
+      // Use admin edge function with service role permissions
+      const { data, error } = await supabase.functions.invoke('admin-transaction-management', {
+        body: { action: 'fetchTransactions' }
+      });
 
       if (error) {
         console.error('Error fetching transactions:', error);
@@ -66,8 +54,8 @@ const TransactionManagement = () => {
         return;
       }
 
-      console.log('Transactions fetched successfully:', data?.length || 0);
-      setTransactions(data || []);
+      console.log('Transactions fetched successfully:', data?.transactions?.length || 0);
+      setTransactions(data?.transactions || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
@@ -84,12 +72,30 @@ const TransactionManagement = () => {
     setActionLoading(`status-${transactionId}`);
     console.log(`Updating transaction ${transactionId} to ${newStatus}`);
     
-    const success = await updateTransactionStatus(transactionId, newStatus);
-    if (success) {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-transaction-management', {
+        body: { 
+          action: 'updateStatus',
+          transactionId,
+          newStatus
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
       await fetchTransactions(); // Refresh the data
       toast({
         title: "Success",
         description: `Transaction ${newStatus} successfully`,
+      });
+    } catch (error) {
+      console.error('Error updating transaction status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update transaction status",
+        variant: "destructive",
       });
     }
     setActionLoading(null);
@@ -101,12 +107,29 @@ const TransactionManagement = () => {
     setActionLoading(`delete-${transactionId}`);
     console.log(`Deleting transaction ${transactionId}`);
     
-    const success = await deleteTransaction(transactionId);
-    if (success) {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-transaction-management', {
+        body: { 
+          action: 'deleteTransaction',
+          transactionId
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
       await fetchTransactions(); // Refresh the data
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction",
+        variant: "destructive",
       });
     }
     setActionLoading(null);
