@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
@@ -16,9 +17,10 @@ serve(async (req) => {
     })
 
     const { action, transactionId, newStatus } = await req.json()
+    console.log('Processing action:', action, 'for transaction:', transactionId)
 
     if (action === 'fetchTransactions') {
-      // Fetch all transactions with service role permissions
+      // Fetch all transactions with user profile information
       const { data: transactions, error } = await supabase
         .from('transactions')
         .select(`
@@ -33,7 +35,12 @@ serve(async (req) => {
           category,
           note,
           sender_user_id,
-          recipient_user_id
+          recipient_user_id,
+          profiles!inner(
+            email,
+            full_name,
+            phone
+          )
         `)
         .order('created_at', { ascending: false })
 
@@ -42,8 +49,18 @@ serve(async (req) => {
         throw error
       }
 
+      console.log('Fetched transactions:', transactions?.length || 0)
+
+      // Format transactions with user info
+      const formattedTransactions = transactions?.map(transaction => ({
+        ...transaction,
+        user_email: transaction.profiles?.email || 'Unknown',
+        user_name: transaction.profiles?.full_name || 'Unknown User',
+        user_phone: transaction.profiles?.phone || 'N/A'
+      })) || []
+
       return new Response(
-        JSON.stringify({ transactions }),
+        JSON.stringify({ transactions: formattedTransactions }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
@@ -56,10 +73,18 @@ serve(async (req) => {
         throw new Error('Transaction ID and new status are required')
       }
 
+      console.log(`Updating transaction ${transactionId} to status: ${newStatus}`)
+
       // Get transaction details first
       const { data: transactionData, error: fetchError } = await supabase
         .from('transactions')
-        .select('*')
+        .select(`
+          *,
+          profiles!inner(
+            email,
+            full_name
+          )
+        `)
         .eq('id', transactionId)
         .single()
 
@@ -67,6 +92,8 @@ serve(async (req) => {
         console.error('Error fetching transaction:', fetchError)
         throw fetchError
       }
+
+      console.log('Transaction data:', transactionData)
 
       // Update transaction status
       const { error: updateError } = await supabase
@@ -82,15 +109,30 @@ serve(async (req) => {
         throw updateError
       }
 
-      // Handle money transfer logic if applicable
+      // Handle money transfer logic based on status
       if (newStatus === 'completed') {
         await handleTransactionApproval(supabase, transactionData)
       } else if (newStatus === 'rejected') {
         await handleTransactionRejection(supabase, transactionData)
       }
 
+      // Send notification to user
+      try {
+        await supabase.functions.invoke('send-notification', {
+          body: {
+            email: transactionData.profiles?.email || transactionData.user_id,
+            type: newStatus === 'completed' ? 'transaction_approved' : 'transaction_rejected',
+            status: newStatus,
+            message: `Your transaction "${transactionData.name}" of $${transactionData.amount} has been ${newStatus} by admin.`
+          }
+        })
+      } catch (notifError) {
+        console.error('Error sending notification:', notifError)
+        // Don't fail the whole operation if notification fails
+      }
+
       return new Response(
-        JSON.stringify({ success: true }),
+        JSON.stringify({ success: true, message: `Transaction ${newStatus} successfully` }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
@@ -103,6 +145,8 @@ serve(async (req) => {
         throw new Error('Transaction ID is required')
       }
 
+      console.log(`Deleting transaction: ${transactionId}`)
+
       const { error } = await supabase
         .from('transactions')
         .delete()
@@ -114,7 +158,7 @@ serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true }),
+        JSON.stringify({ success: true, message: 'Transaction deleted successfully' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
@@ -140,82 +184,61 @@ async function handleTransactionApproval(supabase: any, transactionData: any) {
   try {
     console.log('Handling transaction approval for:', transactionData.id)
     
-    // Find the corresponding money transfer
-    const { data: transferData, error: transferError } = await supabase
-      .from('money_transfers')
-      .select('*')
-      .eq('amount', Math.round(transactionData.amount * 100))
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    // For money transfers, update recipient wallet
+    if (transactionData.type === 'transfer' && transactionData.recipient_user_id) {
+      // Add money to recipient wallet
+      const { data: recipientWallet, error: recipientError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', transactionData.recipient_user_id)
+        .single()
 
-    if (transferError) {
-      console.error('Error finding money transfer:', transferError)
-      return
-    }
+      if (!recipientError && recipientWallet) {
+        const newBalance = Number(recipientWallet.balance) + Number(transactionData.amount)
+        
+        const { error: updateWalletError } = await supabase
+          .from('wallets')
+          .update({ 
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', transactionData.recipient_user_id)
 
-    if (!transferData) {
-      console.log('No money transfer found, transaction approved without transfer')
-      return
-    }
-
-    console.log('Found money transfer:', transferData.id)
-
-    // Update money transfer status
-    const { error: transferUpdateError } = await supabase
-      .from('money_transfers')
-      .update({ status: 'completed' })
-      .eq('id', transferData.id)
-
-    if (transferUpdateError) {
-      console.error('Error updating money transfer:', transferUpdateError)
-      throw transferUpdateError
-    }
-
-    // Handle wallet balance updates
-    const { data: recipientWallet, error: recipientError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', transferData.recipient_id)
-      .single()
-
-    if (recipientError) {
-      console.error('Error finding recipient wallet:', recipientError)
-      throw recipientError
-    }
-
-    // Add money to recipient
-    const newRecipientBalance = Number(recipientWallet.balance) + Number(transactionData.amount)
-    const { error: recipientUpdateError } = await supabase
-      .from('wallets')
-      .update({ 
-        balance: newRecipientBalance,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', transferData.recipient_id)
-
-    if (recipientUpdateError) {
-      console.error('Error updating recipient wallet:', recipientUpdateError)
-      throw recipientUpdateError
-    }
-
-    // Send notification to sender
-    const { data: senderProfile } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('id', transferData.sender_id)
-      .maybeSingle()
-
-    if (senderProfile?.email) {
-      await supabase.functions.invoke('send-notification', {
-        body: {
-          email: senderProfile.email,
-          type: 'transaction_approved',
-          status: 'completed',
-          message: `Your transaction of $${transactionData.amount} has been approved and completed successfully.`
+        if (updateWalletError) {
+          console.error('Error updating recipient wallet:', updateWalletError)
+          throw updateWalletError
         }
-      })
+
+        console.log(`Updated recipient wallet balance to: ${newBalance}`)
+      }
+    }
+
+    // For income transactions, add to user wallet
+    if (transactionData.type === 'income') {
+      const { data: userWallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', transactionData.user_id)
+        .single()
+
+      if (!walletError && userWallet) {
+        const newBalance = Number(userWallet.balance) + Number(transactionData.amount)
+        
+        const { error: updateWalletError } = await supabase
+          .from('wallets')
+          .update({ 
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', transactionData.user_id)
+
+        if (updateWalletError) {
+          console.error('Error updating user wallet:', updateWalletError)
+          throw updateWalletError
+        }
+
+        console.log(`Updated user wallet balance to: ${newBalance}`)
+      }
     }
 
     console.log('Transaction approval completed successfully')
@@ -229,81 +252,32 @@ async function handleTransactionRejection(supabase: any, transactionData: any) {
   try {
     console.log('Handling transaction rejection for:', transactionData.id)
     
-    // Find the corresponding money transfer
-    const { data: transferData, error: transferError } = await supabase
-      .from('money_transfers')
-      .select('*')
-      .eq('amount', Math.round(transactionData.amount * 100))
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    // For expense transactions, refund the user
+    if (transactionData.type === 'expense') {
+      const { data: userWallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', transactionData.user_id)
+        .single()
 
-    if (transferError) {
-      console.error('Error finding money transfer:', transferError)
-      return
-    }
+      if (!walletError && userWallet) {
+        const refundedBalance = Number(userWallet.balance) + Number(transactionData.amount)
+        
+        const { error: updateWalletError } = await supabase
+          .from('wallets')
+          .update({ 
+            balance: refundedBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', transactionData.user_id)
 
-    if (!transferData) {
-      console.log('No money transfer found, transaction rejected without refund')
-      return
-    }
-
-    console.log('Found money transfer:', transferData.id)
-
-    // Update money transfer status
-    const { error: transferUpdateError } = await supabase
-      .from('money_transfers')
-      .update({ status: 'rejected' })
-      .eq('id', transferData.id)
-
-    if (transferUpdateError) {
-      console.error('Error updating money transfer:', transferUpdateError)
-      throw transferUpdateError
-    }
-
-    // Refund the sender
-    const { data: senderWallet, error: senderError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', transferData.sender_id)
-      .single()
-
-    if (senderError) {
-      console.error('Error finding sender wallet:', senderError)
-      throw senderError
-    }
-
-    const refundedBalance = Number(senderWallet.balance) + Number(transactionData.amount)
-    const { error: senderUpdateError } = await supabase
-      .from('wallets')
-      .update({ 
-        balance: refundedBalance,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', transferData.sender_id)
-
-    if (senderUpdateError) {
-      console.error('Error updating sender wallet:', senderUpdateError)
-      throw senderUpdateError
-    }
-
-    // Send notification to sender
-    const { data: senderProfile } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('id', transferData.sender_id)
-      .maybeSingle()
-
-    if (senderProfile?.email) {
-      await supabase.functions.invoke('send-notification', {
-        body: {
-          email: senderProfile.email,
-          type: 'transaction_rejected',
-          status: 'rejected',
-          message: `Your transaction of $${transactionData.amount} has been rejected by admin. The money has been refunded to your wallet.`
+        if (updateWalletError) {
+          console.error('Error refunding user wallet:', updateWalletError)
+          throw updateWalletError
         }
-      })
+
+        console.log(`Refunded user wallet balance to: ${refundedBalance}`)
+      }
     }
 
     console.log('Transaction rejection completed successfully')
