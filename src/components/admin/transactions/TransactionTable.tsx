@@ -66,138 +66,205 @@ const TransactionTable = ({
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm">
+    <div className="rounded-xl border border-border/50 overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow duration-200">
       <Table>
-        <TableHeader className="bg-gray-50">
-          <TableRow>
-            <TableHead className="font-semibold">
+        <TableHeader className="bg-muted/30">
+          <TableRow className="border-b border-border/50 hover:bg-transparent">
+            <TableHead className="font-semibold text-foreground h-12">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
+                <Calendar className="h-4 w-4 text-primary" />
                 Date & Time
               </div>
             </TableHead>
-            <TableHead className="font-semibold">
+            <TableHead className="font-semibold text-foreground">
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4" />
+                <User className="h-4 w-4 text-primary" />
                 User Info
               </div>
             </TableHead>
-            <TableHead className="font-semibold">Transaction</TableHead>
-            <TableHead className="font-semibold">Type</TableHead>
-            <TableHead className="font-semibold">
+            <TableHead className="font-semibold text-foreground">Transaction Details</TableHead>
+            <TableHead className="font-semibold text-foreground">Type</TableHead>
+            <TableHead className="font-semibold text-foreground">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
+                <DollarSign className="h-4 w-4 text-primary" />
                 Amount
               </div>
             </TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="font-semibold">Category</TableHead>
-            <TableHead className="font-semibold text-center">Actions</TableHead>
+            <TableHead className="font-semibold text-foreground">Status</TableHead>
+            <TableHead className="font-semibold text-foreground">Category</TableHead>
+            <TableHead className="font-semibold text-foreground text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {transactions.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-12 text-gray-500">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="text-gray-300 mb-2">
-                    <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+              <TableCell colSpan={8} className="text-center py-16 bg-muted/20">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center">
+                      <svg className="h-8 w-8 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
                   </div>
-                  <p className="font-medium">No transactions available</p>
-                  <p className="text-sm">Transactions will appear here when users make them</p>
+                  <div className="space-y-2">
+                    <p className="font-semibold text-foreground">No transactions to display</p>
+                    <p className="text-sm text-muted-foreground max-w-sm">
+                      Transactions will appear here once users start making payments, transfers, or other financial activities.
+                    </p>
+                  </div>
                 </div>
               </TableCell>
             </TableRow>
           ) : (
-            transactions.map((transaction) => (
-              <TableRow key={transaction.id} className="hover:bg-gray-50">
-                <TableCell className="font-mono text-sm">
-                  {formatDate(transaction.created_at)}
+            transactions.map((transaction, index) => (
+              <TableRow 
+                key={transaction.id} 
+                className="group hover:bg-muted/30 transition-colors duration-150 border-b border-border/30"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <TableCell className="font-mono text-sm text-muted-foreground py-4">
+                  <div className="flex flex-col">
+                    <span className="font-medium text-foreground text-xs">
+                      {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                    <span className="text-xs opacity-75">
+                      {new Date(transaction.created_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground text-sm truncate">
+                          {transaction.user_name || 'Unknown User'}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono truncate">
+                          {formatUserId(transaction.user_id)}
+                        </p>
+                      </div>
+                    </div>
+                    {(transaction.user_email || transaction.user_phone) && (
+                      <div className="space-y-1 pl-10">
+                        {transaction.user_email && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Mail className="h-3 w-3" />
+                            <span className="truncate">{transaction.user_email}</span>
+                          </div>
+                        )}
+                        {transaction.user_phone && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3" />
+                            <span>{transaction.user_phone}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="py-4">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      <User className="h-3 w-3 text-gray-400" />
-                      <span className="font-medium">
-                        {transaction.user_name || 'Unknown User'}
-                      </span>
-                    </div>
-                    {transaction.user_email && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Mail className="h-3 w-3 text-gray-400" />
-                        {transaction.user_email}
-                      </div>
-                    )}
-                    {transaction.user_phone && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Phone className="h-3 w-3 text-gray-400" />
-                        {transaction.user_phone}
-                      </div>
-                    )}
-                    <div className="text-xs text-gray-500 font-mono">
-                      ID: {formatUserId(transaction.user_id)}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <div className="font-medium text-gray-900">{transaction.name}</div>
+                    <p className="font-medium text-foreground">{transaction.name}</p>
                     {transaction.note && (
-                      <div className="text-sm text-gray-500 mt-1">{transaction.note}</div>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{transaction.note}</p>
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={getTypeColor(transaction.type)}>
+                <TableCell className="py-4">
+                  <Badge 
+                    variant="secondary" 
+                    className={`${getTypeColor(transaction.type)} font-medium`}
+                  >
                     {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
                   </Badge>
                 </TableCell>
-                <TableCell className="font-semibold text-lg">
-                  <span className={transaction.type === 'income' ? 'text-green-600' : transaction.type === 'expense' ? 'text-red-600' : 'text-blue-600'}>
-                    {transaction.type === 'expense' ? '-' : '+'}${Number(transaction.amount).toFixed(2)}
-                  </span>
+                <TableCell className="py-4">
+                  <div className="text-right">
+                    <span className={`text-lg font-bold ${
+                      transaction.type === 'income' 
+                        ? 'text-emerald-600' 
+                        : transaction.type === 'expense' 
+                        ? 'text-red-600' 
+                        : 'text-blue-600'
+                    }`}>
+                      {transaction.type === 'expense' ? '-' : '+'}${Number(transaction.amount).toFixed(2)}
+                    </span>
+                  </div>
                 </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={getStatusColor(transaction.status)}>
-                    {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                <TableCell className="py-4">
+                  <Badge 
+                    variant="outline" 
+                    className={`${getStatusColor(transaction.status)} font-medium border-2`}
+                  >
+                    <span className="flex items-center gap-1">
+                      <div className={`h-2 w-2 rounded-full ${
+                        transaction.status === 'completed' ? 'bg-emerald-500' :
+                        transaction.status === 'pending' ? 'bg-amber-500' :
+                        'bg-red-500'
+                      }`}></div>
+                      {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                    </span>
                   </Badge>
                 </TableCell>
-                <TableCell className="text-sm text-gray-600">
-                  {transaction.category || 'Uncategorized'}
+                <TableCell className="py-4">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted/50 text-xs font-medium text-muted-foreground">
+                    {transaction.category || 'Uncategorized'}
+                  </span>
                 </TableCell>
-                <TableCell>
-                  <div className="flex gap-2 justify-center">
+                <TableCell className="py-4">
+                  <div className="flex items-center justify-center gap-2">
                     {transaction.status === 'pending' && (
                       <>
                         <Button 
                           size="sm" 
-                          className="bg-green-600 hover:bg-green-700 text-white px-3"
+                          className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
                           onClick={() => onUpdateStatus(transaction.id, 'completed')}
                           disabled={actionLoading === `status-${transaction.id}`}
                         >
-                          {actionLoading === `status-${transaction.id}` ? '...' : 'Approve'}
+                          {actionLoading === `status-${transaction.id}` ? (
+                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                          ) : (
+                            'Approve'
+                          )}
                         </Button>
                         <Button 
                           size="sm" 
                           variant="destructive"
-                          className="px-3"
+                          className="h-8 px-3 shadow-sm hover:shadow-md transition-all duration-200"
                           onClick={() => onUpdateStatus(transaction.id, 'rejected')}
                           disabled={actionLoading === `status-${transaction.id}`}
                         >
-                          {actionLoading === `status-${transaction.id}` ? '...' : 'Reject'}
+                          {actionLoading === `status-${transaction.id}` ? (
+                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                          ) : (
+                            'Reject'
+                          )}
                         </Button>
                       </>
                     )}
                     <Button 
                       size="sm" 
-                      variant="outline"
-                      className="px-3 text-red-600 border-red-200 hover:bg-red-50"
+                      variant="ghost"
+                      className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 hover:border-red-300 transition-all duration-200"
                       onClick={() => onDelete(transaction.id)}
                       disabled={actionLoading === `delete-${transaction.id}`}
                     >
-                      {actionLoading === `delete-${transaction.id}` ? '...' : 'Delete'}
+                      {actionLoading === `delete-${transaction.id}` ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-red-600/30 border-t-red-600"></div>
+                      ) : (
+                        'Delete'
+                      )}
                     </Button>
                   </div>
                 </TableCell>
