@@ -35,12 +35,7 @@ serve(async (req) => {
           category,
           note,
           sender_user_id,
-          recipient_user_id,
-          profiles!inner(
-            email,
-            full_name,
-            phone
-          )
+          recipient_user_id
         `)
         .order('created_at', { ascending: false })
 
@@ -51,13 +46,23 @@ serve(async (req) => {
 
       console.log('Fetched transactions:', transactions?.length || 0)
 
-      // Format transactions with user info
-      const formattedTransactions = transactions?.map(transaction => ({
-        ...transaction,
-        user_email: transaction.profiles?.email || 'Unknown',
-        user_name: transaction.profiles?.full_name || 'Unknown User',
-        user_phone: transaction.profiles?.phone || 'N/A'
-      })) || []
+      // Get user profile information for each transaction
+      const formattedTransactions = []
+      
+      for (const transaction of transactions || []) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email, full_name, phone')
+          .eq('id', transaction.user_id)
+          .single()
+        
+        formattedTransactions.push({
+          ...transaction,
+          user_email: profile?.email || 'Unknown',
+          user_name: profile?.full_name || 'Unknown User',
+          user_phone: profile?.phone || 'N/A'
+        })
+      }
 
       return new Response(
         JSON.stringify({ transactions: formattedTransactions }),
@@ -78,15 +83,19 @@ serve(async (req) => {
       // Get transaction details first
       const { data: transactionData, error: fetchError } = await supabase
         .from('transactions')
-        .select(`
-          *,
-          profiles!inner(
-            email,
-            full_name
-          )
-        `)
+        .select('*')
         .eq('id', transactionId)
         .single()
+      
+      let userProfile = null
+      if (transactionData && !fetchError) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', transactionData.user_id)
+          .single()
+        userProfile = profile
+      }
 
       if (fetchError) {
         console.error('Error fetching transaction:', fetchError)
@@ -120,7 +129,7 @@ serve(async (req) => {
       try {
         await supabase.functions.invoke('send-notification', {
           body: {
-            email: transactionData.profiles?.email || transactionData.user_id,
+            email: userProfile?.email || transactionData.user_id,
             type: newStatus === 'completed' ? 'transaction_approved' : 'transaction_rejected',
             status: newStatus,
             message: `Your transaction "${transactionData.name}" of $${transactionData.amount} has been ${newStatus} by admin.`
